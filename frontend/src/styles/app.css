@@ -1,0 +1,462 @@
+/**
+ * Global styles matching the artifact exactly
+ */
+
+:root {
+  /* Colors from artifact */
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --text-primary: #e0e0e0;
+  --text-secondary: #8b949e;
+  --text-muted: #c9d1d9;
+  --border: #30363d;
+  --border-hover: #58a6ff;
+  --primary-blue: #58a6ff;
+  --secondary-purple: #bc8cff;
+  --success-green: #3fb950;
+  --warning-orange: #d29922;
+  --selection-orange: #ffa657;
+  --danger-red: #f85149;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a1a;
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Main Layout */
+.app-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Canvas Container */
+.canvas-container {
+  flex: 1;
+  background: var(--bg-primary);
+  position: relative;
+  border-bottom: 2px solid var(--border);
+  overflow: hidden;
+}
+
+.canvas-header {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+}
+
+.canvas-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  margin: 0;
+}
+
+.canvas-stats {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(22, 27, 34, 0.9);
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 10;
+}
+
+/* Settings Sidebar */
+.visual-settings {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 8px;
+  width: 280px;
+  z-index: 10;
+}
+
+.settings-header {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.setting-item {
+  margin-bottom: 14px;
+}
+
+.setting-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  width: 40px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-switch.active {
+  background: var(--success-green);
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch.active::after {
+  transform: translateX(20px);
+}
+
+/* Slider */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  position: relative;
+  cursor: pointer;
+}
+
+.slider-track {
+  height: 100%;
+  background: var(--primary-blue);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.slider-value {
+  min-width: 50px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Control Panel */
+.control-panel {
+  height: 180px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  display: flex;
+}
+
+.quick-actions {
+  flex: 0 0 400px;
+  padding: 20px;
+  border-right: 1px solid var(--border);
+}
+
+.quick-actions h3,
+.history-timeline h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.action-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap; /* Prevent overflow */
+  align-items: center;
+}
+
+.action-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.action-input:focus {
+  border-color: var(--border-hover);
+}
+
+.action-button {
+  background: var(--success-green);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.action-button:hover:not(:disabled) {
+  background: #2ea043;
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-button.secondary {
+  background: #21262d;
+  color: var(--text-muted);
+}
+
+.action-button.secondary:hover:not(:disabled) {
+  background: var(--border);
+}
+
+/* History Timeline */
+.history-timeline {
+  flex: 1;
+  padding: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.timeline-container {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.timeline-group {
+  min-width: 180px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.timeline-group:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-2px);
+  background: rgba(88, 166, 255, 0.05);
+}
+
+.timeline-group.active {
+  border-color: var(--selection-orange);
+  background: rgba(255, 166, 87, 0.05);
+}
+
+.timeline-group.highlighting {
+  border-color: var(--selection-orange);
+  background: rgba(255, 166, 87, 0.1);
+  box-shadow: 0 0 16px rgba(255, 166, 87, 0.3);
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.group-badge {
+  background: var(--primary-blue);
+  color: var(--bg-primary);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.group-content {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-thumbnail {
+  width: 100%;
+  height: 60px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.group-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.visibility-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #21262d;
+  border: none;
+  color: var(--text-secondary);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.visibility-toggle:hover {
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+/* Context Menu */
+.context-menu {
+  position: absolute;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 0;
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.menu-item {
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+  color: var(--text-muted);
+}
+
+.menu-item:hover {
+  background: #21262d;
+}
+
+.menu-item.primary {
+  color: var(--primary-blue);
+}
+
+.menu-item.danger {
+  color: var(--danger-red);
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+.group-highlight {
+  animation: pulse 1.5s infinite;
+}
+
+/* Animated genealogy lines */
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+.genealogy-arrow {
+  animation: dashFlow 1s linear infinite;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* Loading Spinner */
+.spinner {
+  border: 3px solid var(--border);
+  border-top: 3px solid var(--primary-blue);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

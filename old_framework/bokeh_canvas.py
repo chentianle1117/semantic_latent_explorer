@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple, Optional
 from bokeh.plotting import figure
 from bokeh.models import (
     ColumnDataSource, HoverTool, TapTool, CustomJS,
-    MultiLine, Circle, Label, Arrow, NormalHead, ImageURL, Range1d
+    MultiLine, Circle, Label, Arrow, NormalHead, ImageURL, Range1d, TextInput
 )
 from PIL import Image
 from bokeh.palettes import Category20
@@ -153,9 +153,9 @@ def create_interactive_canvas(
 
         data['sizes'].append(size)
 
-        # Convert PIL image to base64 URL
+        # Use cached base64 URL to prevent blinking
         thumbnail_size = int(base_size * 2)  # Higher resolution for better quality
-        img_url = pil_to_base64_url(img_meta.pil_image, size=(thumbnail_size, thumbnail_size))
+        img_url = img_meta.get_base64_url(size=(thumbnail_size, thumbnail_size))
         data['image_urls'].append(img_url)
 
         # Calculate display size in plot units (scale proportionally to slider value)
@@ -188,8 +188,8 @@ def create_interactive_canvas(
         y_range = Range1d(-10, 10)
 
     p = figure(
-        width=1200,
-        height=600,
+        width=1400,
+        height=500,
         title="👟 Semantic Latent Space",
         tools="pan,wheel_zoom,reset,tap",
         background_fill_color=THEME_COLORS['bg_primary'],
@@ -199,12 +199,13 @@ def create_interactive_canvas(
         y_axis_label=y_label,
         x_range=x_range,
         y_range=y_range,
-        active_scroll='wheel_zoom'
+        active_scroll='wheel_zoom',
+        sizing_mode='stretch_width'
     )
 
-    # Style the plot - exact styling from artifact
+    # Style the plot - compact title for space efficiency
     p.title.text_color = THEME_COLORS['primary_blue']
-    p.title.text_font_size = "24px"
+    p.title.text_font_size = "18px"
     p.xaxis.axis_label_text_color = THEME_COLORS['text_primary']
     p.yaxis.axis_label_text_color = THEME_COLORS['text_primary']
     p.xaxis.major_label_text_color = THEME_COLORS['text_primary']
@@ -405,13 +406,11 @@ def create_interactive_canvas(
         """
     )
 
-    # Prepare genealogy display strings for tooltip
+    # Prepare genealogy display strings for tooltip (only for visible images)
     parents_display = []
     children_display = []
     for img_meta in images_metadata:
         if not img_meta.visible:
-            parents_display.append("N/A")
-            children_display.append("N/A")
             continue
 
         # Format parents

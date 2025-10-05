@@ -270,8 +270,10 @@ def recalculate_umap_with_semantic_axes():
         y_positive_text = f"shoe that is {y_axis[1]}"
         y_negative_text = f"shoe that is {y_axis[0]}"
 
-        x_axis_vector = axis_builder.build_semantic_axis(x_positive_text, x_negative_text)
-        y_axis_vector = axis_builder.build_semantic_axis(y_positive_text, y_negative_text)
+        x_axis = axis_builder.create_clip_text_axis(x_positive_text, x_negative_text)
+        y_axis = axis_builder.create_clip_text_axis(y_positive_text, y_negative_text)
+        x_axis_vector = x_axis.direction
+        y_axis_vector = y_axis.direction
 
         # Get all embeddings
         all_embeddings = np.array([img.embedding for img in st.session_state.images_metadata])
@@ -557,43 +559,46 @@ def main():
 
     /* Ultra-compact padding - everything on one screen */
     .block-container {
-        padding-top: 0.75rem !important;
-        padding-bottom: 0.25rem !important;
-        padding-left: 1.5rem !important;
-        padding-right: 1.5rem !important;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
         max-width: 100% !important;
     }
 
-    /* Canvas section - 65% of viewport height for better visibility */
+    /* Canvas section - 55% of viewport height to fit everything */
     .canvas-container {
-        flex: 0 0 65vh;
+        flex: 0 0 55vh;
         display: flex;
         gap: 0.75rem;
         margin-bottom: 0.5rem;
         background: #0d1117;
         border-bottom: 2px solid #30363d;
         position: relative;
+        overflow: hidden;
     }
 
     /* Settings sidebar - compact with artifact styling */
     .settings-sidebar {
         flex: 0 0 280px;
-        max-height: 60vh;
+        max-height: 52vh;
         overflow-y: auto;
         overflow-x: hidden;
-        padding: 16px;
+        padding: 12px;
         background: rgba(22, 27, 34, 0.95);
         border: 1px solid #30363d;
         border-radius: 8px;
     }
 
-    /* Control panel section - exact from artifact */
+    /* Control panel section - reduced height */
     .control-panel {
-        height: 180px;
+        height: 35vh;
+        max-height: 35vh;
         background: #161b22;
         border-top: 1px solid #30363d;
         display: flex;
         padding: 0.5rem 0;
+        overflow-y: auto;
     }
 
     /* Quick Actions Panel - from artifact */
@@ -662,10 +667,10 @@ def main():
     .stats-badge {
         background: rgba(22, 27, 34, 0.9);
         border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 12px 20px !important;
-        font-size: 14px !important;
-        margin-bottom: 12px !important;
+        border-radius: 6px;
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        margin-bottom: 8px !important;
     }
 
     /* Section headers - from artifact */
@@ -693,33 +698,57 @@ def main():
         padding: 0 0.25rem !important;
     }
 
+    /* Hide Streamlit default elements for more space */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
     /* Compact titles */
     h1 {
-        font-size: 24px !important;
+        font-size: 20px !important;
         font-weight: 600;
         color: #58a6ff !important;
-        margin: 0 !important;
+        margin: 0 0 0.5rem 0 !important;
         padding: 0 !important;
+        line-height: 1.2 !important;
     }
 
     h2, h3 {
-        font-size: 14px !important;
+        font-size: 13px !important;
         font-weight: 600;
         color: #8b949e !important;
-        margin: 8px 0 !important;
+        margin: 6px 0 !important;
     }
 
     /* Dividers */
     hr {
         border-color: #30363d !important;
-        margin: 8px 0 !important;
+        margin: 4px 0 !important;
     }
 
     /* Compact alert boxes */
     .stInfo, .stSuccess, .stWarning, .stError {
-        padding: 8px 12px !important;
+        padding: 6px 10px !important;
+        font-size: 11px !important;
+        border-radius: 4px !important;
+        margin: 4px 0 !important;
+    }
+
+    /* Compact expanders */
+    .streamlit-expanderHeader {
+        padding: 6px 10px !important;
         font-size: 12px !important;
-        border-radius: 6px !important;
+        min-height: 32px !important;
+    }
+
+    /* Compact number inputs and text inputs */
+    .stNumberInput, .stTextInput {
+        margin-bottom: 0.25rem !important;
+    }
+
+    /* Reduce spacing in columns */
+    .stColumn {
+        padding: 0 0.25rem !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -758,6 +787,21 @@ def main():
 
             # Use Bokeh chart with interactive tools
             st.bokeh_chart(plot, use_container_width=True)
+
+            # Compact selection interface
+            if len(st.session_state.images_metadata) > 0:
+                with st.expander("🖱️ Select Images", expanded=False):
+                    # Multiselect for image IDs
+                    visible_ids = [img.id for img in st.session_state.images_metadata if img.visible]
+                    selected = st.multiselect(
+                        "Select image IDs:",
+                        options=visible_ids,
+                        default=st.session_state.selected_image_ids,
+                        key="image_selector"
+                    )
+                    if selected != st.session_state.selected_image_ids:
+                        st.session_state.selected_image_ids = selected
+                        st.rerun()
         else:
             st.info("👇 No images yet. Initialize the generator in the control panel below and create your first batch!")
 

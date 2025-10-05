@@ -4,7 +4,11 @@
       "Bash(conda activate:*)",
       "Bash(pip install:*)",
       "Bash(python:*)",
-      "Bash(streamlit run:*)"
+      "Bash(streamlit run:*)",
+      "Bash(mkdir:*)",
+      "Bash(git mv:*)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

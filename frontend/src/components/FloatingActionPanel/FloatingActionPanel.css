@@ -1,0 +1,56 @@
+/* Floating Action Panel - appears next to selected images */
+.floating-action-panel {
+  position: absolute;
+  background: rgba(22, 27, 34, 0.98);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 8px 0;
+  min-width: 240px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 20px rgba(88, 166, 255, 0.2);
+  z-index: 1000;
+  animation: fadeSlideIn 0.2s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.action-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.15s;
+  color: #c9d1d9;
+  text-align: left;
+  display: block;
+}
+
+.action-item:hover {
+  background: #21262d;
+}
+
+.action-item.primary {
+  color: #58a6ff;
+  font-weight: 500;
+}
+
+.action-item.danger {
+  color: #f85149;
+}
+
+.action-divider {
+  height: 1px;
+  background: #30363d;
+  margin: 4px 0;
+}
+

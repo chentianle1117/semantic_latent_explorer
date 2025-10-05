@@ -1,6 +1,8 @@
 # 👟 Zappos Semantic Explorer
 
-An interactive tool for exploring semantic latent spaces of footwear images using CLIP embeddings, UMAP visualization, and semantic axes.
+An interactive tool for exploring semantic latent spaces of footwear images using CLIP embeddings, UMAP visualization, and semantic axes. Now featuring **Plotly-based interactive canvas** with optimized UI/UX!
+
+> **Latest Update**: Migrated from Bokeh to Plotly for improved performance and a more compact, focused interface. See [PLOTLY_MIGRATION_SUMMARY.md](PLOTLY_MIGRATION_SUMMARY.md) for details.
 
 ## 🎯 What it does
 
@@ -81,7 +83,9 @@ zappos_explorer/
 │   └── semantic_axes.py   # Semantic axis construction
 ├── visualization/
 │   ├── __init__.py
-│   └── interactive_plot.py # Interactive Plotly visualizations
+│   ├── plotly_canvas.py    # Main Plotly-based interactive canvas
+│   ├── interactive_plot.py # Additional Plotly utilities
+│   └── theme.py            # UI theme and colors
 ├── cache/                 # Auto-created for caching embeddings
 ├── app.py                 # Main Streamlit application
 ├── config.py              # Configuration settings
@@ -137,11 +141,13 @@ Cache files are stored in `cache/` directory and can be deleted to force recompu
 
 ## 🛠️ Technical Details
 
-### Models Used
+### Models & Libraries Used
 
 - **CLIP ViT-B/32**: For image and text embeddings
+- **Stable Diffusion**: For image generation (optional)
 - **UMAP**: For dimensionality reduction and visualization
-- **Logistic Regression**: For supervised semantic axes (future)
+- **Plotly**: Interactive visualization with genealogy tracking
+- **Streamlit**: Web application framework
 
 ### Semantic Axes
 
@@ -204,14 +210,21 @@ neg_concept = "stiff formal shoe"
 - Ensure images are valid format (jpg, png)
 - Look for permission issues on dataset directory
 
+## 📚 Documentation
+
+- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Comprehensive usage guide
+- **[PLOTLY_MIGRATION_SUMMARY.md](PLOTLY_MIGRATION_SUMMARY.md)** - Migration details and benefits
+- **[UI_OPTIMIZATION_DETAILS.md](UI_OPTIMIZATION_DETAILS.md)** - Layout and design decisions
+- **[MIGRATION_CHECKLIST.md](MIGRATION_CHECKLIST.md)** - Complete migration checklist
+
 ## 🎯 Next Steps
 
 This prototype provides the foundation for:
 
-1. **Real-time generation** - Add Stable Diffusion integration
-2. **Interactive relabeling** - Lasso selection and label updates
+1. **✅ Real-time generation** - Stable Diffusion integration (COMPLETE)
+2. **✅ Interactive visualization** - Plotly-based canvas (COMPLETE)
 3. **Multi-axis exploration** - Combine multiple semantic directions
-4. **Interpolation** - Generate images between semantic points
+4. **✅ Interpolation** - Generate images between semantic points (COMPLETE)
 5. **Advanced metrics** - Time-to-satisfactory, user studies
 
 ## 📊 Performance Expectations

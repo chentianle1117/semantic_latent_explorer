@@ -59,7 +59,7 @@ class SemanticAxisBuilder:
         
         axis_name = axis_name or f"{positive_concept}_vs_{negative_concept}"
         
-        print(f"Creating CLIP text axis: {positive_concept} ↔ {negative_concept}")
+        print(f"Creating CLIP text axis: {positive_concept} <-> {negative_concept}")
         
         # Extract text embeddings
         text_embeddings = self.embedder.extract_text_embeddings([positive_concept, negative_concept])

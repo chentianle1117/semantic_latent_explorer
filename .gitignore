@@ -1,30 +1,83 @@
-# Raw data directories
-raw_data/
-
-# Cache directories
-cache/
+# ===== Python =====
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-# Environment and virtual environments
-.env
-.venv
-env/
+# Virtual environments
 venv/
+env/
 ENV/
+.venv/
 env.bak/
 venv.bak/
 
-# IDE and editor files
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+.hypothesis/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# ===== Node.js / React =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# Vite
+.vite/
+
+# Next.js (if used later)
+.next/
+out/
+
+# ===== IDEs and Editors =====
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
 
-# OS generated files
+# ===== OS Files =====
 .DS_Store
 .DS_Store?
 ._*
@@ -32,35 +85,54 @@ venv.bak/
 .Trashes
 ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# Python specific
-*.egg-info/
-dist/
-build/
-.coverage
-.pytest_cache/
-.tox/
-.mypy_cache/
+# ===== Project Specific =====
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Data directories (large, should not be committed)
+raw_data/
+cache/
+backend/cache/
+
+# Model files (large binary files)
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.pth
+*.pt
+*.ckpt
+*.safetensors
+*.bin
+models/checkpoints/
+models/weights/
+
+# Generated content
+generated_images/
+outputs/
+results/
 
 # Logs
 *.log
 logs/
 
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 # Temporary files
 *.tmp
 *.temp
+tmp/
+temp/
 
-# Model files (if they get large)
-*.pkl
-*.h5
-*.pth
-*.pt
-*.model
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
 
-# Generated images and outputs
-generated_images/
-outputs/
-results/
+# ===== Keep These (Exceptions) =====
+# Use ! to negate patterns if needed
+# !important_file.pkl

@@ -1,23 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
-import { ContextMenu } from "./components/ContextMenu/ContextMenu";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
+import { InterpolationDialog } from "./components/InterpolationDialog/InterpolationDialog";
 import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingActionPanel";
+import { ProgressBar } from "./components/ProgressBar/ProgressBar";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
+import type { ImageData } from "./types";
 import "./styles/app.css";
 
 export const App: React.FC = () => {
-  const [contextMenuPos, setContextMenuPos] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
   const [floatingPanelPos, setFloatingPanelPos] = useState<{
     x: number;
     y: number;
     count: number;
   } | null>(null);
   const [promptDialogImageId, setPromptDialogImageId] = useState<number | null>(
+    null
+  );
+  const [interpolationImageIds, setInterpolationImageIds] = useState<[number, number] | null>(
     null
   );
 
@@ -32,6 +33,8 @@ export const App: React.FC = () => {
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
   const setIsInitialized = useAppStore((state) => state.setIsInitialized);
   const setIsGenerating = useAppStore((state) => state.setIsGenerating);
+  const setGenerationProgress = useAppStore((state) => state.setGenerationProgress);
+  const setGenerationCount = useAppStore((state) => state.setGenerationCount);
   const clearSelection = useAppStore((state) => state.clearSelection);
 
   useEffect(() => {
@@ -40,6 +43,8 @@ export const App: React.FC = () => {
       if (message.type === "state_update" && message.data) {
         setImages(message.data.images);
         setHistoryGroups(message.data.history_groups);
+      } else if (message.type === "progress" && message.progress !== undefined) {
+        setGenerationProgress(message.progress);
       }
     });
 
@@ -64,7 +69,7 @@ export const App: React.FC = () => {
     return () => {
       apiClient.disconnectWebSocket(() => {});
     };
-  }, [setImages, setHistoryGroups, setIsInitialized]);
+  }, [setImages, setHistoryGroups, setIsInitialized, setGenerationProgress]);
 
   const handleGenerate = async () => {
     const prompt = window.prompt("Enter prompt for image generation:");
@@ -79,18 +84,44 @@ export const App: React.FC = () => {
     }
 
     setIsGenerating(true);
+    setGenerationCount(0, nImages);
+    setGenerationProgress(0);
+
+    // Estimate 5 seconds per image, update progress smoothly
+    const estimatedTimeMs = nImages * 5000;
+    const updateIntervalMs = 100; // Update every 100ms for smooth animation
+    const totalUpdates = estimatedTimeMs / updateIntervalMs;
+    let updates = 0;
+
+    const progressInterval = setInterval(() => {
+      updates++;
+      const progress = Math.min((updates / totalUpdates) * 90, 90); // Cap at 90%
+      const currentImageEstimate = Math.floor((progress / 90) * nImages);
+      setGenerationCount(currentImageEstimate, nImages);
+      setGenerationProgress(progress);
+    }, updateIntervalMs);
+
     try {
       await apiClient.generate({ prompt, n_images: nImages });
+      clearInterval(progressInterval);
+      setGenerationCount(nImages, nImages);
+      setGenerationProgress(100);
     } catch (error) {
+      clearInterval(progressInterval);
       console.error("Generation failed:", error);
       alert("Generation failed. Check console for details.");
     } finally {
       setIsGenerating(false);
+      setTimeout(() => {
+        setGenerationProgress(0);
+        setGenerationCount(0, 0);
+      }, 1000);
     }
   };
 
   const handleClearCanvas = async () => {
-    if (!window.confirm("Clear ALL images from canvas? This cannot be undone.")) return;
+    if (!window.confirm("Clear ALL images from canvas? This cannot be undone."))
+      return;
 
     try {
       await apiClient.clearCanvas();
@@ -106,27 +137,61 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleInterpolate = async (idA?: number, idB?: number) => {
-    const id_a = idA ?? selectedImageIds[0];
-    const id_b = idB ?? selectedImageIds[1];
-
-    if (!id_a || !id_b) {
-      alert("Please select exactly 2 images to interpolate.");
-      return;
-    }
-
-    console.log(`Interpolating between images ${id_a} and ${id_b}...`);
+  const handleInterpolate = async (
+    idA: number,
+    idB: number,
+    alpha: number,
+    steps?: number
+  ) => {
+    console.log(`Interpolating between images ${idA} and ${idB} (alpha: ${alpha}, steps: ${steps || 1})...`);
+    setInterpolationImageIds(null);
     setIsGenerating(true);
-    setFloatingPanelPos(null); // Close panel immediately
+    setFloatingPanelPos(null);
+
+    const totalSteps = steps || 1;
+    setGenerationCount(0, totalSteps);
+    setGenerationProgress(0);
+
+    // Estimate 5 seconds per interpolation
+    const estimatedTimeMs = totalSteps * 5000;
+    const updateIntervalMs = 100;
+    const totalUpdates = estimatedTimeMs / updateIntervalMs;
+    let updates = 0;
+
+    const progressInterval = setInterval(() => {
+      updates++;
+      const progress = Math.min((updates / totalUpdates) * 90, 90);
+      const currentStepEstimate = Math.floor((progress / 90) * totalSteps);
+      setGenerationCount(currentStepEstimate, totalSteps);
+      setGenerationProgress(progress);
+    }, updateIntervalMs);
+
     try {
-      const result = await apiClient.interpolate({ id_a, id_b, alpha: 0.5 });
-      console.log("Interpolation successful:", result);
+      if (steps && steps > 1) {
+        // Generate multiple interpolations
+        for (let i = 0; i < steps; i++) {
+          const currentAlpha = i / (steps - 1);
+          await apiClient.interpolate({ id_a: idA, id_b: idB, alpha: currentAlpha });
+        }
+      } else {
+        // Single interpolation
+        await apiClient.interpolate({ id_a: idA, id_b: idB, alpha });
+      }
+      clearInterval(progressInterval);
+      setGenerationCount(totalSteps, totalSteps);
+      setGenerationProgress(100);
+      console.log("Interpolation successful");
       clearSelection();
     } catch (error) {
+      clearInterval(progressInterval);
       console.error("Interpolation failed:", error);
       alert(`Interpolation failed: ${error}`);
     } finally {
       setIsGenerating(false);
+      setTimeout(() => {
+        setGenerationProgress(0);
+        setGenerationCount(0, 0);
+      }, 1000);
     }
   };
 
@@ -134,58 +199,96 @@ export const App: React.FC = () => {
     (img) => img.id === promptDialogImageId
   );
 
+  const interpolationImages = interpolationImageIds
+    ? [
+        images.find((img) => img.id === interpolationImageIds[0]),
+        images.find((img) => img.id === interpolationImageIds[1]),
+      ].filter(Boolean) as [ImageData, ImageData]
+    : null;
+
   const handleGenerateFromReferenceClick = (imageId: number) => {
     setPromptDialogImageId(imageId);
-    setContextMenuPos(null); // Close context menu
+  };
+
+  const handleInterpolateClick = () => {
+    if (selectedImageIds.length === 2) {
+      setInterpolationImageIds([selectedImageIds[0], selectedImageIds[1]]);
+      setFloatingPanelPos(null);
+    }
   };
 
   const handlePromptDialogGenerate = async (
     referenceId: number,
     prompt: string
   ) => {
-    console.log(`Generating from reference ${referenceId} with prompt: "${prompt}"`);
+    console.log(
+      `Generating from reference ${referenceId} with prompt: "${prompt}"`
+    );
     setPromptDialogImageId(null);
     setIsGenerating(true);
-    setFloatingPanelPos(null); // Close panel
+    setFloatingPanelPos(null);
+    setGenerationCount(0, 1);
+    setGenerationProgress(0);
+
+    // Estimate 5 seconds for generation
+    const estimatedTimeMs = 5000;
+    const updateIntervalMs = 100;
+    const totalUpdates = estimatedTimeMs / updateIntervalMs;
+    let updates = 0;
+
+    const progressInterval = setInterval(() => {
+      updates++;
+      const progress = Math.min((updates / totalUpdates) * 90, 90);
+      setGenerationProgress(progress);
+    }, updateIntervalMs);
+
     try {
       const result = await apiClient.generateFromReference({
         reference_id: referenceId,
         prompt,
       });
+      clearInterval(progressInterval);
       console.log("Generation from reference successful:", result);
+      setGenerationCount(1, 1);
+      setGenerationProgress(100);
       clearSelection();
     } catch (error) {
+      clearInterval(progressInterval);
       console.error("Reference generation failed:", error);
       alert(`Generation failed: ${error}`);
     } finally {
       setIsGenerating(false);
+      setTimeout(() => {
+        setGenerationProgress(0);
+        setGenerationCount(0, 0);
+      }, 1000);
     }
   };
 
-  // Click outside to close context menu and floating panel
+  // Click outside to close floating panel
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
 
-      if (contextMenuPos && !target.closest(".context-menu")) {
-        setContextMenuPos(null);
-      }
-
-      if (floatingPanelPos && !target.closest(".floating-action-panel") && !target.closest(".image-node")) {
+      if (
+        floatingPanelPos &&
+        !target.closest(".floating-action-panel") &&
+        !target.closest(".image-node")
+      ) {
         setFloatingPanelPos(null);
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [contextMenuPos, floatingPanelPos]);
+  }, [floatingPanelPos]);
 
   // Close menus on Escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setContextMenuPos(null);
         setPromptDialogImageId(null);
+        setInterpolationImageIds(null);
         setFloatingPanelPos(null);
       }
     };
@@ -203,6 +306,9 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-container">
+      {/* Progress Bar */}
+      <ProgressBar isVisible={isGenerating} message="Generating images..." />
+
       {/* Canvas Container */}
       <div className="canvas-container">
         <div className="canvas-header">
@@ -216,14 +322,13 @@ export const App: React.FC = () => {
         </div>
 
         <SemanticCanvas
-          onContextMenu={(x, y) => setContextMenuPos({ x, y })}
-          onSelectionChange={(x, y, count) => {
+          onSelectionChange={React.useCallback((x, y, count) => {
             if (count > 0) {
               setFloatingPanelPos({ x, y, count });
             } else {
               setFloatingPanelPos(null);
             }
-          }}
+          }, [])}
         />
 
         {/* Floating Action Panel (primary interaction) */}
@@ -239,10 +344,7 @@ export const App: React.FC = () => {
             }}
             onInterpolate={
               floatingPanelPos.count === 2
-                ? () => {
-                    handleInterpolate();
-                    setFloatingPanelPos(null);
-                  }
+                ? handleInterpolateClick
                 : undefined
             }
             onViewDetails={() => {
@@ -272,23 +374,22 @@ export const App: React.FC = () => {
           />
         )}
 
-        {/* Context Menu (legacy, right-click) */}
-        {contextMenuPos && selectedImageIds.length > 0 && (
-          <ContextMenu
-            x={contextMenuPos.x}
-            y={contextMenuPos.y}
-            onClose={() => setContextMenuPos(null)}
-            onGenerateFromReference={handleGenerateFromReferenceClick}
-            onInterpolate={handleInterpolate}
-          />
-        )}
-
         {/* Prompt Dialog */}
         {promptDialogImage && (
           <PromptDialog
             referenceImage={promptDialogImage}
             onClose={() => setPromptDialogImageId(null)}
             onGenerate={handlePromptDialogGenerate}
+          />
+        )}
+
+        {/* Interpolation Dialog */}
+        {interpolationImages && interpolationImages.length === 2 && (
+          <InterpolationDialog
+            imageA={interpolationImages[0]}
+            imageB={interpolationImages[1]}
+            onClose={() => setInterpolationImageIds(null)}
+            onInterpolate={handleInterpolate}
           />
         )}
 
@@ -349,10 +450,10 @@ export const App: React.FC = () => {
             <button
               className="action-button"
               onClick={handleGenerate}
-              disabled={!isInitialized || isGenerating}
+              disabled={!isInitialized}
               style={{ flex: 1 }}
             >
-              {isGenerating ? "⏳ Generating..." : "🎨 Generate Images"}
+              🎨 Generate Images
             </button>
             <button
               className="action-button secondary"

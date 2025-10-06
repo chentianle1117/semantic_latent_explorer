@@ -1,0 +1,86 @@
+.axis-label {
+  background: rgba(88, 166, 255, 0.1);
+  border: 1px solid #58a6ff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  fontSize: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.axis-label:hover {
+  background: rgba(88, 166, 255, 0.2);
+  border-color: #79c0ff;
+}
+
+.axis-editor {
+  background: rgba(22, 27, 34, 0.95);
+  border: 1px solid #58a6ff;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.axis-editor-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.axis-input {
+  flex: 1;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.axis-input:focus {
+  border-color: #58a6ff;
+}
+
+.axis-separator {
+  color: #8b949e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.axis-editor-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.axis-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.axis-btn-update {
+  background: #238636;
+  color: white;
+}
+
+.axis-btn-update:hover {
+  background: #2ea043;
+}
+
+.axis-btn-cancel {
+  background: #30363d;
+  color: #c9d1d9;
+}
+
+.axis-btn-cancel:hover {
+  background: #484f58;
+}

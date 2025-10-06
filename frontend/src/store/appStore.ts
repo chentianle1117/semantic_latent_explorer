@@ -29,6 +29,8 @@ interface AppStore extends AppState {
 
   setIsGenerating: (isGenerating: boolean) => void;
   setIsInitialized: (isInitialized: boolean) => void;
+  setGenerationProgress: (progress: number | ((prev: number) => number)) => void;
+  setGenerationCount: (current: number, total: number) => void;
 
   clearAll: () => void;
 }
@@ -50,6 +52,9 @@ const initialState: AppState = {
   },
   isGenerating: false,
   isInitialized: false,
+  generationProgress: 0,
+  generationCurrent: 0,
+  generationTotal: 0,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -87,17 +92,27 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
 
   // Selection actions (matches artifact's click behavior)
-  setSelectedImageIds: (ids) => set({ selectedImageIds: ids }),
+  setSelectedImageIds: (ids) => {
+    console.log("📋 setSelectedImageIds called with:", ids);
+    set({ selectedImageIds: ids });
+  },
 
   toggleImageSelection: (id, _ctrlKey) =>
     set((state) => {
+      console.log("🔄 toggleImageSelection called:", {
+        id,
+        currentSelection: state.selectedImageIds,
+        isSelected: state.selectedImageIds.includes(id)
+      });
       // Always additive selection - clicking an image adds it to selection
       // Clicking again removes it (toggle off)
       const isSelected = state.selectedImageIds.includes(id);
+      const newSelection = isSelected
+        ? state.selectedImageIds.filter((sid) => sid !== id)
+        : [...state.selectedImageIds, id];
+      console.log("➡️ New selection:", newSelection);
       return {
-        selectedImageIds: isSelected
-          ? state.selectedImageIds.filter((sid) => sid !== id)
-          : [...state.selectedImageIds, id],
+        selectedImageIds: newSelection,
       };
     }),
 
@@ -117,8 +132,19 @@ export const useAppStore = create<AppStore>((set) => ({
   setAxisLabels: (labels) => set({ axisLabels: labels }),
 
   // Loading states
-  setIsGenerating: (isGenerating) => set({ isGenerating }),
+  setIsGenerating: (isGenerating) => set({
+    isGenerating,
+    generationProgress: isGenerating ? 0 : 100,
+    generationCurrent: isGenerating ? 0 : 0,
+    generationTotal: isGenerating ? 0 : 0,
+  }),
   setIsInitialized: (isInitialized) => set({ isInitialized }),
+  setGenerationProgress: (progress) =>
+    set((state) => ({
+      generationProgress: typeof progress === 'function' ? progress(state.generationProgress) : progress,
+    })),
+  setGenerationCount: (current, total) =>
+    set({ generationCurrent: current, generationTotal: total }),
 
   // Clear all
   clearAll: () =>

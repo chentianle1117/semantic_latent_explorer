@@ -40,6 +40,9 @@ export interface AppState {
   visualSettings: VisualSettings;
   isGenerating: boolean;
   isInitialized: boolean;
+  generationProgress: number;
+  generationCurrent: number;
+  generationTotal: number;
 }
 
 export interface VisualSettings {
@@ -73,9 +76,10 @@ export interface AxisUpdateRequest {
 }
 
 export interface WebSocketMessage {
-  type: 'state_update' | 'pong' | 'error';
+  type: 'state_update' | 'pong' | 'error' | 'progress';
   data?: any;
   error?: string;
+  progress?: number;
 }
 
 // D3 specific types

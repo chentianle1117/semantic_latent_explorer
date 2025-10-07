@@ -10,7 +10,11 @@
       "Bash(npm run build:*)",
       "Bash(curl:*)",
       "Bash(findstr:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout:*)",
+      "Bash(conda run:*)"
     ],
     "deny": [],
     "ask": []

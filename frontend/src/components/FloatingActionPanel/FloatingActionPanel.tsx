@@ -27,6 +27,15 @@ export const FloatingActionPanel: React.FC<FloatingActionPanelProps> = ({
   onRemove,
   onClearSelection,
 }) => {
+  console.log("🎨 FloatingActionPanel rendering at:", {
+    x,
+    y,
+    left: x + 60,
+    top: y,
+    selectedCount,
+    hasInterpolate: !!onInterpolate
+  });
+
   return (
     <div
       className="floating-action-panel"
@@ -53,13 +62,35 @@ export const FloatingActionPanel: React.FC<FloatingActionPanelProps> = ({
         </>
       )}
 
-      {selectedCount === 2 && onInterpolate && (
+      {selectedCount === 2 && (
         <>
-          <button className="action-item primary" onClick={onInterpolate}>
-            🔀 Interpolate between (2 selected)
+          {onInterpolate ? (
+            <button className="action-item primary" onClick={onInterpolate}>
+              🔀 Interpolate between (2 selected)
+            </button>
+          ) : (
+            <div
+              style={{
+                padding: "8px 16px",
+                fontSize: "11px",
+                color: "#8b949e",
+                fontStyle: "italic",
+                borderLeft: "3px solid #f85149",
+                background: "rgba(248, 81, 73, 0.05)",
+                margin: "4px 0"
+              }}
+            >
+              💡 Interpolate requires Local SD 1.5 mode
+            </div>
+          )}
+          <button
+            className={`action-item ${!onInterpolate ? 'primary' : ''}`}
+            onClick={onGenerateFromReference}
+          >
+            ✨ Generate from both references...
           </button>
-          <button className="action-item" onClick={onGenerateFromReference}>
-            ✨ Generate batch using both...
+          <button className="action-item" onClick={onViewDetails}>
+            🔍 View details
           </button>
           <div className="action-divider" />
           <button className="action-item" onClick={onClearSelection}>

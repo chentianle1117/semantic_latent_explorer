@@ -38,6 +38,8 @@ export interface AppState {
   hoveredImageId: number | null;
   hoveredGroupId: string | null;
   visualSettings: VisualSettings;
+  generationMode: GenerationMode;
+  removeBackground: boolean;
   isGenerating: boolean;
   isInitialized: boolean;
   generationProgress: number;
@@ -50,6 +52,8 @@ export interface VisualSettings {
   imageOpacity: number;
   removeBackground: boolean;
 }
+
+export type GenerationMode = 'local-sd15' | 'fal-nanobanana';
 
 export interface GenerateRequest {
   prompt: string;

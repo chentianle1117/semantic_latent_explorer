@@ -9,6 +9,12 @@ websockets==12.0
 # CORS support
 python-jose[cryptography]==3.3.0
 
+# HTTP requests
+requests>=2.31.0
+
+# Background removal
+rembg>=2.0.0
+
 # Already installed (from your existing setup):
 # torch>=2.0.0
 # transformers>=4.30.0

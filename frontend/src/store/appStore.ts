@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, GenerationMode } from '../types';
 
 interface AppStore extends AppState {
   // Actions
@@ -32,6 +32,9 @@ interface AppStore extends AppState {
   setGenerationProgress: (progress: number | ((prev: number) => number)) => void;
   setGenerationCount: (current: number, total: number) => void;
 
+  setGenerationMode: (mode: GenerationMode) => void;
+  setRemoveBackground: (remove: boolean) => void;
+
   clearAll: () => void;
 }
 
@@ -50,6 +53,8 @@ const initialState: AppState = {
     imageOpacity: 0.9,
     removeBackground: true,
   },
+  generationMode: 'local-sd15',
+  removeBackground: true,
   isGenerating: false,
   isInitialized: false,
   generationProgress: 0,
@@ -145,6 +150,10 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
   setGenerationCount: (current, total) =>
     set({ generationCurrent: current, generationTotal: total }),
+
+  // Generation mode
+  setGenerationMode: (mode) => set({ generationMode: mode }),
+  setRemoveBackground: (remove) => set({ removeBackground: remove }),
 
   // Clear all
   clearAll: () =>

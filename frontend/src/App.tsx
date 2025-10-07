@@ -4,8 +4,10 @@ import { PromptDialog } from "./components/PromptDialog/PromptDialog";
 import { InterpolationDialog } from "./components/InterpolationDialog/InterpolationDialog";
 import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingActionPanel";
 import { ProgressBar } from "./components/ProgressBar/ProgressBar";
+import { ModeToggle } from "./components/ModeToggle/ModeToggle";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
+import { falClient } from "./api/falClient";
 import type { ImageData } from "./types";
 import "./styles/app.css";
 
@@ -28,6 +30,8 @@ export const App: React.FC = () => {
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
   const isInitialized = useAppStore((state) => state.isInitialized);
   const isGenerating = useAppStore((state) => state.isGenerating);
+  const generationMode = useAppStore((state) => state.generationMode);
+  const removeBackground = useAppStore((state) => state.removeBackground);
 
   const setImages = useAppStore((state) => state.setImages);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
@@ -38,38 +42,67 @@ export const App: React.FC = () => {
   const clearSelection = useAppStore((state) => state.clearSelection);
 
   useEffect(() => {
-    // Connect WebSocket for real-time updates
-    apiClient.connectWebSocket((message) => {
-      if (message.type === "state_update" && message.data) {
-        setImages(message.data.images);
-        setHistoryGroups(message.data.history_groups);
-      } else if (message.type === "progress" && message.progress !== undefined) {
-        setGenerationProgress(message.progress);
-      }
-    });
+    // Reset generating state when switching modes
+    console.log("🔄 Mode changed to:", generationMode);
+    setIsGenerating(false);
+    setGenerationProgress(0);
+    setGenerationCount(0, 0);
 
-    // Initialize backend models
-    apiClient
-      .initialize()
-      .then(() => {
-        setIsInitialized(true);
-        return apiClient.getState();
-      })
-      .then((state) => {
-        setImages(state.images);
-        setHistoryGroups(state.history_groups);
-      })
-      .catch((error) => {
-        console.error("Failed to initialize:", error);
-        alert(
-          "Failed to connect to backend. Make sure backend is running on port 8000."
-        );
+    // Initialize based on mode
+    if (generationMode === 'local-sd15') {
+      // Connect WebSocket for real-time updates
+      apiClient.connectWebSocket((message) => {
+        if (message.type === "state_update" && message.data) {
+          setImages(message.data.images);
+          setHistoryGroups(message.data.history_groups);
+        } else if (message.type === "progress" && message.progress !== undefined) {
+          setGenerationProgress(message.progress);
+        }
       });
 
-    return () => {
-      apiClient.disconnectWebSocket(() => {});
-    };
-  }, [setImages, setHistoryGroups, setIsInitialized, setGenerationProgress]);
+      // Initialize backend models (SD 1.5 + CLIP)
+      apiClient
+        .initialize()
+        .then(() => {
+          setIsInitialized(true);
+          return apiClient.getState();
+        })
+        .then((state) => {
+          setImages(state.images);
+          setHistoryGroups(state.history_groups);
+        })
+        .catch((error) => {
+          console.error("Failed to initialize:", error);
+          setIsInitialized(false);
+          alert(
+            "Failed to connect to backend. Make sure backend is running on port 8000."
+          );
+        });
+
+      return () => {
+        apiClient.disconnectWebSocket(() => {});
+      };
+    } else {
+      // For fal.ai mode, only initialize CLIP (for embeddings)
+      apiClient
+        .initializeClipOnly()
+        .then(() => {
+          setIsInitialized(true);
+          return apiClient.getState();
+        })
+        .then((state) => {
+          setImages(state.images);
+          setHistoryGroups(state.history_groups);
+        })
+        .catch((error) => {
+          console.error("Failed to initialize CLIP:", error);
+          setIsInitialized(false);
+          alert(
+            "Failed to connect to backend. Make sure backend is running on port 8000."
+          );
+        });
+    }
+  }, [generationMode, setImages, setHistoryGroups, setIsInitialized, setGenerationProgress, setIsGenerating, setGenerationCount]);
 
   const handleGenerate = async () => {
     const prompt = window.prompt("Enter prompt for image generation:");
@@ -83,12 +116,33 @@ export const App: React.FC = () => {
       return;
     }
 
+    // Check if fal.ai is configured when using fal-nanobanana mode
+    if (generationMode === 'fal-nanobanana' && !falClient.isConfigured()) {
+      alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file.");
+      return;
+    }
+
+    // Inform user about batching for fal.ai
+    if (generationMode === 'fal-nanobanana' && nImages > 4) {
+      const numBatches = Math.ceil(nImages / 4);
+      console.log(`ℹ️ Generating ${nImages} images in ${numBatches} batches (fal.ai limit: 4 per request)`);
+    }
+
     setIsGenerating(true);
     setGenerationCount(0, nImages);
     setGenerationProgress(0);
 
-    // Estimate 5 seconds per image, update progress smoothly
-    const estimatedTimeMs = nImages * 5000;
+    // Estimate time based on mode and number of images
+    // fal.ai batches in groups of 4, so larger requests take longer
+    let estimatedTimeMs;
+    if (generationMode === 'fal-nanobanana') {
+      const numBatches = Math.ceil(nImages / 4); // fal.ai processes 4 at a time
+      estimatedTimeMs = numBatches * 8000; // ~8 seconds per batch of 4
+      console.log(`Estimated time: ${numBatches} batches × 8s = ${estimatedTimeMs/1000}s`);
+    } else {
+      estimatedTimeMs = nImages * 5000; // 5 seconds per image for local SD
+    }
+
     const updateIntervalMs = 100; // Update every 100ms for smooth animation
     const totalUpdates = estimatedTimeMs / updateIntervalMs;
     let updates = 0;
@@ -101,15 +155,51 @@ export const App: React.FC = () => {
       setGenerationProgress(progress);
     }, updateIntervalMs);
 
-    try {
-      await apiClient.generate({ prompt, n_images: nImages });
+    // Safety timeout: auto-reset after 5 minutes
+    const safetyTimeout = setTimeout(() => {
+      console.error("⚠️ Generation timed out after 5 minutes");
       clearInterval(progressInterval);
+      setIsGenerating(false);
+      setGenerationProgress(0);
+      setGenerationCount(0, 0);
+      alert("Generation timed out. Please try again or check your connection.");
+    }, 300000); // 5 minutes
+
+    try {
+      if (generationMode === 'local-sd15') {
+        // Use local SD 1.5 backend
+        await apiClient.generate({ prompt, n_images: nImages });
+      } else {
+        // Use fal.ai nano-banana text-to-image
+        const result = await falClient.generateTextToImage({
+          prompt,
+          num_images: nImages,
+          aspect_ratio: "1:1",
+          output_format: "jpeg"
+        });
+
+        console.log("fal.ai generation result:", result);
+
+        // Send images to backend for CLIP embedding extraction
+        await apiClient.addExternalImages({
+          images: result.images.map(img => ({ url: img.url })),
+          prompt: prompt,
+          generation_method: 'batch',
+          remove_background: removeBackground
+        });
+
+        console.log(`✓ Added ${result.images.length} fal.ai images to canvas`);
+      }
+
+      clearInterval(progressInterval);
+      clearTimeout(safetyTimeout);
       setGenerationCount(nImages, nImages);
       setGenerationProgress(100);
     } catch (error) {
       clearInterval(progressInterval);
+      clearTimeout(safetyTimeout);
       console.error("Generation failed:", error);
-      alert("Generation failed. Check console for details.");
+      alert(`Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsGenerating(false);
       setTimeout(() => {
@@ -166,6 +256,16 @@ export const App: React.FC = () => {
       setGenerationProgress(progress);
     }, updateIntervalMs);
 
+    // Safety timeout: auto-reset after 5 minutes
+    const safetyTimeout = setTimeout(() => {
+      console.error("⚠️ Interpolation timed out after 5 minutes");
+      clearInterval(progressInterval);
+      setIsGenerating(false);
+      setGenerationProgress(0);
+      setGenerationCount(0, 0);
+      alert("Interpolation timed out. Please try again.");
+    }, 300000);
+
     try {
       if (steps && steps > 1) {
         // Generate multiple interpolations
@@ -178,12 +278,14 @@ export const App: React.FC = () => {
         await apiClient.interpolate({ id_a: idA, id_b: idB, alpha });
       }
       clearInterval(progressInterval);
+      clearTimeout(safetyTimeout);
       setGenerationCount(totalSteps, totalSteps);
       setGenerationProgress(100);
       console.log("Interpolation successful");
       clearSelection();
     } catch (error) {
       clearInterval(progressInterval);
+      clearTimeout(safetyTimeout);
       console.error("Interpolation failed:", error);
       alert(`Interpolation failed: ${error}`);
     } finally {
@@ -224,6 +326,13 @@ export const App: React.FC = () => {
     console.log(
       `Generating from reference ${referenceId} with prompt: "${prompt}"`
     );
+
+    // Check if fal.ai is configured when using fal-nanobanana mode
+    if (generationMode === 'fal-nanobanana' && !falClient.isConfigured()) {
+      alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file.");
+      return;
+    }
+
     setPromptDialogImageId(null);
     setIsGenerating(true);
     setFloatingPanelPos(null);
@@ -242,20 +351,92 @@ export const App: React.FC = () => {
       setGenerationProgress(progress);
     }, updateIntervalMs);
 
-    try {
-      const result = await apiClient.generateFromReference({
-        reference_id: referenceId,
-        prompt,
-      });
+    // Safety timeout: auto-reset after 5 minutes
+    const safetyTimeout = setTimeout(() => {
+      console.error("⚠️ Reference generation timed out after 5 minutes");
       clearInterval(progressInterval);
-      console.log("Generation from reference successful:", result);
-      setGenerationCount(1, 1);
-      setGenerationProgress(100);
-      clearSelection();
+      setIsGenerating(false);
+      setGenerationProgress(0);
+      setGenerationCount(0, 0);
+      alert("Generation timed out. Please try again.");
+    }, 300000);
+
+    try {
+      if (generationMode === 'local-sd15') {
+        // Use local SD 1.5 backend
+        const result = await apiClient.generateFromReference({
+          reference_id: referenceId,
+          prompt,
+        });
+        clearInterval(progressInterval);
+        clearTimeout(safetyTimeout);
+        console.log("Generation from reference successful:", result);
+        setGenerationCount(1, 1);
+        setGenerationProgress(100);
+        clearSelection();
+      } else {
+        // Use fal.ai nano-banana image editing
+        // Get selected images to use as references
+        const selectedImages = selectedImageIds.length > 0
+          ? images.filter(img => selectedImageIds.includes(img.id))
+          : images.filter(img => img.id === referenceId);
+
+        if (selectedImages.length === 0) {
+          throw new Error("No reference images found");
+        }
+
+        // Convert base64 images to URLs that fal.ai can use
+        // For now, we'll use the text-to-image endpoint since we have base64 data
+        // In a production app, you'd upload these images to fal.ai storage first
+        const imageUrls: string[] = [];
+
+        for (const img of selectedImages) {
+          // Create a blob from base64
+          const base64Data = img.base64_image;
+          const blob = await (await fetch(`data:image/png;base64,${base64Data}`)).blob();
+          const file = new File([blob], `reference-${img.id}.png`, { type: 'image/png' });
+
+          // Upload to fal.ai storage
+          const url = await falClient.uploadFile(file);
+          imageUrls.push(url);
+        }
+
+        // Use image edit endpoint with reference images
+        const result = await falClient.generateImageEdit({
+          prompt,
+          image_urls: imageUrls,
+          num_images: 1,
+          aspect_ratio: "1:1",
+          output_format: "jpeg"
+        });
+
+        console.log("fal.ai image edit result:", result);
+
+        // Send images to backend for CLIP embedding extraction
+        // Include parent IDs for genealogy tracking
+        const parentIds = selectedImages.map(img => img.id);
+        console.log("Setting parent IDs:", parentIds);
+
+        await apiClient.addExternalImages({
+          images: result.images.map(img => ({ url: img.url })),
+          prompt: prompt,
+          generation_method: 'reference',
+          remove_background: removeBackground,
+          parent_ids: parentIds
+        });
+
+        console.log(`✓ Added fal.ai edited image to canvas with ${parentIds.length} parent(s)`);
+        clearInterval(progressInterval);
+        clearTimeout(safetyTimeout);
+        setGenerationCount(1, 1);
+        setGenerationProgress(100);
+        clearSelection();
+      }
     } catch (error) {
       clearInterval(progressInterval);
+      clearTimeout(safetyTimeout);
       console.error("Reference generation failed:", error);
-      alert(`Generation failed: ${error}`);
+      alert(`Generation failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsGenerating(false);
       setTimeout(() => {
@@ -323,8 +504,14 @@ export const App: React.FC = () => {
 
         <SemanticCanvas
           onSelectionChange={React.useCallback((x, y, count) => {
+            console.log("🎯 App received onSelectionChange:", { x, y, count });
             if (count > 0) {
-              setFloatingPanelPos({ x, y, count });
+              // -1 signals to keep existing position, just update count
+              if (x === -1 && y === -1) {
+                setFloatingPanelPos(prev => prev ? { ...prev, count } : { x: 0, y: 0, count });
+              } else {
+                setFloatingPanelPos({ x, y, count });
+              }
             } else {
               setFloatingPanelPos(null);
             }
@@ -343,7 +530,7 @@ export const App: React.FC = () => {
               setFloatingPanelPos(null);
             }}
             onInterpolate={
-              floatingPanelPos.count === 2
+              floatingPanelPos.count === 2 && generationMode === 'local-sd15'
                 ? handleInterpolateClick
                 : undefined
             }
@@ -405,7 +592,7 @@ export const App: React.FC = () => {
             <input
               type="range"
               min="30"
-              max="200"
+              max="400"
               value={useAppStore.getState().visualSettings.imageSize}
               onChange={(e) => {
                 useAppStore.getState().updateVisualSettings({
@@ -442,6 +629,9 @@ export const App: React.FC = () => {
 
       {/* Control Panel */}
       <div className="control-panel">
+        {/* Mode Toggle */}
+        <ModeToggle />
+
         {/* Quick Actions */}
         <div className="quick-actions">
           <h3>Quick Actions</h3>
@@ -450,7 +640,7 @@ export const App: React.FC = () => {
             <button
               className="action-button"
               onClick={handleGenerate}
-              disabled={!isInitialized}
+              disabled={!isInitialized || isGenerating}
               style={{ flex: 1 }}
             >
               🎨 Generate Images
@@ -465,6 +655,28 @@ export const App: React.FC = () => {
               🗑️ Clear All
             </button>
           </div>
+
+          {isGenerating && (
+            <button
+              className="action-button secondary"
+              onClick={() => {
+                console.warn("⚠️ Force stopping generation");
+                setIsGenerating(false);
+                setGenerationProgress(0);
+                setGenerationCount(0, 0);
+              }}
+              style={{
+                width: "100%",
+                marginTop: "8px",
+                background: "rgba(248, 81, 73, 0.2)",
+                color: "#f85149",
+                border: "1px solid rgba(248, 81, 73, 0.3)"
+              }}
+              title="Force stop if generation is stuck"
+            >
+              ⏹️ Force Stop Generation
+            </button>
+          )}
 
           {selectedImageIds.length > 0 && (
             <div

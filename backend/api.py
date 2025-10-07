@@ -14,6 +14,8 @@ from datetime import datetime
 import uvicorn
 import sys
 from pathlib import Path
+import requests
+from rembg import remove
 
 # Add parent directory to Python path to import models
 parent_dir = Path(__file__).parent.parent
@@ -60,6 +62,18 @@ class AxisUpdateRequest(BaseModel):
     y_negative: str
 
 
+class ExternalImage(BaseModel):
+    url: str
+
+
+class AddExternalImagesRequest(BaseModel):
+    images: List[ExternalImage]
+    prompt: str
+    generation_method: str = 'batch'
+    remove_background: bool = False
+    parent_ids: List[int] = []  # Parent image IDs for genealogy tracking
+
+
 class ImageResponse(BaseModel):
     id: int
     group_id: str
@@ -100,6 +114,7 @@ state = AppState()
 def pil_to_base64(pil_image: Image.Image) -> str:
     """Convert PIL image to base64 string."""
     buffered = BytesIO()
+    # Save as PNG to preserve transparency if present
     pil_image.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
@@ -187,7 +202,7 @@ async def get_state():
 
 @app.post("/api/initialize")
 async def initialize_models():
-    """Initialize ML models."""
+    """Initialize ML models (SD 1.5 + CLIP)."""
     try:
         if state.embedder is None:
             print("Loading CLIP embedder...")
@@ -212,6 +227,26 @@ async def initialize_models():
         return {"status": "success", "message": "Models initialized"}
     except Exception as e:
         print(f"ERROR initializing models: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/initialize-clip-only")
+async def initialize_clip_only():
+    """Initialize only CLIP embedder (for fal.ai mode)."""
+    try:
+        if state.embedder is None:
+            print("Loading CLIP embedder...")
+            state.embedder = CLIPEmbedder()
+            print("✓ CLIP loaded")
+
+        if state.axis_builder is None:
+            state.axis_builder = SemanticAxisBuilder(state.embedder)
+
+        return {"status": "success", "message": "CLIP initialized"}
+    except Exception as e:
+        print(f"ERROR initializing CLIP: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -382,8 +417,14 @@ async def generate_from_reference(request: GenerateFromReferenceRequest):
 async def interpolate_images(request: InterpolateRequest):
     """Generate interpolated image."""
     try:
-        if state.generator is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
+        if state.generator is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Interpolation requires local Stable Diffusion. Please switch to 'local-sd15' mode and initialize models."
+            )
+
+        if state.embedder is None:
+            raise HTTPException(status_code=400, detail="CLIP embedder not initialized")
 
         # Find both images
         img_a = next((img for img in state.images_metadata if img.id == request.id_a), None)
@@ -516,6 +557,146 @@ async def clear_canvas():
     await broadcast_state_update()
 
     return {"status": "success"}
+
+
+@app.post("/api/add-external-images")
+async def add_external_images(request: AddExternalImagesRequest):
+    """Add images from external URLs (e.g., fal.ai) and compute embeddings."""
+    try:
+        print(f"\n=== Add External Images Request ===")
+        print(f"Prompt: {request.prompt}")
+        print(f"Count: {len(request.images)}")
+        print(f"Method: {request.generation_method}")
+
+        if state.embedder is None:
+            raise HTTPException(status_code=400, detail="CLIP embedder not initialized. Call /api/initialize-clip-only first.")
+
+        # Download images from URLs
+        print("Downloading images from URLs...")
+        pil_images = []
+        for i, img_data in enumerate(request.images):
+            print(f"  Downloading image {i+1}/{len(request.images)} from {img_data.url[:50]}...")
+            response = requests.get(img_data.url, timeout=30)
+            response.raise_for_status()
+            img = Image.open(BytesIO(response.content))
+            # Convert to RGB if needed
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+
+            # Remove background if requested
+            if request.remove_background:
+                print(f"  Removing background from image {i+1}...")
+                # Convert PIL image to bytes
+                img_bytes = BytesIO()
+                img.save(img_bytes, format='PNG')
+                img_bytes.seek(0)
+
+                # Remove background
+                output_bytes = remove(img_bytes.getvalue())
+
+                # Convert back to PIL image with transparency
+                img = Image.open(BytesIO(output_bytes))
+                # Keep as RGBA to preserve transparency
+                if img.mode != 'RGBA':
+                    img = img.convert('RGBA')
+                print(f"  ✓ Background removed from image {i+1} (transparent)")
+            else:
+                # Ensure RGB mode if not removing background
+                if img.mode == 'RGBA':
+                    # Convert RGBA to RGB with white background
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    background.paste(img, mask=img.split()[3])
+                    img = background
+
+            pil_images.append(img)
+            print(f"  ✓ Image {i+1} processed")
+
+        # Extract embeddings
+        print("Extracting CLIP embeddings...")
+        embeddings = state.embedder.extract_image_embeddings_from_pil(pil_images)
+        print("✓ Embeddings extracted")
+
+        # Calculate UMAP coordinates (simplified - using PCA for now)
+        from sklearn.decomposition import PCA
+        if len(state.images_metadata) == 0:
+            # First batch - create new space
+            pca = PCA(n_components=2, random_state=42)
+            coords = pca.fit_transform(embeddings)
+        else:
+            # Project to existing space
+            all_embeddings = np.array([img.embedding for img in state.images_metadata])
+            combined = np.vstack([all_embeddings, embeddings])
+            pca = PCA(n_components=2, random_state=42)
+            all_coords = pca.fit_transform(combined)
+            coords = all_coords[-len(embeddings):]
+
+        # Create ImageMetadata objects
+        group_id = f"{request.generation_method}_{len(state.history_groups)}"
+        new_metadata = []
+
+        for i, (img, emb, coord) in enumerate(zip(pil_images, embeddings, coords)):
+            img_meta = ImageMetadata(
+                id=state.next_id,
+                group_id=group_id,
+                pil_image=img,
+                embedding=emb,
+                coordinates=(float(coord[0]), float(coord[1])),
+                parents=request.parent_ids.copy(),  # Set parent relationships
+                children=[],
+                generation_method=request.generation_method,
+                prompt=request.prompt,
+                reference_ids=request.parent_ids.copy(),  # Reference IDs same as parents
+                timestamp=datetime.now(),
+                visible=True
+            )
+            new_metadata.append(img_meta)
+            state.next_id += 1
+
+        state.images_metadata.extend(new_metadata)
+
+        # Update parent images' children lists
+        if request.parent_ids:
+            print(f"Updating parent-child relationships for {len(request.parent_ids)} parents...")
+            for parent_id in request.parent_ids:
+                parent = next((img for img in state.images_metadata if img.id == parent_id), None)
+                if parent:
+                    # Add all new image IDs as children of this parent
+                    for new_img in new_metadata:
+                        if new_img.id not in parent.children:
+                            parent.children.append(new_img.id)
+                    print(f"  ✓ Parent {parent_id} now has {len(parent.children)} children")
+                else:
+                    print(f"  ⚠️ Parent {parent_id} not found")
+
+        # Create history group
+        image_ids = [m.id for m in new_metadata]
+        history_group = HistoryGroup(
+            id=group_id,
+            type=request.generation_method,
+            image_ids=image_ids,
+            prompt=request.prompt,
+            visible=True,
+            thumbnail_id=image_ids[0] if image_ids else None,
+            timestamp=datetime.now()
+        )
+        state.history_groups.append(history_group)
+
+        # Broadcast update
+        await broadcast_state_update()
+
+        print(f"✓ Added {len(new_metadata)} external images to canvas")
+        return {
+            "status": "success",
+            "images": [image_metadata_to_response(img).dict() for img in new_metadata]
+        }
+
+    except Exception as e:
+        print(f"\n!!! ERROR in add_external_images !!!")
+        print(f"Error type: {type(e).__name__}")
+        print(f"Error message: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.websocket("/ws")

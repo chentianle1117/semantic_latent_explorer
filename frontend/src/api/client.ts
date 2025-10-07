@@ -21,9 +21,15 @@ class APIClient {
   private ws: WebSocket | null = null;
   private wsCallbacks: Set<(message: WebSocketMessage) => void> = new Set();
 
-  // Initialize models
+  // Initialize models (SD 1.5 + CLIP)
   async initialize(): Promise<void> {
     const response = await axios.post(`${API_BASE}/initialize`);
+    return response.data;
+  }
+
+  // Initialize CLIP only (for fal.ai mode)
+  async initializeClipOnly(): Promise<void> {
+    const response = await axios.post(`${API_BASE}/initialize-clip-only`);
     return response.data;
   }
 
@@ -72,6 +78,18 @@ class APIClient {
   // Clear canvas
   async clearCanvas(): Promise<{ status: string }> {
     const response = await axios.post(`${API_BASE}/clear`);
+    return response.data;
+  }
+
+  // Add external images (e.g., from fal.ai)
+  async addExternalImages(request: {
+    images: { url: string }[];
+    prompt: string;
+    generation_method: string;
+    remove_background?: boolean;
+    parent_ids?: number[];
+  }): Promise<{ status: string; images: ImageData[] }> {
+    const response = await axios.post(`${API_BASE}/add-external-images`, request);
     return response.data;
   }
 

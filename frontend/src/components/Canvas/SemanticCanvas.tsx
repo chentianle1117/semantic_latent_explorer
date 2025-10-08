@@ -26,6 +26,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
   const hoveredGroupId = useAppStore((state) => state.hoveredGroupId);
   const axisLabels = useAppStore((state) => state.axisLabels);
+  const canvasBounds = useAppStore((state) => state.canvasBounds);
 
   // Memoize filtered images to prevent new array on every render
   const images = useMemo(
@@ -160,51 +161,67 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       svg.call(zoom.transform as any, zoomTransformRef.current);
     }
 
-    // Calculate data extent
-    const xExtent = d3.extent(images, (d) => d.coordinates[0]) as [
-      number,
-      number
-    ];
-    const yExtent = d3.extent(images, (d) => d.coordinates[1]) as [
-      number,
-      number
-    ];
+    // Determine canvas bounds:
+    // - If canvasBounds is null: Calculate from data (first generation, axis update, or manual reset)
+    // - Otherwise: Use stored bounds (stable, prevents rescaling when adding images)
+    let xMin, xMax, yMin, yMax;
 
-    // Add padding
-    const xPadding = (xExtent[1] - xExtent[0]) * 0.1 || 1;
-    const yPadding = (yExtent[1] - yExtent[0]) * 0.1 || 1;
+    if (canvasBounds === null) {
+      // Calculate from data extent
+      console.log("📐 Calculating bounds from data extent");
+      const xExtent = d3.extent(images, (d) => d.coordinates[0]) as [number, number];
+      const yExtent = d3.extent(images, (d) => d.coordinates[1]) as [number, number];
 
-    // Create scales
+      // Add padding based on user preference (layoutPadding setting)
+      const paddingFactor = visualSettings.layoutPadding;
+      const xPadding = Math.max((xExtent[1] - xExtent[0]) * paddingFactor, 0.05);
+      const yPadding = Math.max((yExtent[1] - yExtent[0]) * paddingFactor, 0.05);
+
+      xMin = xExtent[0] - xPadding;
+      xMax = xExtent[1] + xPadding;
+      yMin = yExtent[0] - yPadding;
+      yMax = yExtent[1] + yPadding;
+
+      // Save these bounds to state so future renders use them
+      const newBounds = { xMin, xMax, yMin, yMax };
+      useAppStore.getState().setCanvasBounds(newBounds);
+      console.log(`✓ Bounds calculated with ${(paddingFactor * 100).toFixed(0)}% padding:`, newBounds);
+    } else {
+      // Use stored bounds
+      console.log("📏 Using stored bounds:", canvasBounds);
+      ({ xMin, xMax, yMin, yMax } = canvasBounds);
+    }
+
     const xScale = d3
       .scaleLinear()
-      .domain([xExtent[0] - xPadding, xExtent[1] + xPadding])
+      .domain([xMin, xMax])
       .range([50, width - 50]);
 
     const yScale = d3
       .scaleLinear()
-      .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
+      .domain([yMin, yMax])
       .range([height - 50, 50]);
 
     // Group for grid lines (behind everything)
     const gridGroup = g.append("g").attr("class", "grid-lines");
 
-    // Draw grid lines - adaptive spacing based on data range
-    const dataRangeX = xExtent[1] - xExtent[0];
-    const dataRangeY = yExtent[1] - yExtent[0];
+    // Draw grid lines using adaptive spacing based on bounds
+    const dataRangeX = xMax - xMin;
+    const dataRangeY = yMax - yMin;
 
-    // Adaptive grid spacing: aim for ~10-15 lines across the visible range
+    // Aim for ~12 grid lines across the visible range
     const targetLineCount = 12;
     const gridSpacingX = dataRangeX / targetLineCount;
     const gridSpacingY = dataRangeY / targetLineCount;
 
     const gridColor = "#30363d";
-    const gridOpacity = 0.25; // Increased from 0.15 for better visibility
+    const gridOpacity = 0.25;
 
-    // Calculate grid bounds based on data extent with extra padding
-    const gridXMin = Math.floor((xExtent[0] - xPadding) / gridSpacingX) * gridSpacingX - gridSpacingX * 5;
-    const gridXMax = Math.ceil((xExtent[1] + xPadding) / gridSpacingX) * gridSpacingX + gridSpacingX * 5;
-    const gridYMin = Math.floor((yExtent[0] - yPadding) / gridSpacingY) * gridSpacingY - gridSpacingY * 5;
-    const gridYMax = Math.ceil((yExtent[1] + yPadding) / gridSpacingY) * gridSpacingY + gridSpacingY * 5;
+    // Calculate grid bounds with extra padding
+    const gridXMin = Math.floor(xMin / gridSpacingX) * gridSpacingX - gridSpacingX * 2;
+    const gridXMax = Math.ceil(xMax / gridSpacingX) * gridSpacingX + gridSpacingX * 2;
+    const gridYMin = Math.floor(yMin / gridSpacingY) * gridSpacingY - gridSpacingY * 2;
+    const gridYMax = Math.ceil(yMax / gridSpacingY) * gridSpacingY + gridSpacingY * 2;
 
     // Vertical grid lines
     for (let x = gridXMin; x <= gridXMax; x += gridSpacingX) {
@@ -531,6 +548,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     images,
     visualSettings,
     axisLabels,
+    canvasBounds,
     // Note: Excluded selectedImageIds and hoveredGroupId to prevent full redraws on selection/hover changes
     // These are handled in a separate effect below
   ]);
@@ -587,26 +605,33 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       selectedImageIds.forEach((selectedId) => {
         const selectedImg = images.find((img) => img.id === selectedId);
         if (selectedImg) {
-          // Redraw genealogy using the existing drawGenealogy function
+          // Use same bounds as main render for consistency
           const width = svgRef.current!.clientWidth;
           const height = svgRef.current!.clientHeight;
-          const xExtent = d3.extent(images, (d) => d.coordinates[0]) as [
-            number,
-            number
-          ];
-          const yExtent = d3.extent(images, (d) => d.coordinates[1]) as [
-            number,
-            number
-          ];
-          const xPadding = (xExtent[1] - xExtent[0]) * 0.1 || 1;
-          const yPadding = (yExtent[1] - yExtent[0]) * 0.1 || 1;
+          const currentBounds = useAppStore.getState().canvasBounds;
+
+          let xMin2, xMax2, yMin2, yMax2;
+          if (currentBounds) {
+            ({ xMin: xMin2, xMax: xMax2, yMin: yMin2, yMax: yMax2 } = currentBounds);
+          } else {
+            // Fallback to data extent if bounds not set
+            const xExtent = d3.extent(images, (d) => d.coordinates[0]) as [number, number];
+            const yExtent = d3.extent(images, (d) => d.coordinates[1]) as [number, number];
+            const xPadding = Math.max((xExtent[1] - xExtent[0]) * 0.1, 0.1);
+            const yPadding = Math.max((yExtent[1] - yExtent[0]) * 0.1, 0.1);
+            xMin2 = xExtent[0] - xPadding;
+            xMax2 = xExtent[1] + xPadding;
+            yMin2 = yExtent[0] - yPadding;
+            yMax2 = yExtent[1] + yPadding;
+          }
+
           const xScale = d3
             .scaleLinear()
-            .domain([xExtent[0] - xPadding, xExtent[1] + xPadding])
+            .domain([xMin2, xMax2])
             .range([50, width - 50]);
           const yScale = d3
             .scaleLinear()
-            .domain([yExtent[0] - yPadding, yExtent[1] + yPadding])
+            .domain([yMin2, yMax2])
             .range([height - 50, 50]);
 
           const currentX = xScale(selectedImg.coordinates[0]);
@@ -691,13 +716,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         negativeLabel={axisLabels.x[0]}
         positiveLabel={axisLabels.x[1]}
         onUpdate={async (negative, positive) => {
-          const newLabels = {
-            ...axisLabels,
-            x: [negative, positive] as [string, string],
-          };
-          useAppStore.setState({ axisLabels: newLabels });
-
           try {
+            // Reset bounds to trigger rescale with new axis organization
+            useAppStore.getState().resetCanvasBounds();
+
+            // Update backend first (this recalculates all positions)
             await apiClient.updateAxes({
               x_negative: negative,
               x_positive: positive,
@@ -705,7 +728,16 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               y_positive: axisLabels.y[1],
             });
 
+            // Get updated state with new coordinates
             const state = await apiClient.getState();
+
+            // Update store with both new labels AND new coordinates
+            // This ensures canvas re-renders with correct positions
+            const newLabels = {
+              ...axisLabels,
+              x: [negative, positive] as [string, string],
+            };
+            useAppStore.setState({ axisLabels: newLabels });
             useAppStore.getState().setImages(state.images);
           } catch (error) {
             console.error("Failed to update X-axis:", error);
@@ -726,13 +758,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         negativeLabel={axisLabels.y[0]}
         positiveLabel={axisLabels.y[1]}
         onUpdate={async (negative, positive) => {
-          const newLabels = {
-            ...axisLabels,
-            y: [negative, positive] as [string, string],
-          };
-          useAppStore.setState({ axisLabels: newLabels });
-
           try {
+            // Reset bounds to trigger rescale with new axis organization
+            useAppStore.getState().resetCanvasBounds();
+
+            // Update backend first (this recalculates all positions)
             await apiClient.updateAxes({
               x_negative: axisLabels.x[0],
               x_positive: axisLabels.x[1],
@@ -740,7 +770,16 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               y_positive: positive,
             });
 
+            // Get updated state with new coordinates
             const state = await apiClient.getState();
+
+            // Update store with both new labels AND new coordinates
+            // This ensures canvas re-renders with correct positions
+            const newLabels = {
+              ...axisLabels,
+              y: [negative, positive] as [string, string],
+            };
+            useAppStore.setState({ axisLabels: newLabels });
             useAppStore.getState().setImages(state.images);
           } catch (error) {
             console.error("Failed to update Y-axis:", error);

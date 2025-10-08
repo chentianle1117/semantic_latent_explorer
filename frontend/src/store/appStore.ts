@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, GenerationMode } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, GenerationMode, CanvasBounds } from '../types';
 
 interface AppStore extends AppState {
   // Actions
@@ -26,6 +26,9 @@ interface AppStore extends AppState {
   updateVisualSettings: (settings: Partial<VisualSettings>) => void;
 
   setAxisLabels: (labels: { x: [string, string]; y: [string, string] }) => void;
+
+  setCanvasBounds: (bounds: CanvasBounds | null) => void;
+  resetCanvasBounds: () => void; // Trigger rescale on next render
 
   setIsGenerating: (isGenerating: boolean) => void;
   setIsInitialized: (isInitialized: boolean) => void;
@@ -52,7 +55,9 @@ const initialState: AppState = {
     imageSize: 120,
     imageOpacity: 0.9,
     removeBackground: true,
+    layoutPadding: 0.1, // 10% padding by default
   },
+  canvasBounds: null, // Will auto-calculate on first render
   generationMode: 'local-sd15',
   removeBackground: true,
   isGenerating: false,
@@ -135,6 +140,10 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // Axis labels
   setAxisLabels: (labels) => set({ axisLabels: labels }),
+
+  // Canvas bounds
+  setCanvasBounds: (bounds) => set({ canvasBounds: bounds }),
+  resetCanvasBounds: () => set({ canvasBounds: null }),
 
   // Loading states
   setIsGenerating: (isGenerating) => set({

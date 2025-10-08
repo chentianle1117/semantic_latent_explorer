@@ -120,6 +120,32 @@ def pil_to_base64(pil_image: Image.Image) -> str:
     return img_str
 
 
+def project_embeddings_to_coordinates(embeddings: np.ndarray) -> np.ndarray:
+    """
+    Project embeddings onto semantic axes to get 2D coordinates.
+    Uses current axis labels to create semantic directions.
+    Returns array of shape (N, 2) with (x, y) coordinates.
+    """
+    if state.axis_builder is None or state.embedder is None:
+        raise RuntimeError("Models not initialized")
+
+    # Build semantic axes from current labels
+    x_axis = state.axis_builder.create_clip_text_axis(
+        f"shoe that is {state.axis_labels['x'][1]}",  # positive
+        f"shoe that is {state.axis_labels['x'][0]}"   # negative
+    )
+    y_axis = state.axis_builder.create_clip_text_axis(
+        f"shoe that is {state.axis_labels['y'][1]}",  # positive
+        f"shoe that is {state.axis_labels['y'][0]}"   # negative
+    )
+
+    # Project embeddings onto axes
+    x_coords = embeddings @ x_axis.direction
+    y_coords = embeddings @ y_axis.direction
+
+    return np.column_stack([x_coords, y_coords])
+
+
 def image_metadata_to_response(img: ImageMetadata) -> ImageResponse:
     """Convert ImageMetadata to API response."""
     return ImageResponse(
@@ -275,19 +301,8 @@ async def generate_images(request: GenerateRequest):
         # Extract embeddings
         embeddings = state.embedder.extract_image_embeddings_from_pil(images)
 
-        # Calculate UMAP coordinates (simplified - using PCA for now)
-        from sklearn.decomposition import PCA
-        if len(state.images_metadata) == 0:
-            # First batch - create new space
-            pca = PCA(n_components=2, random_state=42)
-            coords = pca.fit_transform(embeddings)
-        else:
-            # Project to existing space
-            all_embeddings = np.array([img.embedding for img in state.images_metadata])
-            combined = np.vstack([all_embeddings, embeddings])
-            pca = PCA(n_components=2, random_state=42)
-            all_coords = pca.fit_transform(combined)
-            coords = all_coords[-len(embeddings):]
+        # Project embeddings onto semantic axes
+        coords = project_embeddings_to_coordinates(embeddings)
 
         # Create ImageMetadata objects
         group_id = f"batch_{len(state.history_groups)}"
@@ -362,13 +377,8 @@ async def generate_from_reference(request: GenerateFromReferenceRequest):
         # Extract embedding
         new_embedding = state.embedder.extract_image_embeddings_from_pil([new_img])[0]
 
-        # Project coordinates (simplified)
-        all_embeddings = np.array([img.embedding for img in state.images_metadata])
-        combined = np.vstack([all_embeddings, new_embedding.reshape(1, -1)])
-        from sklearn.decomposition import PCA
-        pca = PCA(n_components=2, random_state=42)
-        all_coords = pca.fit_transform(combined)
-        new_coord = all_coords[-1]
+        # Project onto semantic axes
+        new_coord = project_embeddings_to_coordinates(new_embedding.reshape(1, -1))[0]
 
         # Create metadata
         group_id = f"reference_{len(state.history_groups)}"
@@ -443,13 +453,8 @@ async def interpolate_images(request: InterpolateRequest):
         # Extract embedding
         new_embedding = state.embedder.extract_image_embeddings_from_pil([new_img])[0]
 
-        # Project coordinates
-        all_embeddings = np.array([img.embedding for img in state.images_metadata])
-        combined = np.vstack([all_embeddings, new_embedding.reshape(1, -1)])
-        from sklearn.decomposition import PCA
-        pca = PCA(n_components=2, random_state=42)
-        all_coords = pca.fit_transform(combined)
-        new_coord = all_coords[-1]
+        # Project onto semantic axes
+        new_coord = project_embeddings_to_coordinates(new_embedding.reshape(1, -1))[0]
 
         # Create metadata
         group_id = f"interpolation_{len(state.history_groups)}"
@@ -502,35 +507,35 @@ async def update_semantic_axes(request: AxisUpdateRequest):
         if state.axis_builder is None or state.embedder is None:
             raise HTTPException(status_code=400, detail="Models not initialized")
 
+        print(f"\n=== Updating Semantic Axes ===")
+        print(f"X: {request.x_negative} → {request.x_positive}")
+        print(f"Y: {request.y_negative} → {request.y_positive}")
+
         # Update axis labels
         state.axis_labels = {
             'x': (request.x_negative, request.x_positive),
             'y': (request.y_negative, request.y_positive)
         }
 
-        # Build semantic axes
-        x_axis = state.axis_builder.create_clip_text_axis(
-            f"shoe that is {request.x_positive}",
-            f"shoe that is {request.x_negative}"
-        )
-        y_axis = state.axis_builder.create_clip_text_axis(
-            f"shoe that is {request.y_positive}",
-            f"shoe that is {request.y_negative}"
-        )
+        # Recalculate ALL positions using the new axes
+        if len(state.images_metadata) > 0:
+            print(f"Recalculating positions for {len(state.images_metadata)} images...")
+            all_embeddings = np.array([img.embedding for img in state.images_metadata])
+            new_coords = project_embeddings_to_coordinates(all_embeddings)
 
-        # Recalculate positions
-        all_embeddings = np.array([img.embedding for img in state.images_metadata])
-        x_coords = all_embeddings @ x_axis.direction
-        y_coords = all_embeddings @ y_axis.direction
+            for i, img_meta in enumerate(state.images_metadata):
+                img_meta.coordinates = (float(new_coords[i][0]), float(new_coords[i][1]))
 
-        for i, img_meta in enumerate(state.images_metadata):
-            img_meta.coordinates = (float(x_coords[i]), float(y_coords[i]))
+            print(f"✓ All positions recalculated")
 
         await broadcast_state_update()
 
         return {"status": "success", "message": "Axes updated"}
 
     except Exception as e:
+        print(f"ERROR updating axes: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -616,19 +621,10 @@ async def add_external_images(request: AddExternalImagesRequest):
         embeddings = state.embedder.extract_image_embeddings_from_pil(pil_images)
         print("✓ Embeddings extracted")
 
-        # Calculate UMAP coordinates (simplified - using PCA for now)
-        from sklearn.decomposition import PCA
-        if len(state.images_metadata) == 0:
-            # First batch - create new space
-            pca = PCA(n_components=2, random_state=42)
-            coords = pca.fit_transform(embeddings)
-        else:
-            # Project to existing space
-            all_embeddings = np.array([img.embedding for img in state.images_metadata])
-            combined = np.vstack([all_embeddings, embeddings])
-            pca = PCA(n_components=2, random_state=42)
-            all_coords = pca.fit_transform(combined)
-            coords = all_coords[-len(embeddings):]
+        # Project embeddings onto semantic axes
+        print("Projecting onto semantic axes...")
+        coords = project_embeddings_to_coordinates(embeddings)
+        print(f"✓ Coordinates calculated: {coords.shape}")
 
         # Create ImageMetadata objects
         group_id = f"{request.generation_method}_{len(state.history_groups)}"

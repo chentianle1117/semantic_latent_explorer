@@ -624,6 +624,51 @@ export const App: React.FC = () => {
               style={{ width: "100%" }}
             />
           </div>
+
+          <div className="setting-item">
+            <div className="setting-label">
+              <span>
+                Layout Padding:{" "}
+                {(useAppStore.getState().visualSettings.layoutPadding * 100).toFixed(0)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.05"
+              max="0.3"
+              step="0.05"
+              value={useAppStore.getState().visualSettings.layoutPadding}
+              onChange={(e) => {
+                useAppStore.getState().updateVisualSettings({
+                  layoutPadding: parseFloat(e.target.value),
+                });
+              }}
+              style={{ width: "100%" }}
+              title="Controls spacing around images when rescaling (5% = tight, 30% = spacious)"
+            />
+            <div style={{ fontSize: "11px", color: "#8b949e", marginTop: "4px" }}>
+              {useAppStore.getState().visualSettings.layoutPadding <= 0.1
+                ? "Tight spacing"
+                : useAppStore.getState().visualSettings.layoutPadding <= 0.2
+                ? "Moderate spacing"
+                : "Spacious layout"}
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <button
+              className="action-button secondary"
+              onClick={() => {
+                useAppStore.getState().resetCanvasBounds();
+                console.log("🔄 Canvas bounds reset - will rescale on next render");
+              }}
+              disabled={images.length === 0}
+              style={{ width: "100%", marginTop: "8px" }}
+              title="Rescale canvas to fit all images with current padding setting"
+            >
+              📐 Rescale Canvas
+            </button>
+          </div>
         </div>
       </div>
 

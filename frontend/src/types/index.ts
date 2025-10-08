@@ -30,6 +30,13 @@ export interface AxisLabels {
   y: [string, string];
 }
 
+export interface CanvasBounds {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
 export interface AppState {
   images: ImageData[];
   historyGroups: HistoryGroup[];
@@ -38,6 +45,7 @@ export interface AppState {
   hoveredImageId: number | null;
   hoveredGroupId: string | null;
   visualSettings: VisualSettings;
+  canvasBounds: CanvasBounds | null; // null = auto-calculate from data
   generationMode: GenerationMode;
   removeBackground: boolean;
   isGenerating: boolean;
@@ -51,6 +59,7 @@ export interface VisualSettings {
   imageSize: number;
   imageOpacity: number;
   removeBackground: boolean;
+  layoutPadding: number; // Padding factor for canvas bounds (0.05 = 5%, 0.2 = 20%)
 }
 
 export type GenerationMode = 'local-sd15' | 'fal-nanobanana';

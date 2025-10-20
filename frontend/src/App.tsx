@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
+import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
 import { InterpolationDialog } from "./components/InterpolationDialog/InterpolationDialog";
 import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingActionPanel";
 import { ProgressBar } from "./components/ProgressBar/ProgressBar";
 import { ModeToggle } from "./components/ModeToggle/ModeToggle";
+import { Canvas3DToggle } from "./components/Canvas3DToggle/Canvas3DToggle";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
@@ -32,6 +34,7 @@ export const App: React.FC = () => {
   const isGenerating = useAppStore((state) => state.isGenerating);
   const generationMode = useAppStore((state) => state.generationMode);
   const removeBackground = useAppStore((state) => state.removeBackground);
+  const is3DMode = useAppStore((state) => state.is3DMode);
 
   const setImages = useAppStore((state) => state.setImages);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
@@ -488,12 +491,13 @@ export const App: React.FC = () => {
         setPromptDialogImageId(null);
         setInterpolationImageIds(null);
         setFloatingPanelPos(null);
+        clearSelection(); // Also clear selection to close dialogs
       }
     };
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, []);
+  }, [clearSelection]);
 
   // Update floating panel position when selection changes
   useEffect(() => {
@@ -516,24 +520,42 @@ export const App: React.FC = () => {
         <div className="canvas-stats">
           <strong>{images.length}</strong> images •{" "}
           <strong>CLIP ViT-B/32</strong> •{" "}
-          {isInitialized ? "✅ Ready" : "⏳ Initializing..."}
+          {isInitialized ? "✅ Ready" : "⏳ Initializing..."} •{" "}
+          <strong>{is3DMode ? "3D" : "2D"}</strong> mode
         </div>
 
-        <SemanticCanvas
-          onSelectionChange={React.useCallback((x, y, count) => {
-            console.log("🎯 App received onSelectionChange:", { x, y, count });
-            if (count > 0) {
-              // -1 signals to keep existing position, just update count
-              if (x === -1 && y === -1) {
-                setFloatingPanelPos(prev => prev ? { ...prev, count } : { x: 0, y: 0, count });
+        {/* Conditionally render 2D or 3D canvas */}
+        {is3DMode ? (
+          <SemanticCanvas3D
+            onSelectionChange={React.useCallback((x, y, count) => {
+              console.log("🎯 App received 3D onSelectionChange:", { x, y, count });
+              if (count > 0) {
+                if (x === -1 && y === -1) {
+                  setFloatingPanelPos(prev => prev ? { ...prev, count } : { x: 0, y: 0, count });
+                } else {
+                  setFloatingPanelPos({ x, y, count });
+                }
               } else {
-                setFloatingPanelPos({ x, y, count });
+                setFloatingPanelPos(null);
               }
-            } else {
-              setFloatingPanelPos(null);
-            }
-          }, [])}
-        />
+            }, [])}
+          />
+        ) : (
+          <SemanticCanvas
+            onSelectionChange={React.useCallback((x, y, count) => {
+              console.log("🎯 App received 2D onSelectionChange:", { x, y, count });
+              if (count > 0) {
+                if (x === -1 && y === -1) {
+                  setFloatingPanelPos(prev => prev ? { ...prev, count } : { x: 0, y: 0, count });
+                } else {
+                  setFloatingPanelPos({ x, y, count });
+                }
+              } else {
+                setFloatingPanelPos(null);
+              }
+            }, [])}
+          />
+        )}
 
         {/* Floating Action Panel (primary interaction) */}
         {floatingPanelPos && floatingPanelPos.count > 0 && (
@@ -584,7 +606,7 @@ export const App: React.FC = () => {
             referenceImages={promptDialogImages}
             onClose={() => {
               setPromptDialogImageId(null);
-              // Don't clear selection here - let user keep it
+              clearSelection(); // Clear selection to close the dialog
             }}
             onGenerate={handlePromptDialogGenerate}
           />
@@ -694,8 +716,11 @@ export const App: React.FC = () => {
 
       {/* Control Panel */}
       <div className="control-panel">
-        {/* Mode Toggle */}
-        <ModeToggle />
+        {/* Mode Toggles */}
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          <ModeToggle />
+          <Canvas3DToggle />
+        </div>
 
         {/* Quick Actions */}
         <div className="quick-actions">

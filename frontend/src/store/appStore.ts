@@ -25,7 +25,7 @@ interface AppStore extends AppState {
 
   updateVisualSettings: (settings: Partial<VisualSettings>) => void;
 
-  setAxisLabels: (labels: { x: [string, string]; y: [string, string] }) => void;
+  setAxisLabels: (labels: { x: [string, string]; y: [string, string]; z?: [string, string] }) => void;
 
   setCanvasBounds: (bounds: CanvasBounds | null) => void;
   resetCanvasBounds: () => void; // Trigger rescale on next render
@@ -38,6 +38,8 @@ interface AppStore extends AppState {
   setGenerationMode: (mode: GenerationMode) => void;
   setRemoveBackground: (remove: boolean) => void;
 
+  setIs3DMode: (is3D: boolean) => void;  // New: toggle 3D mode
+
   clearAll: () => void;
 }
 
@@ -47,6 +49,7 @@ const initialState: AppState = {
   axisLabels: {
     x: ['formal', 'sporty'],
     y: ['dark', 'colorful'],
+    z: ['casual', 'elegant'],  // New: default z-axis labels
   },
   selectedImageIds: [],
   hoveredImageId: null,
@@ -65,6 +68,7 @@ const initialState: AppState = {
   generationProgress: 0,
   generationCurrent: 0,
   generationTotal: 0,
+  is3DMode: false,  // New: default to 2D mode
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -163,6 +167,9 @@ export const useAppStore = create<AppStore>((set) => ({
   // Generation mode
   setGenerationMode: (mode) => set({ generationMode: mode }),
   setRemoveBackground: (remove) => set({ removeBackground: remove }),
+
+  // 3D mode
+  setIs3DMode: (is3D) => set({ is3DMode: is3D }),
 
   // Clear all
   clearAll: () =>

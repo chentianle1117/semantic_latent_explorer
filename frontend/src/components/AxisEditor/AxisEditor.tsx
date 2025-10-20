@@ -6,7 +6,7 @@ import React, { useState, useEffect } from "react";
 import "./AxisEditor.css";
 
 interface AxisEditorProps {
-  axis: "x" | "y";
+  axis: "x" | "y" | "z";  // Support z-axis for 3D mode
   negativeLabel: string;
   positiveLabel: string;
   onUpdate: (negative: string, positive: string) => void;

@@ -6,7 +6,7 @@ export interface ImageData {
   id: number;
   group_id: string;
   base64_image: string;
-  coordinates: [number, number];
+  coordinates: [number, number] | [number, number, number];  // 2D or 3D coordinates
   parents: number[];
   children: number[];
   generation_method: 'batch' | 'reference' | 'interpolation' | 'dataset';
@@ -28,6 +28,7 @@ export interface HistoryGroup {
 export interface AxisLabels {
   x: [string, string]; // [negative, positive]
   y: [string, string];
+  z?: [string, string];  // Optional z-axis for 3D mode
 }
 
 export interface CanvasBounds {
@@ -35,6 +36,8 @@ export interface CanvasBounds {
   xMax: number;
   yMin: number;
   yMax: number;
+  zMin?: number;  // Optional for 3D mode
+  zMax?: number;  // Optional for 3D mode
 }
 
 export interface AppState {
@@ -53,6 +56,7 @@ export interface AppState {
   generationProgress: number;
   generationCurrent: number;
   generationTotal: number;
+  is3DMode: boolean;  // New: track 3D visualization mode
 }
 
 export interface VisualSettings {
@@ -86,6 +90,8 @@ export interface AxisUpdateRequest {
   x_negative: string;
   y_positive: string;
   y_negative: string;
+  z_positive?: string;  // Optional for 3D mode
+  z_negative?: string;  // Optional for 3D mode
 }
 
 export interface WebSocketMessage {

@@ -93,6 +93,14 @@ class APIClient {
     return response.data;
   }
 
+  // Toggle 3D mode
+  async set3DMode(use3D: boolean): Promise<{ status: string; is_3d_mode: boolean; message: string }> {
+    const response = await axios.post(`${API_BASE}/set-3d-mode`, null, {
+      params: { use_3d: use3D }
+    });
+    return response.data;
+  }
+
   // WebSocket connection for real-time updates
   connectWebSocket(onMessage: (message: WebSocketMessage) => void): void {
     this.wsCallbacks.add(onMessage);

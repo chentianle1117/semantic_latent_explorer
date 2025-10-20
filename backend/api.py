@@ -60,6 +60,8 @@ class AxisUpdateRequest(BaseModel):
     x_negative: str
     y_positive: str
     y_negative: str
+    z_positive: Optional[str] = None  # New: optional z-axis
+    z_negative: Optional[str] = None  # New: optional z-axis
 
 
 class ExternalImage(BaseModel):
@@ -78,7 +80,7 @@ class ImageResponse(BaseModel):
     id: int
     group_id: str
     base64_image: str
-    coordinates: Tuple[float, float]
+    coordinates: Tuple[float, ...]  # Changed to support 2D or 3D
     parents: List[int]
     children: List[int]
     generation_method: str
@@ -91,6 +93,7 @@ class StateResponse(BaseModel):
     images: List[ImageResponse]
     history_groups: List[Dict]
     axis_labels: Dict[str, Tuple[str, str]]
+    is_3d_mode: bool = False  # New: track if in 3D mode
 
 
 # Global state
@@ -103,8 +106,10 @@ class AppState:
         self.history_groups: List[HistoryGroup] = []
         self.axis_labels = {
             'x': ('formal', 'sporty'),
-            'y': ('dark', 'colorful')
+            'y': ('dark', 'colorful'),
+            'z': ('casual', 'elegant')  # New: default z-axis labels
         }
+        self.is_3d_mode = False  # New: track 3D mode
         self.next_id = 0
         self.websocket_connections: List[WebSocket] = []
 
@@ -120,14 +125,24 @@ def pil_to_base64(pil_image: Image.Image) -> str:
     return img_str
 
 
-def project_embeddings_to_coordinates(embeddings: np.ndarray) -> np.ndarray:
+def project_embeddings_to_coordinates(embeddings: np.ndarray, use_3d: bool = None) -> np.ndarray:
     """
-    Project embeddings onto semantic axes to get 2D coordinates.
+    Project embeddings onto semantic axes to get 2D or 3D coordinates.
     Uses current axis labels to create semantic directions.
-    Returns array of shape (N, 2) with (x, y) coordinates.
+
+    Args:
+        embeddings: Image embeddings (N, embedding_dim)
+        use_3d: If True, use 3D projection. If None, use state.is_3d_mode
+
+    Returns:
+        Array of shape (N, 2) or (N, 3) depending on mode
     """
     if state.axis_builder is None or state.embedder is None:
         raise RuntimeError("Models not initialized")
+
+    # Determine 3D mode
+    if use_3d is None:
+        use_3d = state.is_3d_mode
 
     # Build semantic axes from current labels
     x_axis = state.axis_builder.create_clip_text_axis(
@@ -142,6 +157,15 @@ def project_embeddings_to_coordinates(embeddings: np.ndarray) -> np.ndarray:
     # Project embeddings onto axes
     x_coords = embeddings @ x_axis.direction
     y_coords = embeddings @ y_axis.direction
+
+    # If 3D mode, add z-axis projection
+    if use_3d and 'z' in state.axis_labels:
+        z_axis = state.axis_builder.create_clip_text_axis(
+            f"shoe that is {state.axis_labels['z'][1]}",  # positive
+            f"shoe that is {state.axis_labels['z'][0]}"   # negative
+        )
+        z_coords = embeddings @ z_axis.direction
+        return np.column_stack([x_coords, y_coords, z_coords])
 
     return np.column_stack([x_coords, y_coords])
 
@@ -222,7 +246,8 @@ async def get_state():
             }
             for g in state.history_groups
         ],
-        axis_labels=state.axis_labels
+        axis_labels=state.axis_labels,
+        is_3d_mode=state.is_3d_mode  # New: include 3D mode state
     )
 
 
@@ -314,7 +339,7 @@ async def generate_images(request: GenerateRequest):
                 group_id=group_id,
                 pil_image=img,
                 embedding=emb,
-                coordinates=(float(coord[0]), float(coord[1])),
+                coordinates=tuple(float(c) for c in coord),  # Support 2D or 3D
                 parents=[],
                 children=[],
                 generation_method='batch',
@@ -387,7 +412,7 @@ async def generate_from_reference(request: GenerateFromReferenceRequest):
             group_id=group_id,
             pil_image=new_img,
             embedding=new_embedding,
-            coordinates=(float(new_coord[0]), float(new_coord[1])),
+            coordinates=tuple(float(c) for c in new_coord),  # Support 2D or 3D
             parents=[request.reference_id],
             children=[],
             generation_method='reference',
@@ -463,7 +488,7 @@ async def interpolate_images(request: InterpolateRequest):
             group_id=group_id,
             pil_image=new_img,
             embedding=new_embedding,
-            coordinates=(float(new_coord[0]), float(new_coord[1])),
+            coordinates=tuple(float(c) for c in new_coord),  # Support 2D or 3D
             parents=[request.id_a, request.id_b],
             children=[],
             generation_method='interpolation',
@@ -512,10 +537,13 @@ async def update_semantic_axes(request: AxisUpdateRequest):
         print(f"Y: {request.y_negative} → {request.y_positive}")
 
         # Update axis labels
-        state.axis_labels = {
-            'x': (request.x_negative, request.x_positive),
-            'y': (request.y_negative, request.y_positive)
-        }
+        state.axis_labels['x'] = (request.x_negative, request.x_positive)
+        state.axis_labels['y'] = (request.y_negative, request.y_positive)
+
+        # Update z-axis if provided
+        if request.z_positive and request.z_negative:
+            print(f"Z: {request.z_negative} → {request.z_positive}")
+            state.axis_labels['z'] = (request.z_negative, request.z_positive)
 
         # Recalculate ALL positions using the new axes
         if len(state.images_metadata) > 0:
@@ -524,7 +552,8 @@ async def update_semantic_axes(request: AxisUpdateRequest):
             new_coords = project_embeddings_to_coordinates(all_embeddings)
 
             for i, img_meta in enumerate(state.images_metadata):
-                img_meta.coordinates = (float(new_coords[i][0]), float(new_coords[i][1]))
+                # Store coordinates as tuple (2D or 3D)
+                img_meta.coordinates = tuple(float(c) for c in new_coords[i])
 
             print(f"✓ All positions recalculated")
 
@@ -534,6 +563,43 @@ async def update_semantic_axes(request: AxisUpdateRequest):
 
     except Exception as e:
         print(f"ERROR updating axes: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/set-3d-mode")
+async def set_3d_mode(use_3d: bool):
+    """Toggle between 2D and 3D visualization mode."""
+    try:
+        if state.axis_builder is None or state.embedder is None:
+            raise HTTPException(status_code=400, detail="Models not initialized")
+
+        print(f"\n=== Setting 3D Mode: {use_3d} ===")
+        state.is_3d_mode = use_3d
+
+        # Recalculate ALL positions with new dimensionality
+        if len(state.images_metadata) > 0:
+            print(f"Recalculating positions for {len(state.images_metadata)} images in {'3D' if use_3d else '2D'} mode...")
+            all_embeddings = np.array([img.embedding for img in state.images_metadata])
+            new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=use_3d)
+
+            for i, img_meta in enumerate(state.images_metadata):
+                # Store coordinates as tuple (2D or 3D)
+                img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+
+            print(f"✓ All positions recalculated to {'3D' if use_3d else '2D'}")
+
+        await broadcast_state_update()
+
+        return {
+            "status": "success",
+            "is_3d_mode": use_3d,
+            "message": f"Switched to {'3D' if use_3d else '2D'} mode"
+        }
+
+    except Exception as e:
+        print(f"ERROR setting 3D mode: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -636,7 +702,7 @@ async def add_external_images(request: AddExternalImagesRequest):
                 group_id=group_id,
                 pil_image=img,
                 embedding=emb,
-                coordinates=(float(coord[0]), float(coord[1])),
+                coordinates=tuple(float(c) for c in coord),  # Support 2D or 3D
                 parents=request.parent_ids.copy(),  # Set parent relationships
                 children=[],
                 generation_method=request.generation_method,

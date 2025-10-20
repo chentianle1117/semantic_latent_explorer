@@ -2,7 +2,7 @@
  * Inline Axis Editor Component
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./AxisEditor.css";
 
 interface AxisEditorProps {
@@ -14,7 +14,7 @@ interface AxisEditorProps {
 }
 
 export const AxisEditor: React.FC<AxisEditorProps> = ({
-  axis,
+  axis: _axis,
   negativeLabel,
   positiveLabel,
   onUpdate,
@@ -23,6 +23,12 @@ export const AxisEditor: React.FC<AxisEditorProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [negative, setNegative] = useState(negativeLabel);
   const [positive, setPositive] = useState(positiveLabel);
+
+  // Sync local state with props whenever they change
+  useEffect(() => {
+    setNegative(negativeLabel);
+    setPositive(positiveLabel);
+  }, [negativeLabel, positiveLabel]);
 
   const handleUpdate = () => {
     if (negative.trim() && positive.trim()) {

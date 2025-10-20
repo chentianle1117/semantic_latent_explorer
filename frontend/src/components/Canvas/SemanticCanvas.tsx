@@ -48,22 +48,33 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   // Track previous values to see what changed
   const prevImagesRef = React.useRef(images);
   const prevVisualSettingsRef = React.useRef(visualSettings);
+  const prevLayoutPaddingRef = React.useRef(visualSettings.layoutPadding);
 
   // Main rendering effect - ONLY for full redraws (images, visualSettings, axisLabels change)
   useEffect(() => {
     const imagesChanged = prevImagesRef.current !== images;
     const visualSettingsChanged =
       prevVisualSettingsRef.current !== visualSettings;
+    const layoutPaddingChanged =
+      prevLayoutPaddingRef.current !== visualSettings.layoutPadding;
 
     console.log("🔄 Canvas FULL render effect triggered", {
       imagesCount: images.length,
       imagesChanged,
       visualSettingsChanged,
+      layoutPaddingChanged,
       hasSvgRef: !!svgRef.current,
     });
 
+    // If layout padding changed, reset bounds to force recalculation
+    if (layoutPaddingChanged && !imagesChanged) {
+      console.log("📏 Layout padding changed, resetting bounds");
+      useAppStore.getState().resetCanvasBounds();
+    }
+
     prevImagesRef.current = images;
     prevVisualSettingsRef.current = visualSettings;
+    prevLayoutPaddingRef.current = visualSettings.layoutPadding;
 
     if (!svgRef.current) {
       console.warn("⚠️ No SVG ref available");

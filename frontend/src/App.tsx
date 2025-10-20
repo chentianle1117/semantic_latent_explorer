@@ -297,9 +297,12 @@ export const App: React.FC = () => {
     }
   };
 
-  const promptDialogImage = images.find(
-    (img) => img.id === promptDialogImageId
-  );
+  // Get all selected images for the prompt dialog
+  const promptDialogImages = selectedImageIds.length > 0
+    ? images.filter((img) => selectedImageIds.includes(img.id))
+    : promptDialogImageId !== null
+    ? images.filter((img) => img.id === promptDialogImageId)
+    : [];
 
   const interpolationImages = interpolationImageIds
     ? [
@@ -308,8 +311,13 @@ export const App: React.FC = () => {
       ].filter(Boolean) as [ImageData, ImageData]
     : null;
 
-  const handleGenerateFromReferenceClick = (imageId: number) => {
-    setPromptDialogImageId(imageId);
+  const handleGenerateFromReferenceClick = () => {
+    // Use selected images, or if none selected, single image ID will be set
+    // The promptDialogImages computed property handles this
+    if (selectedImageIds.length === 0 && promptDialogImageId === null) {
+      console.warn("No images selected for reference generation");
+      return;
+    }
   };
 
   const handleInterpolateClick = () => {
@@ -320,11 +328,12 @@ export const App: React.FC = () => {
   };
 
   const handlePromptDialogGenerate = async (
-    referenceId: number,
-    prompt: string
+    referenceIds: number[],
+    prompt: string,
+    numImages: number = 1
   ) => {
     console.log(
-      `Generating from reference ${referenceId} with prompt: "${prompt}"`
+      `Generating from ${referenceIds.length} reference(s) with prompt: "${prompt}", count: ${numImages}`
     );
 
     // Check if fal.ai is configured when using fal-nanobanana mode
@@ -336,11 +345,17 @@ export const App: React.FC = () => {
     setPromptDialogImageId(null);
     setIsGenerating(true);
     setFloatingPanelPos(null);
-    setGenerationCount(0, 1);
+    setGenerationCount(0, numImages);
     setGenerationProgress(0);
 
-    // Estimate 5 seconds for generation
-    const estimatedTimeMs = 5000;
+    // Estimate time based on mode and number of images
+    let estimatedTimeMs;
+    if (generationMode === 'fal-nanobanana') {
+      estimatedTimeMs = Math.max(8000, numImages * 2000); // ~2 seconds per image, min 8s
+    } else {
+      estimatedTimeMs = 5000; // Local SD takes ~5 seconds
+    }
+
     const updateIntervalMs = 100;
     const totalUpdates = estimatedTimeMs / updateIntervalMs;
     let updates = 0;
@@ -348,6 +363,8 @@ export const App: React.FC = () => {
     const progressInterval = setInterval(() => {
       updates++;
       const progress = Math.min((updates / totalUpdates) * 90, 90);
+      const currentImageEstimate = Math.floor((progress / 90) * numImages);
+      setGenerationCount(currentImageEstimate, numImages);
       setGenerationProgress(progress);
     }, updateIntervalMs);
 
@@ -363,9 +380,9 @@ export const App: React.FC = () => {
 
     try {
       if (generationMode === 'local-sd15') {
-        // Use local SD 1.5 backend
+        // Use local SD 1.5 backend (only supports single reference)
         const result = await apiClient.generateFromReference({
-          reference_id: referenceId,
+          reference_id: referenceIds[0],  // Use first reference
           prompt,
         });
         clearInterval(progressInterval);
@@ -376,14 +393,14 @@ export const App: React.FC = () => {
         clearSelection();
       } else {
         // Use fal.ai nano-banana image editing
-        // Get selected images to use as references
-        const selectedImages = selectedImageIds.length > 0
-          ? images.filter(img => selectedImageIds.includes(img.id))
-          : images.filter(img => img.id === referenceId);
+        // Get reference images from IDs
+        const selectedImages = images.filter(img => referenceIds.includes(img.id));
 
         if (selectedImages.length === 0) {
           throw new Error("No reference images found");
         }
+
+        console.log(`Using ${selectedImages.length} reference images to generate ${numImages} variations`);
 
         // Convert base64 images to URLs that fal.ai can use
         // For now, we'll use the text-to-image endpoint since we have base64 data
@@ -405,7 +422,7 @@ export const App: React.FC = () => {
         const result = await falClient.generateImageEdit({
           prompt,
           image_urls: imageUrls,
-          num_images: 1,
+          num_images: numImages,  // Changed from hardcoded 1
           aspect_ratio: "1:1",
           output_format: "jpeg"
         });
@@ -425,10 +442,10 @@ export const App: React.FC = () => {
           parent_ids: parentIds
         });
 
-        console.log(`✓ Added fal.ai edited image to canvas with ${parentIds.length} parent(s)`);
+        console.log(`✓ Added ${result.images.length} fal.ai edited image(s) to canvas with ${parentIds.length} parent(s)`);
         clearInterval(progressInterval);
         clearTimeout(safetyTimeout);
-        setGenerationCount(1, 1);
+        setGenerationCount(numImages, numImages);
         setGenerationProgress(100);
         clearSelection();
       }
@@ -525,8 +542,8 @@ export const App: React.FC = () => {
             y={floatingPanelPos.y}
             selectedCount={floatingPanelPos.count}
             onGenerateFromReference={() => {
-              // Use first selected image as reference
-              handleGenerateFromReferenceClick(selectedImageIds[0]);
+              // Open dialog with all selected images
+              handleGenerateFromReferenceClick();
               setFloatingPanelPos(null);
             }}
             onInterpolate={
@@ -562,10 +579,13 @@ export const App: React.FC = () => {
         )}
 
         {/* Prompt Dialog */}
-        {promptDialogImage && (
+        {promptDialogImages.length > 0 && (
           <PromptDialog
-            referenceImage={promptDialogImage}
-            onClose={() => setPromptDialogImageId(null)}
+            referenceImages={promptDialogImages}
+            onClose={() => {
+              setPromptDialogImageId(null);
+              // Don't clear selection here - let user keep it
+            }}
             onGenerate={handlePromptDialogGenerate}
           />
         )}

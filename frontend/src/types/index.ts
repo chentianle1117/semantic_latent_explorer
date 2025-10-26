@@ -64,6 +64,8 @@ export interface VisualSettings {
   imageOpacity: number;
   removeBackground: boolean;
   layoutPadding: number; // Padding factor for canvas bounds (0.05 = 5%, 0.2 = 20%)
+  coordinateScale: number; // Scale multiplier for coordinates (affects spacing between items)
+  coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
 }
 
 export type GenerationMode = 'local-sd15' | 'fal-nanobanana';

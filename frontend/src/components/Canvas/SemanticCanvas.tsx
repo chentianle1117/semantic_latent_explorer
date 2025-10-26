@@ -272,16 +272,18 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const drawGenealogy = (imgData: ImageData) => {
       linesGroup.selectAll("*").remove();
 
-      const currentX = xScale(imgData.coordinates[0]);
-      const currentY = yScale(imgData.coordinates[1]);
+      const coordScale = visualSettings.coordinateScale || 1.0;
+      const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+      const currentX = xScale((imgData.coordinates[0] + coordOffset[0]) * coordScale);
+      const currentY = yScale((imgData.coordinates[1] + coordOffset[1]) * coordScale);
 
       // Draw parent lines (green)
       imgData.parents.forEach((parentId) => {
         const parent = images.find((img) => img.id === parentId);
         if (!parent) return;
 
-        const parentX = xScale(parent.coordinates[0]);
-        const parentY = yScale(parent.coordinates[1]);
+        const parentX = xScale((parent.coordinates[0] + coordOffset[0]) * coordScale);
+        const parentY = yScale((parent.coordinates[1] + coordOffset[1]) * coordScale);
         const midX = (parentX + currentX) / 2;
         const midY = (parentY + currentY) / 2;
         const dx = currentX - parentX;
@@ -311,8 +313,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const child = images.find((img) => img.id === childId);
         if (!child) return;
 
-        const childX = xScale(child.coordinates[0]);
-        const childY = yScale(child.coordinates[1]);
+        const childX = xScale((child.coordinates[0] + coordOffset[0]) * coordScale);
+        const childY = yScale((child.coordinates[1] + coordOffset[1]) * coordScale);
         const midX = (currentX + childX) / 2;
         const midY = (currentY + childY) / 2;
         const dx = childX - currentX;
@@ -346,6 +348,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     // Render images
     const imageSize = visualSettings.imageSize;
+    const coordScale = visualSettings.coordinateScale || 1.0; // Get coordinate scale multiplier
+    const coordOffset = visualSettings.coordinateOffset || [0, 0, 0]; // Get coordinate offset
     const imageNodes = imagesGroup
       .selectAll(".image-node")
       .data(images, (d: any) => d.id)
@@ -355,7 +359,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr(
         "transform",
         (d) =>
-          `translate(${xScale(d.coordinates[0])}, ${yScale(d.coordinates[1])})`
+          `translate(${xScale((d.coordinates[0] + coordOffset[0]) * coordScale)}, ${yScale((d.coordinates[1] + coordOffset[1]) * coordScale)})`
       );
 
     console.log("🎯 Attaching click handlers to", images.length, "image nodes");
@@ -376,6 +380,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           imageId: d.id,
           eventType: event.type,
           button: event.button,
+          ctrlKey: event.ctrlKey,
           target: event.target,
           currentTarget: event.currentTarget,
         });
@@ -390,7 +395,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           useAppStore.getState().selectedImageIds
         );
 
-        toggleImageSelection(d.id, false);
+        toggleImageSelection(d.id, event.ctrlKey);
 
         setTimeout(() => {
           const currentSelection = useAppStore.getState().selectedImageIds;
@@ -636,6 +641,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             yMax2 = yExtent[1] + yPadding;
           }
 
+          const coordScale = visualSettings.coordinateScale || 1.0;
+          const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
           const xScale = d3
             .scaleLinear()
             .domain([xMin2, xMax2])
@@ -645,16 +652,16 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             .domain([yMin2, yMax2])
             .range([height - 50, 50]);
 
-          const currentX = xScale(selectedImg.coordinates[0]);
-          const currentY = yScale(selectedImg.coordinates[1]);
+          const currentX = xScale((selectedImg.coordinates[0] + coordOffset[0]) * coordScale);
+          const currentY = yScale((selectedImg.coordinates[1] + coordOffset[1]) * coordScale);
 
           // Draw parent lines
           selectedImg.parents.forEach((parentId) => {
             const parent = images.find((img) => img.id === parentId);
             if (!parent) return;
 
-            const parentX = xScale(parent.coordinates[0]);
-            const parentY = yScale(parent.coordinates[1]);
+            const parentX = xScale((parent.coordinates[0] + coordOffset[0]) * coordScale);
+            const parentY = yScale((parent.coordinates[1] + coordOffset[1]) * coordScale);
             const midX = (parentX + currentX) / 2;
             const midY = (parentY + currentY) / 2;
             const dx = currentX - parentX;
@@ -684,8 +691,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             const child = images.find((img) => img.id === childId);
             if (!child) return;
 
-            const childX = xScale(child.coordinates[0]);
-            const childY = yScale(child.coordinates[1]);
+            const childX = xScale((child.coordinates[0] + coordOffset[0]) * coordScale);
+            const childY = yScale((child.coordinates[1] + coordOffset[1]) * coordScale);
             const midX = (currentX + childX) / 2;
             const midY = (currentY + childY) / 2;
             const dx = childX - currentX;

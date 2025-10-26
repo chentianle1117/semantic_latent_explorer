@@ -59,6 +59,8 @@ const initialState: AppState = {
     imageOpacity: 0.9,
     removeBackground: true,
     layoutPadding: 0.1, // 10% padding by default
+    coordinateScale: 1.0, // Scale multiplier for coordinates (affects spacing)
+    coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
   },
   canvasBounds: null, // Will auto-calculate on first render
   generationMode: 'local-sd15',

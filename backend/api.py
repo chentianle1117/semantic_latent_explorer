@@ -258,19 +258,19 @@ async def initialize_models():
         if state.embedder is None:
             print("Loading CLIP embedder...")
             state.embedder = CLIPEmbedder()
-            print("✓ CLIP loaded")
+            print("OK: CLIP loaded")
 
         if state.generator is None:
             print("Loading Stable Diffusion generator...")
             # Try CUDA first, fall back to CPU if it fails
             try:
                 state.generator = SemanticGenerator(device='cuda')
-                print("✓ Generator loaded (GPU)")
+                print("OK: Generator loaded (GPU)")
             except Exception as gpu_error:
                 print(f"GPU failed: {gpu_error}")
                 print("Falling back to CPU mode...")
                 state.generator = SemanticGenerator(device='cpu')
-                print("✓ Generator loaded (CPU)")
+                print("OK: Generator loaded (CPU)")
 
         if state.axis_builder is None:
             state.axis_builder = SemanticAxisBuilder(state.embedder)
@@ -290,10 +290,11 @@ async def initialize_clip_only():
         if state.embedder is None:
             print("Loading CLIP embedder...")
             state.embedder = CLIPEmbedder()
-            print("✓ CLIP loaded")
+            print("CLIP loaded successfully")
 
         if state.axis_builder is None:
             state.axis_builder = SemanticAxisBuilder(state.embedder)
+            print("Axis builder initialized")
 
         return {"status": "success", "message": "CLIP initialized"}
     except Exception as e:
@@ -321,7 +322,7 @@ async def generate_images(request: GenerateRequest):
             print(f"  Generating image {i+1}/{request.n_images}...")
             img = state.generator.generate_from_text(request.prompt)
             images.append(img)
-            print(f"  ✓ Image {i+1} generated")
+            print(f"  OK: Image {i+1} generated")
 
         # Extract embeddings
         embeddings = state.embedder.extract_image_embeddings_from_pil(images)
@@ -369,7 +370,7 @@ async def generate_images(request: GenerateRequest):
         # Broadcast update
         await broadcast_state_update()
 
-        print(f"✓ Generation complete! Created {len(new_metadata)} images")
+        print(f"OK: Generation complete! Created {len(new_metadata)} images")
         return {
             "status": "success",
             "images": [image_metadata_to_response(img).dict() for img in new_metadata]
@@ -555,7 +556,7 @@ async def update_semantic_axes(request: AxisUpdateRequest):
                 # Store coordinates as tuple (2D or 3D)
                 img_meta.coordinates = tuple(float(c) for c in new_coords[i])
 
-            print(f"✓ All positions recalculated")
+            print(f"OK: All positions recalculated")
 
         await broadcast_state_update()
 
@@ -588,7 +589,7 @@ async def set_3d_mode(use_3d: bool):
                 # Store coordinates as tuple (2D or 3D)
                 img_meta.coordinates = tuple(float(c) for c in new_coords[i])
 
-            print(f"✓ All positions recalculated to {'3D' if use_3d else '2D'}")
+            print(f"OK: All positions recalculated to {'3D' if use_3d else '2D'}")
 
         await broadcast_state_update()
 
@@ -670,7 +671,7 @@ async def add_external_images(request: AddExternalImagesRequest):
                 # Keep as RGBA to preserve transparency
                 if img.mode != 'RGBA':
                     img = img.convert('RGBA')
-                print(f"  ✓ Background removed from image {i+1} (transparent)")
+                print(f"  OK: Background removed from image {i+1} (transparent)")
             else:
                 # Ensure RGB mode if not removing background
                 if img.mode == 'RGBA':
@@ -680,17 +681,17 @@ async def add_external_images(request: AddExternalImagesRequest):
                     img = background
 
             pil_images.append(img)
-            print(f"  ✓ Image {i+1} processed")
+            print(f"  OK: Image {i+1} processed")
 
         # Extract embeddings
         print("Extracting CLIP embeddings...")
         embeddings = state.embedder.extract_image_embeddings_from_pil(pil_images)
-        print("✓ Embeddings extracted")
+        print("OK: Embeddings extracted")
 
         # Project embeddings onto semantic axes
         print("Projecting onto semantic axes...")
         coords = project_embeddings_to_coordinates(embeddings)
-        print(f"✓ Coordinates calculated: {coords.shape}")
+        print(f"OK: Coordinates calculated: {coords.shape}")
 
         # Create ImageMetadata objects
         group_id = f"{request.generation_method}_{len(state.history_groups)}"
@@ -726,9 +727,9 @@ async def add_external_images(request: AddExternalImagesRequest):
                     for new_img in new_metadata:
                         if new_img.id not in parent.children:
                             parent.children.append(new_img.id)
-                    print(f"  ✓ Parent {parent_id} now has {len(parent.children)} children")
+                    print(f"  OK: Parent {parent_id} now has {len(parent.children)} children")
                 else:
-                    print(f"  ⚠️ Parent {parent_id} not found")
+                    print(f"  WARNING: Parent {parent_id} not found")
 
         # Create history group
         image_ids = [m.id for m in new_metadata]
@@ -746,7 +747,7 @@ async def add_external_images(request: AddExternalImagesRequest):
         # Broadcast update
         await broadcast_state_update()
 
-        print(f"✓ Added {len(new_metadata)} external images to canvas")
+        print(f"OK: Added {len(new_metadata)} external images to canvas")
         return {
             "status": "success",
             "images": [image_metadata_to_response(img).dict() for img in new_metadata]

@@ -19,6 +19,7 @@ export const App: React.FC = () => {
     y: number;
     count: number;
   } | null>(null);
+  const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [promptDialogImageId, setPromptDialogImageId] = useState<number | null>(
     null
   );
@@ -51,49 +52,54 @@ export const App: React.FC = () => {
     setGenerationProgress(0);
     setGenerationCount(0, 0);
 
+    // COMMENTED OUT: Local SD 1.5 initialization - only using fal.ai nanobanana now
     // Initialize based on mode
-    if (generationMode === 'local-sd15') {
-      // Connect WebSocket for real-time updates
-      apiClient.connectWebSocket((message) => {
-        if (message.type === "state_update" && message.data) {
-          setImages(message.data.images);
-          setHistoryGroups(message.data.history_groups);
-        } else if (message.type === "progress" && message.progress !== undefined) {
-          setGenerationProgress(message.progress);
-        }
-      });
+    // if (generationMode === 'local-sd15') {
+    //   // Connect WebSocket for real-time updates
+    //   apiClient.connectWebSocket((message) => {
+    //     if (message.type === "state_update" && message.data) {
+    //       setImages(message.data.images);
+    //       setHistoryGroups(message.data.history_groups);
+    //     } else if (message.type === "progress" && message.progress !== undefined) {
+    //       setGenerationProgress(message.progress);
+    //     }
+    //   });
 
-      // Initialize backend models (SD 1.5 + CLIP)
-      apiClient
-        .initialize()
-        .then(() => {
-          setIsInitialized(true);
-          return apiClient.getState();
-        })
-        .then((state) => {
-          setImages(state.images);
-          setHistoryGroups(state.history_groups);
-        })
-        .catch((error) => {
-          console.error("Failed to initialize:", error);
-          setIsInitialized(false);
-          alert(
-            "Failed to connect to backend. Make sure backend is running on port 8000."
-          );
-        });
+    //   // Initialize backend models (SD 1.5 + CLIP)
+    //   apiClient
+    //     .initialize()
+    //     .then(() => {
+    //       setIsInitialized(true);
+    //       return apiClient.getState();
+    //     })
+    //     .then((state) => {
+    //       setImages(state.images);
+    //       setHistoryGroups(state.history_groups);
+    //     })
+    //     .catch((error) => {
+    //       console.error("Failed to initialize:", error);
+    //       setIsInitialized(false);
+    //       alert(
+    //         "Failed to connect to backend. Make sure backend is running on port 8000."
+    //       );
+    //     });
 
-      return () => {
-        apiClient.disconnectWebSocket(() => {});
-      };
-    } else {
+    //   return () => {
+    //     apiClient.disconnectWebSocket(() => {});
+    //   };
+    // } else {
       // For fal.ai mode, only initialize CLIP (for embeddings)
+      // NOTE: This is always used now since we only use fal.ai nanobanana for generation
+      console.log("Initializing CLIP embedder...");
       apiClient
         .initializeClipOnly()
         .then(() => {
+          console.log("CLIP initialization successful");
           setIsInitialized(true);
           return apiClient.getState();
         })
         .then((state) => {
+          console.log("State fetched:", { images: state.images.length, groups: state.history_groups.length });
           setImages(state.images);
           setHistoryGroups(state.history_groups);
         })
@@ -101,10 +107,10 @@ export const App: React.FC = () => {
           console.error("Failed to initialize CLIP:", error);
           setIsInitialized(false);
           alert(
-            "Failed to connect to backend. Make sure backend is running on port 8000."
+            `Failed to initialize CLIP. Make sure backend is running on port 8000.\n\nError: ${error.message || error}`
           );
         });
-    }
+    // }
   }, [generationMode, setImages, setHistoryGroups, setIsInitialized, setGenerationProgress, setIsGenerating, setGenerationCount]);
 
   const handleGenerate = async () => {
@@ -169,11 +175,13 @@ export const App: React.FC = () => {
     }, 300000); // 5 minutes
 
     try {
-      if (generationMode === 'local-sd15') {
-        // Use local SD 1.5 backend
-        await apiClient.generate({ prompt, n_images: nImages });
-      } else {
+      // COMMENTED OUT: Local SD generation - only using fal.ai nanobanana now
+      // if (generationMode === 'local-sd15') {
+      //   // Use local SD 1.5 backend
+      //   await apiClient.generate({ prompt, n_images: nImages });
+      // } else {
         // Use fal.ai nano-banana text-to-image
+        // NOTE: This is always used now
         const result = await falClient.generateTextToImage({
           prompt,
           num_images: nImages,
@@ -192,7 +200,12 @@ export const App: React.FC = () => {
         });
 
         console.log(`✓ Added ${result.images.length} fal.ai images to canvas`);
-      }
+
+        // Fetch updated state since we're not using WebSocket
+        const state = await apiClient.getState();
+        setImages(state.images);
+        setHistoryGroups(state.history_groups);
+      // }
 
       clearInterval(progressInterval);
       clearTimeout(safetyTimeout);
@@ -230,74 +243,79 @@ export const App: React.FC = () => {
     }
   };
 
+  // COMMENTED OUT: Local SD interpolation - not supported in fal.ai nanobanana
+  // This feature requires local SD 1.5 with latent space interpolation
   const handleInterpolate = async (
     idA: number,
     idB: number,
     alpha: number,
     steps?: number
   ) => {
-    console.log(`Interpolating between images ${idA} and ${idB} (alpha: ${alpha}, steps: ${steps || 1})...`);
-    setInterpolationImageIds(null);
-    setIsGenerating(true);
-    setFloatingPanelPos(null);
+    alert("Interpolation is only available with Local SD 1.5 mode. This feature is disabled when using fal.ai nanobanana.");
+    return;
 
-    const totalSteps = steps || 1;
-    setGenerationCount(0, totalSteps);
-    setGenerationProgress(0);
+    // console.log(`Interpolating between images ${idA} and ${idB} (alpha: ${alpha}, steps: ${steps || 1})...`);
+    // setInterpolationImageIds(null);
+    // setIsGenerating(true);
+    // setFloatingPanelPos(null);
 
-    // Estimate 5 seconds per interpolation
-    const estimatedTimeMs = totalSteps * 5000;
-    const updateIntervalMs = 100;
-    const totalUpdates = estimatedTimeMs / updateIntervalMs;
-    let updates = 0;
+    // const totalSteps = steps || 1;
+    // setGenerationCount(0, totalSteps);
+    // setGenerationProgress(0);
 
-    const progressInterval = setInterval(() => {
-      updates++;
-      const progress = Math.min((updates / totalUpdates) * 90, 90);
-      const currentStepEstimate = Math.floor((progress / 90) * totalSteps);
-      setGenerationCount(currentStepEstimate, totalSteps);
-      setGenerationProgress(progress);
-    }, updateIntervalMs);
+    // // Estimate 5 seconds per interpolation
+    // const estimatedTimeMs = totalSteps * 5000;
+    // const updateIntervalMs = 100;
+    // const totalUpdates = estimatedTimeMs / updateIntervalMs;
+    // let updates = 0;
 
-    // Safety timeout: auto-reset after 5 minutes
-    const safetyTimeout = setTimeout(() => {
-      console.error("⚠️ Interpolation timed out after 5 minutes");
-      clearInterval(progressInterval);
-      setIsGenerating(false);
-      setGenerationProgress(0);
-      setGenerationCount(0, 0);
-      alert("Interpolation timed out. Please try again.");
-    }, 300000);
+    // const progressInterval = setInterval(() => {
+    //   updates++;
+    //   const progress = Math.min((updates / totalUpdates) * 90, 90);
+    //   const currentStepEstimate = Math.floor((progress / 90) * totalSteps);
+    //   setGenerationCount(currentStepEstimate, totalSteps);
+    //   setGenerationProgress(progress);
+    // }, updateIntervalMs);
 
-    try {
-      if (steps && steps > 1) {
-        // Generate multiple interpolations
-        for (let i = 0; i < steps; i++) {
-          const currentAlpha = i / (steps - 1);
-          await apiClient.interpolate({ id_a: idA, id_b: idB, alpha: currentAlpha });
-        }
-      } else {
-        // Single interpolation
-        await apiClient.interpolate({ id_a: idA, id_b: idB, alpha });
-      }
-      clearInterval(progressInterval);
-      clearTimeout(safetyTimeout);
-      setGenerationCount(totalSteps, totalSteps);
-      setGenerationProgress(100);
-      console.log("Interpolation successful");
-      clearSelection();
-    } catch (error) {
-      clearInterval(progressInterval);
-      clearTimeout(safetyTimeout);
-      console.error("Interpolation failed:", error);
-      alert(`Interpolation failed: ${error}`);
-    } finally {
-      setIsGenerating(false);
-      setTimeout(() => {
-        setGenerationProgress(0);
-        setGenerationCount(0, 0);
-      }, 1000);
-    }
+    // // Safety timeout: auto-reset after 5 minutes
+    // const safetyTimeout = setTimeout(() => {
+    //   console.error("⚠️ Interpolation timed out after 5 minutes");
+    //   clearInterval(progressInterval);
+    //   setIsGenerating(false);
+    //   setGenerationProgress(0);
+    //   setGenerationCount(0, 0);
+    //   alert("Interpolation timed out. Please try again.");
+    // }, 300000);
+
+    // try {
+    //   if (steps && steps > 1) {
+    //     // Generate multiple interpolations
+    //     for (let i = 0; i < steps; i++) {
+    //       const currentAlpha = i / (steps - 1);
+    //       await apiClient.interpolate({ id_a: idA, id_b: idB, alpha: currentAlpha });
+    //     }
+    //   } else {
+    //     // Single interpolation
+    //     await apiClient.interpolate({ id_a: idA, id_b: idB, alpha });
+    //   }
+    //   clearInterval(progressInterval);
+    //   clearTimeout(safetyTimeout);
+    //   setGenerationCount(totalSteps, totalSteps);
+    //   setGenerationProgress(100);
+    //   console.log("Interpolation successful");
+    //   clearSelection();
+    // } catch (error) {
+    //   clearInterval(progressInterval);
+    //   clearTimeout(safetyTimeout);
+    //   console.error("Interpolation failed:", error);
+    //   alert(`Interpolation failed: ${error}`);
+    // } finally {
+    //   setIsGenerating(false);
+    //   setTimeout(() => {
+    //     setGenerationProgress(0);
+    //     setGenerationCount(0, 0);
+    //   }, 1000);
+    // }
   };
 
   // Get all selected images for the prompt dialog
@@ -321,6 +339,7 @@ export const App: React.FC = () => {
       console.warn("No images selected for reference generation");
       return;
     }
+    setShowPromptDialog(true);
   };
 
   const handleInterpolateClick = () => {
@@ -346,6 +365,7 @@ export const App: React.FC = () => {
     }
 
     setPromptDialogImageId(null);
+    setShowPromptDialog(false);
     setIsGenerating(true);
     setFloatingPanelPos(null);
     setGenerationCount(0, numImages);
@@ -382,20 +402,22 @@ export const App: React.FC = () => {
     }, 300000);
 
     try {
-      if (generationMode === 'local-sd15') {
-        // Use local SD 1.5 backend (only supports single reference)
-        const result = await apiClient.generateFromReference({
-          reference_id: referenceIds[0],  // Use first reference
-          prompt,
-        });
-        clearInterval(progressInterval);
-        clearTimeout(safetyTimeout);
-        console.log("Generation from reference successful:", result);
-        setGenerationCount(1, 1);
-        setGenerationProgress(100);
-        clearSelection();
-      } else {
+      // COMMENTED OUT: Local SD reference generation - only using fal.ai nanobanana now
+      // if (generationMode === 'local-sd15') {
+      //   // Use local SD 1.5 backend (only supports single reference)
+      //   const result = await apiClient.generateFromReference({
+      //     reference_id: referenceIds[0],  // Use first reference
+      //     prompt,
+      //   });
+      //   clearInterval(progressInterval);
+      //   clearTimeout(safetyTimeout);
+      //   console.log("Generation from reference successful:", result);
+      //   setGenerationCount(1, 1);
+      //   setGenerationProgress(100);
+      //   clearSelection();
+      // } else {
         // Use fal.ai nano-banana image editing
+        // NOTE: This is always used now
         // Get reference images from IDs
         const selectedImages = images.filter(img => referenceIds.includes(img.id));
 
@@ -446,12 +468,18 @@ export const App: React.FC = () => {
         });
 
         console.log(`✓ Added ${result.images.length} fal.ai edited image(s) to canvas with ${parentIds.length} parent(s)`);
+
+        // Fetch updated state since we're not using WebSocket
+        const state = await apiClient.getState();
+        setImages(state.images);
+        setHistoryGroups(state.history_groups);
+
         clearInterval(progressInterval);
         clearTimeout(safetyTimeout);
         setGenerationCount(numImages, numImages);
         setGenerationProgress(100);
         clearSelection();
-      }
+      // }
     } catch (error) {
       clearInterval(progressInterval);
       clearTimeout(safetyTimeout);
@@ -489,6 +517,7 @@ export const App: React.FC = () => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setPromptDialogImageId(null);
+        setShowPromptDialog(false);
         setInterpolationImageIds(null);
         setFloatingPanelPos(null);
         clearSelection(); // Also clear selection to close dialogs
@@ -503,6 +532,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (selectedImageIds.length === 0) {
       setFloatingPanelPos(null);
+      setShowPromptDialog(false);
     }
   }, [selectedImageIds]);
 
@@ -568,10 +598,12 @@ export const App: React.FC = () => {
               handleGenerateFromReferenceClick();
               setFloatingPanelPos(null);
             }}
+            // COMMENTED OUT: Interpolation disabled - only available with local SD 1.5
             onInterpolate={
-              floatingPanelPos.count === 2 && generationMode === 'local-sd15'
-                ? handleInterpolateClick
-                : undefined
+              undefined
+              // floatingPanelPos.count === 2 && generationMode === 'local-sd15'
+              //   ? handleInterpolateClick
+              //   : undefined
             }
             onViewDetails={() => {
               // Show details of selected images
@@ -601,11 +633,12 @@ export const App: React.FC = () => {
         )}
 
         {/* Prompt Dialog */}
-        {promptDialogImages.length > 0 && (
+        {showPromptDialog && promptDialogImages.length > 0 && (
           <PromptDialog
             referenceImages={promptDialogImages}
             onClose={() => {
               setPromptDialogImageId(null);
+              setShowPromptDialog(false);
               clearSelection(); // Clear selection to close the dialog
             }}
             onGenerate={handlePromptDialogGenerate}
@@ -695,6 +728,75 @@ export const App: React.FC = () => {
                 ? "Moderate spacing"
                 : "Spacious layout"}
             </div>
+          </div>
+
+          <div className="setting-item">
+            <div className="setting-label">
+              <span>
+                Coordinate Scale:{" "}
+                {useAppStore.getState().visualSettings.coordinateScale.toFixed(2)}x
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0.1"
+              max="5"
+              step="0.1"
+              value={useAppStore.getState().visualSettings.coordinateScale}
+              onChange={(e) => {
+                useAppStore.getState().updateVisualSettings({
+                  coordinateScale: parseFloat(e.target.value),
+                });
+                useAppStore.getState().resetCanvasBounds(); // Trigger bounds recalculation
+              }}
+              style={{ width: "100%" }}
+              title="Scale coordinates (0.1x = tight, 5x = spread out)"
+            />
+            <div style={{ fontSize: "11px", color: "#8b949e", marginTop: "4px" }}>
+              {useAppStore.getState().visualSettings.coordinateScale < 0.5
+                ? "Very tight spacing"
+                : useAppStore.getState().visualSettings.coordinateScale < 1
+                ? "Tight spacing"
+                : useAppStore.getState().visualSettings.coordinateScale === 1
+                ? "Original spacing"
+                : useAppStore.getState().visualSettings.coordinateScale < 2
+                ? "Spread out"
+                : "Very spread out"}
+            </div>
+          </div>
+
+          <div className="setting-item">
+            <button
+              className="action-button secondary"
+              onClick={() => {
+                // Calculate centroid of all visible images
+                const visibleImages = images.filter(img => img.visible);
+                if (visibleImages.length === 0) return;
+
+                const sum = visibleImages.reduce((acc, img) => {
+                  return [
+                    acc[0] + img.coordinates[0],
+                    acc[1] + img.coordinates[1],
+                    acc[2] + (img.coordinates[2] || 0)
+                  ];
+                }, [0, 0, 0]);
+
+                const centroid = sum.map(s => s / visibleImages.length);
+
+                // Set offset to negative centroid to move cluster to origin
+                useAppStore.getState().updateVisualSettings({
+                  coordinateOffset: [-centroid[0], -centroid[1], -centroid[2]] as [number, number, number]
+                });
+                useAppStore.getState().resetCanvasBounds();
+
+                console.log("🎯 Recentered cluster. Centroid was:", centroid);
+              }}
+              disabled={images.length === 0}
+              style={{ width: "100%", marginTop: "8px" }}
+              title="Move cluster center to coordinate origin"
+            >
+              🎯 Recenter Cluster
+            </button>
           </div>
 
           <div className="setting-item">

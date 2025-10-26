@@ -23,6 +23,7 @@ interface ImageSpriteProps {
   opacity: number;
   isSelected: boolean;
   isHovered: boolean;
+  isHighlightedFromHistory: boolean;
   onClick: (id: number, event: any) => void;
   onPointerEnter: (id: number) => void;
   onPointerLeave: () => void;
@@ -34,6 +35,7 @@ const ImageSprite: React.FC<ImageSpriteProps> = ({
   opacity,
   isSelected,
   isHovered,
+  isHighlightedFromHistory,
   onClick,
   onPointerEnter,
   onPointerLeave,
@@ -67,18 +69,20 @@ const ImageSprite: React.FC<ImageSpriteProps> = ({
     });
   }, [texture, opacity]);
 
-  // Update material on selection/hover
+  // Update material on selection/hover/history highlight
   useEffect(() => {
     if (meshRef.current && material) {
       if (isSelected) {
         material.color.setRGB(0.3, 0.7, 1); // Blue tint for selected
+      } else if (isHighlightedFromHistory) {
+        material.color.setRGB(1, 0.3, 0.3); // Red tint for history highlight
       } else if (isHovered) {
         material.color.setRGB(1, 0.9, 0.5); // Yellow tint for hover
       } else {
         material.color.setRGB(1, 1, 1); // Normal
       }
     }
-  }, [isSelected, isHovered, material]);
+  }, [isSelected, isHovered, isHighlightedFromHistory, material]);
 
   if (!material) return null;
 
@@ -99,42 +103,190 @@ const ImageSprite: React.FC<ImageSpriteProps> = ({
 };
 
 // Axis Labels Component
-const AxisLabels: React.FC = () => {
+interface AxisLabelsProps {
+  axisLabels: {
+    x: [string, string];
+    y: [string, string];
+    z?: [string, string];
+  };
+}
+
+const AxisLabels: React.FC<AxisLabelsProps> = ({ axisLabels }) => {
   return (
     <>
-      {/* X-axis label (Red) */}
+      {/* X-axis labels (Red) */}
+      {/* Negative X */}
+      <Text
+        position={[-7, 0, 0]}
+        fontSize={1.2}
+        color="#ff4444"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.1}
+        outlineColor="#000000"
+      >
+        {axisLabels.x[0]}
+      </Text>
+      {/* Positive X */}
       <Text
         position={[7, 0, 0]}
-        fontSize={0.8}
-        color="#ff0000"
+        fontSize={1.2}
+        color="#ff4444"
         anchorX="center"
         anchorY="middle"
+        outlineWidth={0.1}
+        outlineColor="#000000"
       >
-        X
+        {axisLabels.x[1]}
       </Text>
 
-      {/* Y-axis label (Green) */}
+      {/* Y-axis labels (Green) */}
+      {/* Negative Y */}
+      <Text
+        position={[0, -7, 0]}
+        fontSize={1.2}
+        color="#44ff44"
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.1}
+        outlineColor="#000000"
+      >
+        {axisLabels.y[0]}
+      </Text>
+      {/* Positive Y */}
       <Text
         position={[0, 7, 0]}
-        fontSize={0.8}
-        color="#00ff00"
+        fontSize={1.2}
+        color="#44ff44"
         anchorX="center"
         anchorY="middle"
+        outlineWidth={0.1}
+        outlineColor="#000000"
       >
-        Y
+        {axisLabels.y[1]}
       </Text>
 
-      {/* Z-axis label (Blue) */}
-      <Text
-        position={[0, 0, 7]}
-        fontSize={0.8}
-        color="#0000ff"
-        anchorX="center"
-        anchorY="middle"
-      >
-        Z
-      </Text>
+      {/* Z-axis labels (Blue) - if in 3D mode */}
+      {axisLabels.z && (
+        <>
+          {/* Negative Z */}
+          <Text
+            position={[0, 0, -7]}
+            fontSize={1.2}
+            color="#4444ff"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.1}
+            outlineColor="#000000"
+          >
+            {axisLabels.z[0]}
+          </Text>
+          {/* Positive Z */}
+          <Text
+            position={[0, 0, 7]}
+            fontSize={1.2}
+            color="#4444ff"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.1}
+            outlineColor="#000000"
+          >
+            {axisLabels.z[1]}
+          </Text>
+        </>
+      )}
     </>
+  );
+};
+
+// Lineage Lines Component - Shows parent/child relationships
+interface LineageLinesProps {
+  images: ImageData[];
+  selectedImageIds: number[];
+  hoveredId: number | null;
+}
+
+const LineageLines: React.FC<LineageLinesProps> = ({ images, selectedImageIds, hoveredId }) => {
+  // Determine which images to show lineage for
+  const targetImageIds = selectedImageIds.length > 0 ? selectedImageIds : hoveredId ? [hoveredId] : [];
+
+  if (targetImageIds.length === 0) return null;
+
+  return (
+    <group>
+      {targetImageIds.map((targetId) => {
+        const targetImage = images.find(img => img.id === targetId);
+        if (!targetImage) return null;
+
+        const [tx, ty, tz] = targetImage.coordinates.length === 3
+          ? targetImage.coordinates
+          : [...targetImage.coordinates, 0];
+
+        return (
+          <group key={`lineage-${targetId}`}>
+            {/* Parent lines (green) */}
+            {targetImage.parents?.map((parentId) => {
+              const parentImage = images.find(img => img.id === parentId);
+              if (!parentImage) return null;
+
+              const [px, py, pz] = parentImage.coordinates.length === 3
+                ? parentImage.coordinates
+                : [...parentImage.coordinates, 0];
+
+              // Create curved line using QuadraticBezierCurve3
+              const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(px, py, pz),
+                new THREE.Vector3(
+                  (px + tx) / 2 + (ty - py) * 0.1,
+                  (py + ty) / 2 - (tx - px) * 0.1,
+                  (pz + tz) / 2
+                ),
+                new THREE.Vector3(tx, ty, tz)
+              );
+
+              const points = curve.getPoints(50);
+              const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+              return (
+                <line key={`parent-${parentId}`} geometry={geometry}>
+                  <lineBasicMaterial color="#3fb950" linewidth={2} opacity={0.8} transparent />
+                </line>
+              );
+            })}
+
+            {/* Child lines (orange) */}
+            {targetImage.children?.map((childId) => {
+              const childImage = images.find(img => img.id === childId);
+              if (!childImage) return null;
+
+              const [cx, cy, cz] = childImage.coordinates.length === 3
+                ? childImage.coordinates
+                : [...childImage.coordinates, 0];
+
+              // Create curved line using QuadraticBezierCurve3
+              const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(tx, ty, tz),
+                new THREE.Vector3(
+                  (tx + cx) / 2 + (cy - ty) * 0.1,
+                  (ty + cy) / 2 - (cx - tx) * 0.1,
+                  (tz + cz) / 2
+                ),
+                new THREE.Vector3(cx, cy, cz)
+              );
+
+              const points = curve.getPoints(50);
+              const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+              return (
+                <line key={`child-${childId}`} geometry={geometry}>
+                  <lineBasicMaterial color="#d29922" linewidth={2} opacity={0.8} transparent />
+                </line>
+              );
+            })}
+          </group>
+        );
+      })}
+    </group>
   );
 };
 
@@ -212,10 +364,17 @@ const Scene: React.FC<{
   imageSize: number;
   imageOpacity: number;
   selectedImageIds: number[];
+  hoveredGroupId: string | null;
+  visualSettings: any; // Pass full visual settings for coordinate transformations
   onImageClick: (id: number, event: any) => void;
   cameraTarget: THREE.Vector3 | null;
   useOrthographic: boolean;
-}> = ({ images, imageSize, imageOpacity, selectedImageIds, onImageClick, cameraTarget, useOrthographic }) => {
+  axisLabels: {
+    x: [string, string];
+    y: [string, string];
+    z?: [string, string];
+  };
+}> = ({ images, imageSize, imageOpacity, selectedImageIds, hoveredGroupId, visualSettings, onImageClick, cameraTarget, useOrthographic, axisLabels }) => {
   const [hoveredId, setHoveredId] = useState<number | null>(null);
 
   // Calculate data extent and normalization parameters
@@ -262,6 +421,21 @@ const Scene: React.FC<{
   // Calculate scale from pixel size
   const scale = imageSize / 100;
 
+  // Create normalized images for lineage rendering
+  const normalizedImages = useMemo(() => {
+    const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+    const coordScale = visualSettings.coordinateScale || 1.0;
+
+    return images.map(image => ({
+      ...image,
+      coordinates: [
+        ((image.coordinates[0] + coordOffset[0]) * coordScale) * xScale,
+        ((image.coordinates[1] + coordOffset[1]) * coordScale) * yScale,
+        ((image.coordinates.length === 3 ? image.coordinates[2] : 0) + coordOffset[2]) * coordScale * zScale
+      ] as [number, number, number]
+    }));
+  }, [images, xScale, yScale, zScale, visualSettings.coordinateOffset, visualSettings.coordinateScale]);
+
   return (
     <>
       {/* Ambient lighting */}
@@ -274,22 +448,36 @@ const Scene: React.FC<{
       <axesHelper args={[6]} />
 
       {/* Axis labels */}
-      <AxisLabels />
+      <AxisLabels axisLabels={axisLabels} />
+
+      {/* Lineage lines */}
+      <LineageLines
+        images={normalizedImages}
+        selectedImageIds={selectedImageIds}
+        hoveredId={hoveredId}
+      />
 
       {/* Camera controller */}
       <CameraController targetPosition={cameraTarget} useOrthographic={useOrthographic} />
 
       {/* Render all image sprites with normalized coordinates */}
       {images.map((image) => {
-        // Apply scaling to normalize coordinates
+        // Apply coordinate offset and scale
+        const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+        const coordScale = visualSettings.coordinateScale || 1.0;
+
+        // Apply scaling to normalize coordinates and then apply user transformations
         const normalizedImage = {
           ...image,
           coordinates: [
-            image.coordinates[0] * xScale,
-            image.coordinates[1] * yScale,
-            (image.coordinates.length === 3 ? image.coordinates[2] : 0) * zScale
+            ((image.coordinates[0] + coordOffset[0]) * coordScale) * xScale,
+            ((image.coordinates[1] + coordOffset[1]) * coordScale) * yScale,
+            ((image.coordinates.length === 3 ? image.coordinates[2] : 0) + coordOffset[2]) * coordScale * zScale
           ] as [number, number, number]
         };
+
+        // Check if this image should be highlighted from history panel hover
+        const isHighlightedFromHistory = hoveredGroupId !== null && image.group_id === hoveredGroupId;
 
         return (
           <ImageSprite
@@ -299,6 +487,7 @@ const Scene: React.FC<{
             opacity={imageOpacity}
             isSelected={selectedImageIds.includes(image.id)}
             isHovered={hoveredId === image.id}
+            isHighlightedFromHistory={isHighlightedFromHistory}
             onClick={onImageClick}
             onPointerEnter={setHoveredId}
             onPointerLeave={() => setHoveredId(null)}
@@ -330,6 +519,7 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
   const allImages = useAppStore((state) => state.images);
   const visualSettings = useAppStore((state) => state.visualSettings);
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
+  const hoveredGroupId = useAppStore((state) => state.hoveredGroupId);
   const axisLabels = useAppStore((state) => state.axisLabels);
 
   const [cameraTarget, setCameraTarget] = useState<THREE.Vector3 | null>(null);
@@ -379,6 +569,12 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
     });
 
     console.log(`✓ ${axis.toUpperCase()}-axis updated to: ${negative} ↔ ${positive}`);
+
+    // Fetch updated state to get recalculated coordinates
+    const state = await apiClient.getState();
+    useAppStore.getState().setImages(state.images);
+    useAppStore.getState().setAxisLabels(state.axis_labels);
+    console.log(`✓ Coordinates recalculated for ${state.images.length} images`);
   };
 
   return (
@@ -393,9 +589,12 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
           imageSize={visualSettings.imageSize}
           imageOpacity={visualSettings.imageOpacity}
           selectedImageIds={selectedImageIds}
+          hoveredGroupId={hoveredGroupId}
+          visualSettings={visualSettings}
           onImageClick={handleImageClick}
           cameraTarget={cameraTarget}
           useOrthographic={useOrthographic}
+          axisLabels={axisLabels}
         />
       </Canvas>
 

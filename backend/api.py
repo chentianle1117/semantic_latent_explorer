@@ -16,6 +16,10 @@ import sys
 from pathlib import Path
 import requests
 from rembg import remove
+import zipfile
+import json
+import tempfile
+from fastapi.responses import FileResponse, StreamingResponse
 
 # Add parent directory to Python path to import models
 parent_dir = Path(__file__).parent.parent
@@ -226,7 +230,17 @@ async def broadcast_state_update():
 
 @app.get("/")
 async def root():
-    return {"message": "Zappos Semantic Explorer API", "status": "running"}
+    print("🏠 ROOT ENDPOINT HIT - NEW VERSION 2025-10-31")
+    return {
+        "message": "Zappos Semantic Explorer API",
+        "status": "running",
+        "version": "2025-10-31-UPDATED"
+    }
+
+@app.get("/api/test")
+async def test():
+    print("🧪 TEST ENDPOINT HIT")
+    return {"message": "Backend is working!", "status": "ok"}
 
 
 @app.get("/api/state")
@@ -633,24 +647,69 @@ async def clear_canvas():
 
 @app.post("/api/add-external-images")
 async def add_external_images(request: AddExternalImagesRequest):
-    """Add images from external URLs (e.g., fal.ai) and compute embeddings."""
+    """Add images from external URLs (e.g., fal.ai) or data URLs (local files) and compute embeddings."""
+    print("\n" + "="*80)
+    print("🚀 ADD EXTERNAL IMAGES ENDPOINT HIT!")
+    print("="*80)
     try:
         print(f"\n=== Add External Images Request ===")
         print(f"Prompt: {request.prompt}")
         print(f"Count: {len(request.images)}")
         print(f"Method: {request.generation_method}")
 
+        # Debug: check first URL
+        if len(request.images) > 0:
+            first_url = request.images[0].url
+            print(f"First URL type: {type(first_url)}")
+            print(f"First URL preview (100 chars): {str(first_url)[:100]}")
+            print(f"Starts with 'data:': {str(first_url).startswith('data:')}")
+
         if state.embedder is None:
             raise HTTPException(status_code=400, detail="CLIP embedder not initialized. Call /api/initialize-clip-only first.")
 
-        # Download images from URLs
-        print("Downloading images from URLs...")
+        # Download images from URLs or decode data URLs
+        print("Loading images...")
         pil_images = []
         for i, img_data in enumerate(request.images):
-            print(f"  Downloading image {i+1}/{len(request.images)} from {img_data.url[:50]}...")
-            response = requests.get(img_data.url, timeout=30)
-            response.raise_for_status()
-            img = Image.open(BytesIO(response.content))
+            url = str(img_data.url)  # Ensure it's a string
+            print(f"  Processing image {i+1}/{len(request.images)}")
+            print(f"  URL type: {type(url)}, first 50 chars: {url[:50]}")
+
+            # Check if it's a data URL (base64 encoded) or HTTP URL
+            is_data_url = url.startswith('data:')
+            is_http_url = url.startswith('http://') or url.startswith('https://')
+
+            print(f"  is_data_url={is_data_url}, is_http_url={is_http_url}")
+
+            if is_data_url:
+                print(f"  → Decoding from data URL...")
+                # Extract base64 data from data URL
+                # Format: data:image/png;base64,iVBORw0KGgoAAAANS...
+                try:
+                    if ',' not in url:
+                        raise ValueError("Invalid data URL format: missing comma separator")
+
+                    header, encoded = url.split(',', 1)
+                    img_bytes = base64.b64decode(encoded)
+                    img = Image.open(BytesIO(img_bytes))
+                    print(f"  ✓ Image {i+1} decoded (size: {img.size})")
+                except Exception as e:
+                    print(f"  ✗ ERROR decoding data URL: {e}")
+                    raise HTTPException(status_code=400, detail=f"Failed to decode image {i+1}: {str(e)}")
+            elif is_http_url:
+                print(f"  → Downloading from HTTP URL: {url[:50]}...")
+                try:
+                    response = requests.get(url, timeout=30)
+                    response.raise_for_status()
+                    img = Image.open(BytesIO(response.content))
+                    print(f"  ✓ Image {i+1} downloaded (size: {img.size})")
+                except Exception as e:
+                    print(f"  ✗ ERROR downloading: {e}")
+                    raise HTTPException(status_code=400, detail=f"Failed to download image {i+1}: {str(e)}")
+            else:
+                print(f"  ✗ ERROR: Unsupported URL format: {url[:100]}")
+                raise HTTPException(status_code=400, detail=f"Unsupported URL format for image {i+1}: {url[:100]}")
+
             # Convert to RGB if needed
             if img.mode != 'RGB':
                 img = img.convert('RGB')
@@ -681,7 +740,6 @@ async def add_external_images(request: AddExternalImagesRequest):
                     img = background
 
             pil_images.append(img)
-            print(f"  OK: Image {i+1} processed")
 
         # Extract embeddings
         print("Extracting CLIP embeddings...")
@@ -753,6 +811,8 @@ async def add_external_images(request: AddExternalImagesRequest):
             "images": [image_metadata_to_response(img).dict() for img in new_metadata]
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"\n!!! ERROR in add_external_images !!!")
         print(f"Error type: {type(e).__name__}")
@@ -760,6 +820,139 @@ async def add_external_images(request: AddExternalImagesRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/export-zip")
+async def export_zip():
+    """Export all images and metadata as a ZIP file."""
+    try:
+        print(f"\n=== Export ZIP Request ===")
+        print(f"Total images in state: {len(state.images_metadata)}")
+
+        visible_images = [img for img in state.images_metadata if img.visible]
+        print(f"Visible images to export: {len(visible_images)}")
+
+        if len(visible_images) == 0:
+            raise HTTPException(status_code=400, detail="No visible images to export")
+
+        # Create a temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            print(f"Created temp directory: {temp_path}")
+
+            # Save each image with timestamp-based filename
+            print(f"Saving {len(visible_images)} images...")
+            saved_count = 0
+            for img_meta in visible_images:
+                # Create timestamp-based filename
+                timestamp_str = img_meta.timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Remove last 3 digits of microseconds
+                filename = f"img_{img_meta.id}_{timestamp_str}"
+
+                # Save image as PNG
+                img_path = temp_path / f"{filename}.png"
+                img_meta.pil_image.save(img_path, format="PNG")
+                saved_count += 1
+                if saved_count % 10 == 0:
+                    print(f"  Saved {saved_count}/{len(visible_images)} images...")
+
+                # Create metadata JSON
+                metadata = {
+                    "id": img_meta.id,
+                    "group_id": img_meta.group_id,
+                    "prompt": img_meta.prompt,
+                    "generation_method": img_meta.generation_method,
+                    "timestamp": img_meta.timestamp.isoformat(),
+                    "coordinates": list(img_meta.coordinates),
+                    "parents": img_meta.parents,
+                    "children": img_meta.children,
+                    "reference_ids": img_meta.reference_ids,
+                }
+
+                json_path = temp_path / f"{filename}.json"
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+            print(f"Saved all {saved_count} images successfully")
+
+            # Create a summary metadata file
+            summary = {
+                "export_timestamp": datetime.now().isoformat(),
+                "total_images": len(visible_images),
+                "axis_labels": state.axis_labels,
+                "is_3d_mode": state.is_3d_mode,
+                "history_groups": [
+                    {
+                        "id": g.id,
+                        "type": g.type,
+                        "image_ids": g.image_ids,
+                        "prompt": g.prompt,
+                        "timestamp": g.timestamp.isoformat()
+                    }
+                    for g in state.history_groups
+                ],
+                "images": [
+                    {
+                        "id": img.id,
+                        "filename": f"img_{img.id}_{img.timestamp.strftime('%Y%m%d_%H%M%S_%f')[:-3]}.png",
+                        "prompt": img.prompt,
+                        "generation_method": img.generation_method,
+                        "parents": img.parents,
+                        "children": img.children,
+                    }
+                    for img in state.images_metadata if img.visible
+                ]
+            }
+
+            summary_path = temp_path / "export_summary.json"
+            print("Writing summary JSON...")
+            with open(summary_path, 'w', encoding='utf-8') as f:
+                json.dump(summary, f, indent=2, ensure_ascii=False)
+
+            # Create ZIP file
+            print("Creating ZIP archive...")
+            zip_path = temp_path / "zappos_export.zip"
+            files_to_zip = list(temp_path.glob("*"))
+            print(f"Files to zip: {len(files_to_zip)}")
+
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in files_to_zip:
+                    if file_path != zip_path:
+                        zipf.write(file_path, file_path.name)
+
+            png_count = len(list(temp_path.glob('*.png')))
+            json_count = len(list(temp_path.glob('*.json')))
+            print(f"OK: ZIP file created with {png_count} PNG images and {json_count} JSON files")
+
+            # Read the ZIP file and return it
+            print("Reading ZIP file for response...")
+            with open(zip_path, 'rb') as f:
+                zip_content = f.read()
+
+            zip_size = len(zip_content)
+            print(f"ZIP file size: {zip_size} bytes ({zip_size / 1024:.2f} KB)")
+
+            if zip_size == 0:
+                raise Exception("Generated ZIP file is empty!")
+
+            print("Sending ZIP file to client...")
+            return StreamingResponse(
+                BytesIO(zip_content),
+                media_type="application/zip",
+                headers={
+                    "Content-Disposition": f"attachment; filename=zappos_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    "Content-Length": str(zip_size)
+                }
+            )
+
+    except Exception as e:
+        print(f"\n!!! ERROR in export_zip !!!")
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# HTML export endpoint removed - was unstable with embedded base64 images
 
 
 @app.websocket("/ws")

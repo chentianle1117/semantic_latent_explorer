@@ -7,6 +7,8 @@ import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingAc
 import { ProgressBar } from "./components/ProgressBar/ProgressBar";
 import { ModeToggle } from "./components/ModeToggle/ModeToggle";
 import { Canvas3DToggle } from "./components/Canvas3DToggle/Canvas3DToggle";
+import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
+import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
@@ -26,6 +28,13 @@ export const App: React.FC = () => {
   const [interpolationImageIds, setInterpolationImageIds] = useState<[number, number] | null>(
     null
   );
+  const [showBatchPromptDialog, setShowBatchPromptDialog] = useState(false);
+  const [showExternalImageLoader, setShowExternalImageLoader] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{
+    current: number;
+    total: number;
+    currentPrompt: string;
+  } | null>(null);
 
   const images = useAppStore((state) =>
     state.images.filter((img) => img.visible)
@@ -240,6 +249,198 @@ export const App: React.FC = () => {
     } catch (error) {
       console.error("Clear failed:", error);
       alert("Failed to clear canvas. Check console for details.");
+    }
+  };
+
+  const handleExportZip = async () => {
+    if (images.length === 0) {
+      alert("No images to export. Generate some images first!");
+      return;
+    }
+
+    // Show loading state
+    setIsGenerating(true);
+    setGenerationProgress(50);
+
+    try {
+      console.log(`📦 Exporting ${images.length} images and metadata as ZIP...`);
+      console.log("Fetching from: http://localhost:8000/api/export-zip");
+
+      const response = await fetch("http://localhost:8000/api/export-zip", {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/zip',
+        },
+      });
+
+      console.log("Response status:", response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Export error response:", errorText);
+        throw new Error(`Export failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      console.log("Creating blob from response...");
+      const blob = await response.blob();
+      console.log("Blob size:", blob.size, "bytes");
+
+      if (blob.size === 0) {
+        throw new Error("Received empty ZIP file from server");
+      }
+
+      // Download the ZIP file
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `zappos_export_${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      console.log(`✅ Successfully exported ${images.length} images with metadata!`);
+      alert(`✅ Successfully exported ${images.length} images with metadata!`);
+    } catch (error) {
+      console.error("❌ Export ZIP failed:", error);
+      alert(`Failed to export ZIP: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+    }
+  };
+
+  const handleBatchGenerate = async (prompts: string[]) => {
+    console.log(`🚀 Starting batch generation for ${prompts.length} prompts`);
+    setShowBatchPromptDialog(false);
+    setIsGenerating(true);
+
+    const totalPrompts = prompts.length;
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = prompts[i];
+      console.log(`\n📝 [${i + 1}/${totalPrompts}] Generating: "${prompt.substring(0, 50)}..."`);
+
+      setBatchProgress({
+        current: i + 1,
+        total: totalPrompts,
+        currentPrompt: prompt
+      });
+
+      try {
+        // Generate image using fal.ai
+        const result = await falClient.generateTextToImage({
+          prompt,
+          num_images: 1,
+          aspect_ratio: "1:1",
+          output_format: "jpeg"
+        });
+
+        console.log(`✓ Generated image for prompt ${i + 1}`);
+
+        // Send to backend for CLIP embedding
+        await apiClient.addExternalImages({
+          images: result.images.map(img => ({ url: img.url })),
+          prompt: prompt,
+          generation_method: 'batch',
+          remove_background: removeBackground
+        });
+
+        console.log(`✓ Added to canvas (${i + 1}/${totalPrompts})`);
+        successCount++;
+
+        // Fetch updated state
+        const state = await apiClient.getState();
+        setImages(state.images);
+        setHistoryGroups(state.history_groups);
+
+      } catch (error) {
+        console.error(`✗ Failed prompt ${i + 1}:`, error);
+        failCount++;
+
+        // Ask user if they want to continue
+        if (i < prompts.length - 1) {
+          const shouldContinue = window.confirm(
+            `Failed to generate image ${i + 1}/${totalPrompts}:\n"${prompt.substring(0, 50)}..."\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nContinue with remaining ${totalPrompts - i - 1} prompts?`
+          );
+
+          if (!shouldContinue) {
+            console.log("🛑 User cancelled batch generation");
+            break;
+          }
+        }
+      }
+    }
+
+    setBatchProgress(null);
+    setIsGenerating(false);
+
+    const message = `Batch generation complete!\n\n✅ Success: ${successCount}/${totalPrompts}\n${failCount > 0 ? `❌ Failed: ${failCount}/${totalPrompts}` : ''}`;
+    alert(message);
+    console.log(`\n🎉 ${message.replace(/\n/g, ' ')}`);
+  };
+
+  const handleLoadExternalImages = async (urls: string[], prompt: string) => {
+    console.log(`📥 Loading ${urls.length} external images...`);
+    setShowExternalImageLoader(false);
+    setIsGenerating(true);
+    setGenerationProgress(0);
+    setGenerationCount(0, urls.length);
+
+    try {
+      // Process images one at a time to avoid overwhelming the server
+      const BATCH_SIZE = 1; // Process 1 image at a time for stability
+      const numBatches = Math.ceil(urls.length / BATCH_SIZE);
+
+      if (numBatches > 1) {
+        console.log(`📦 Processing ${urls.length} images one at a time...`);
+      }
+
+      for (let i = 0; i < numBatches; i++) {
+        const start = i * BATCH_SIZE;
+        const end = Math.min(start + BATCH_SIZE, urls.length);
+        const batchUrls = urls.slice(start, end);
+
+        console.log(`📷 Loading image ${i + 1}/${numBatches}...`);
+
+        // Send batch to backend for CLIP embedding extraction
+        await apiClient.addExternalImages({
+          images: batchUrls.map(url => ({ url })),
+          prompt: prompt,
+          generation_method: 'external',
+          remove_background: removeBackground
+        });
+
+        console.log(`✓ Image ${i + 1}/${numBatches} complete`);
+
+        // Immediately fetch and update state after each image so it appears on canvas
+        const state = await apiClient.getState();
+        setImages(state.images);
+        setHistoryGroups(state.history_groups);
+
+        // Update progress
+        const processed = end;
+        setGenerationCount(processed, urls.length);
+        setGenerationProgress((processed / urls.length) * 100);
+      }
+
+      console.log(`✓ All ${urls.length} images loaded successfully`);
+
+      setGenerationProgress(100);
+      setGenerationCount(urls.length, urls.length);
+
+      alert(`✅ Successfully loaded ${urls.length} images to canvas!`);
+    } catch (error) {
+      console.error("Failed to load external images:", error);
+      alert(`Failed to load images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsGenerating(false);
+      setTimeout(() => {
+        setGenerationProgress(0);
+        setGenerationCount(0, 0);
+      }, 1000);
     }
   };
 
@@ -539,7 +740,14 @@ export const App: React.FC = () => {
   return (
     <div className="app-container">
       {/* Progress Bar */}
-      <ProgressBar isVisible={isGenerating} message="Generating images..." />
+      <ProgressBar
+        isVisible={isGenerating}
+        message={
+          batchProgress
+            ? `Batch generating ${batchProgress.current}/${batchProgress.total}: ${batchProgress.currentPrompt.substring(0, 50)}...`
+            : "Generating images..."
+        }
+      />
 
       {/* Canvas Container */}
       <div className="canvas-container">
@@ -652,6 +860,22 @@ export const App: React.FC = () => {
             imageB={interpolationImages[1]}
             onClose={() => setInterpolationImageIds(null)}
             onInterpolate={handleInterpolate}
+          />
+        )}
+
+        {/* Batch Prompt Dialog */}
+        {showBatchPromptDialog && (
+          <BatchPromptDialog
+            onClose={() => setShowBatchPromptDialog(false)}
+            onGenerate={handleBatchGenerate}
+          />
+        )}
+
+        {/* External Image Loader Dialog */}
+        {showExternalImageLoader && (
+          <ExternalImageLoader
+            onClose={() => setShowExternalImageLoader(false)}
+            onLoad={handleLoadExternalImages}
           />
         )}
 
@@ -845,6 +1069,41 @@ export const App: React.FC = () => {
               title="Clear all images from canvas"
             >
               🗑️ Clear All
+            </button>
+          </div>
+
+          {/* Batch & Import Actions */}
+          <div className="action-row" style={{ marginTop: "8px" }}>
+            <button
+              className="action-button"
+              onClick={() => setShowBatchPromptDialog(true)}
+              disabled={!isInitialized || isGenerating}
+              style={{ flex: 1 }}
+              title="Generate multiple images from a JSON list of prompts"
+            >
+              📝 Batch Generate
+            </button>
+            <button
+              className="action-button"
+              onClick={() => setShowExternalImageLoader(true)}
+              disabled={!isInitialized || isGenerating}
+              style={{ flex: 1 }}
+              title="Load images from external URLs"
+            >
+              📥 Load Images
+            </button>
+          </div>
+
+          {/* Export Actions */}
+          <div className="action-row" style={{ marginTop: "8px" }}>
+            <button
+              className="action-button"
+              onClick={handleExportZip}
+              disabled={images.length === 0}
+              style={{ flex: 1 }}
+              title="Export all images with metadata as ZIP (timestamp-named files + JSON)"
+            >
+              📦 Export ZIP
             </button>
           </div>
 

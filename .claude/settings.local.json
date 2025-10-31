@@ -14,7 +14,9 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(timeout:*)",
-      "Bash(conda run:*)"
+      "Bash(conda run:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell \"Get-Process python,uvicorn -ErrorAction SilentlyContinue | Stop-Process -Force; Write-Host ''Processes killed''\")"
     ],
     "deny": [],
     "ask": []

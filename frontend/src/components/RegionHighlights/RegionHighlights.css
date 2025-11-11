@@ -1,0 +1,189 @@
+.region-highlights-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5; /* Lower z-index to stay behind shoe images */
+}
+
+.highlights-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Subtle light glowing circle animation - stays behind images */
+.region-circle {
+  fill: rgba(88, 166, 255, 0.08); /* Very light fill for glow effect */
+  stroke: rgba(88, 166, 255, 0.25); /* Subtle stroke */
+  stroke-width: 1.5;
+  opacity: 0.6;
+  animation: pulse-ring 3s ease-in-out infinite;
+  filter: blur(3px); /* Soft blur for gentle glow effect */
+}
+
+@keyframes pulse-ring {
+  0%, 100% {
+    r: 50;
+    opacity: 0.3;
+  }
+  50% {
+    r: 60;
+    opacity: 0.5;
+  }
+}
+
+.region-dot {
+  fill: rgba(88, 166, 255, 0.35); /* Subtle dot */
+  filter: drop-shadow(0 0 4px rgba(88, 166, 255, 0.3));
+}
+
+/* Floating region cards - appear above images */
+.region-card {
+  position: absolute;
+  width: 260px;
+  background: rgba(22, 27, 34, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 8px;
+  padding: 12px;
+  pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: slideIn 0.4s ease;
+  transition: all 0.3s ease;
+  z-index: 60; /* Above images but below floating action panel */
+}
+
+.region-card.expanded {
+  width: 320px;
+  border-color: rgba(88, 166, 255, 0.6);
+  box-shadow: 0 12px 32px rgba(88, 166, 255, 0.2);
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #58a6ff;
+  flex: 1;
+}
+
+.card-expand-button {
+  background: rgba(88, 166, 255, 0.15);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  color: #58a6ff;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: all 0.2s ease;
+}
+
+.card-expand-button:hover {
+  background: rgba(88, 166, 255, 0.25);
+  border-color: rgba(88, 166, 255, 0.5);
+}
+
+.card-description {
+  font-size: 13px;
+  color: #c9d1d9;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.card-prompts {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(88, 166, 255, 0.2);
+}
+
+.prompts-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.prompt-chip {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: rgba(31, 111, 235, 0.1);
+  border: 1px solid rgba(31, 111, 235, 0.3);
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.prompt-chip:hover {
+  background: rgba(31, 111, 235, 0.2);
+  border-color: rgba(31, 111, 235, 0.5);
+  transform: translateX(4px);
+}
+
+.prompt-chip:active {
+  transform: translateX(2px);
+}
+
+/* Dismiss all button */
+.dismiss-all-button {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 16px;
+  background: rgba(248, 81, 73, 0.15);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: 6px;
+  color: #f85149;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.2s ease;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dismiss-all-button:hover {
+  background: rgba(248, 81, 73, 0.25);
+  border-color: rgba(248, 81, 73, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(248, 81, 73, 0.3);
+}

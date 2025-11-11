@@ -1,8 +1,9 @@
 """FastAPI backend for Zappos Semantic Explorer."""
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Tuple
 import numpy as np
@@ -13,6 +14,7 @@ import asyncio
 from datetime import datetime
 import uvicorn
 import sys
+import os
 from pathlib import Path
 import requests
 from rembg import remove
@@ -20,6 +22,20 @@ import zipfile
 import json
 import tempfile
 from fastapi.responses import FileResponse, StreamingResponse
+import google.generativeai as genai
+from dotenv import load_dotenv
+import re
+
+# Load environment variables
+load_dotenv()
+
+# Configure Gemini
+gemini_api_key = os.getenv('GOOGLE_API_KEY')
+if gemini_api_key:
+    genai.configure(api_key=gemini_api_key)
+    print("✓ Gemini API configured")
+else:
+    print("⚠ WARNING: GOOGLE_API_KEY not found in .env file")
 
 # Add parent directory to Python path to import models
 parent_dir = Path(__file__).parent.parent
@@ -34,11 +50,31 @@ app = FastAPI(title="Zappos Semantic Explorer API")
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React dev servers
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"],  # React dev servers
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add validation error handler for better error messages
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return detailed validation errors to help debug API issues."""
+    print(f"\n❌ VALIDATION ERROR on {request.method} {request.url}")
+    print(f"Errors: {exc.errors()}")
+    try:
+        body = await request.body()
+        body_str = body.decode('utf-8')[:500] if body else "No body"
+    except Exception as e:
+        body_str = f"Error reading body: {str(e)}"
+    print(f"Body preview: {body_str}")
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": exc.errors(),
+            "body_preview": body_str
+        }
+    )
 
 
 # Pydantic models for API
@@ -76,8 +112,8 @@ class AddExternalImagesRequest(BaseModel):
     images: List[ExternalImage]
     prompt: str
     generation_method: str = 'batch'
-    remove_background: bool = False
-    parent_ids: List[int] = []  # Parent image IDs for genealogy tracking
+    remove_background: Optional[bool] = False
+    parent_ids: Optional[List[int]] = []  # Parent image IDs for genealogy tracking
 
 
 class ImageResponse(BaseModel):
@@ -715,7 +751,7 @@ async def add_external_images(request: AddExternalImagesRequest):
                 img = img.convert('RGB')
 
             # Remove background if requested
-            if request.remove_background:
+            if request.remove_background is True:
                 print(f"  Removing background from image {i+1}...")
                 # Convert PIL image to bytes
                 img_bytes = BytesIO()
@@ -817,6 +853,198 @@ async def add_external_images(request: AddExternalImagesRequest):
         print(f"\n!!! ERROR in add_external_images !!!")
         print(f"Error type: {type(e).__name__}")
         print(f"Error message: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# AGENT ENDPOINTS
+# ============================================================================
+
+@app.get("/api/canvas-digest")
+async def get_canvas_digest():
+    """Get lightweight canvas summary for agent analysis"""
+    try:
+        visible = [img for img in state.images_metadata if img.visible]
+
+        if len(visible) == 0:
+            return {
+                "count": 0,
+                "clusters": [],
+                "axis_labels": state.axis_labels,
+                "bounds": {"x": [0, 0], "y": [0, 0]}
+            }
+
+        coords = np.array([img.coordinates for img in visible])
+
+        # Quick clustering (k=3-5)
+        from sklearn.cluster import KMeans
+        k = min(5, max(3, len(visible) // 10))
+        km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(coords)
+
+        clusters = []
+        for i in range(k):
+            mask = km.labels_ == i
+            cluster_imgs = [visible[j] for j in np.where(mask)[0]]
+
+            clusters.append({
+                "id": f"cluster_{i}",
+                "center": km.cluster_centers_[i].tolist(),
+                "size": int(mask.sum()),
+                "sample_prompts": [img.prompt for img in cluster_imgs[:3]],
+                "generation_methods": list(set(img.generation_method for img in cluster_imgs))
+            })
+
+        return {
+            "count": len(visible),
+            "clusters": clusters,
+            "axis_labels": state.axis_labels,
+            "bounds": {
+                "x": [float(coords[:,0].min()), float(coords[:,0].max())],
+                "y": [float(coords[:,1].min()), float(coords[:,1].max())]
+            }
+        }
+    except Exception as e:
+        print(f"ERROR in canvas-digest: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class InitialPromptsRequest(BaseModel):
+    brief: str
+
+@app.post("/api/agent/initial-prompts")
+async def get_initial_prompts(request: InitialPromptsRequest):
+    """Generate initial prompt suggestions based on design brief"""
+    try:
+        if not gemini_api_key:
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+        print(f"\n=== Initial Prompts Request ===")
+        print(f"Brief: {request.brief}")
+
+        prompt = f"""You are a design exploration assistant helping with shoe design.
+
+DESIGN BRIEF:
+{request.brief}
+
+TASK:
+Suggest 3 specific, diverse prompts to start exploring this design space.
+Each prompt should:
+1. Be specific and detailed (not generic)
+2. Cover different aspects of the brief
+3. Be ready to use with an image generation model
+
+Return JSON ONLY (no markdown, no explanation):
+{{
+  "prompts": [
+    {{"prompt": "minimal white leather sneaker with clean lines", "reasoning": "Explores minimalism aspect"}},
+    {{"prompt": "chunky athletic running shoe in bright colors", "reasoning": "Explores sporty/bold direction"}},
+    {{"prompt": "sleek low-profile canvas casual shoe", "reasoning": "Explores everyday wearability"}}
+  ]
+}}"""
+
+        # Using gemini-2.5-flash-lite (fast, low-cost, high-performance)
+        # Note: gemini-1.5-flash was retired in April 2025
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+
+        # Parse JSON from response
+        json_match = re.search(r'\{[\s\S]*\}', response.text)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            print(f"Generated {len(result.get('prompts', []))} initial prompts")
+            return result
+
+        # Fallback if parsing fails
+        return {"prompts": [
+            {"prompt": "minimal athletic sneaker", "reasoning": "Starting point"},
+            {"prompt": "classic leather shoe", "reasoning": "Alternative style"},
+            {"prompt": "modern running shoe", "reasoning": "Third direction"}
+        ]}
+
+    except Exception as e:
+        print(f"ERROR in initial-prompts: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AnalyzeCanvasRequest(BaseModel):
+    brief: str
+
+@app.post("/api/agent/analyze-canvas")
+async def analyze_canvas(request: AnalyzeCanvasRequest):
+    """Analyze canvas and suggest exploration regions"""
+    try:
+        if not gemini_api_key:
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+        print(f"\n=== Analyze Canvas Request ===")
+        print(f"Brief: {request.brief}")
+
+        # Get canvas digest
+        digest = await get_canvas_digest()
+
+        if digest["count"] == 0:
+            return {"regions": []}
+
+        print(f"Canvas has {digest['count']} images in {len(digest['clusters'])} clusters")
+
+        prompt = f"""You are a design exploration assistant analyzing a shoe design canvas.
+
+DESIGN BRIEF:
+{request.brief}
+
+CURRENT CANVAS STATE:
+- {digest['count']} shoes displayed
+- Axes: X={digest['axis_labels']['x']}, Y={digest['axis_labels']['y']}
+- {len(digest['clusters'])} clusters detected
+
+CLUSTERS:
+{json.dumps(digest['clusters'], indent=2)}
+
+TASK:
+Suggest 2-3 specific regions on the canvas to explore next.
+Consider:
+1. Gaps in coverage relative to the brief
+2. Promising clusters that could be expanded
+3. New directions that would add diversity
+
+Return JSON ONLY (no markdown):
+{{
+  "regions": [
+    {{
+      "center": [0.3, 0.7],
+      "title": "Minimal White Zone",
+      "description": "Dense cluster matching brief's minimalism focus, but could use more variations",
+      "suggested_prompts": [
+        "minimal white leather high-top sneaker",
+        "clean white canvas low-top with subtle texture"
+      ]
+    }}
+  ]
+}}"""
+
+        # Using gemini-2.5-flash-lite (fast, low-cost, high-performance)
+        # Note: gemini-1.5-flash was retired in April 2025
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+
+        # Parse JSON
+        json_match = re.search(r'\{[\s\S]*\}', response.text)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            print(f"Generated {len(result.get('regions', []))} region suggestions")
+            return result
+
+        # Fallback
+        return {"regions": []}
+
+    except Exception as e:
+        print(f"ERROR in analyze-canvas: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

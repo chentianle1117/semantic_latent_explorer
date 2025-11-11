@@ -9,10 +9,13 @@ import { ModeToggle } from "./components/ModeToggle/ModeToggle";
 import { Canvas3DToggle } from "./components/Canvas3DToggle/Canvas3DToggle";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
+import { BriefPanel } from "./components/BriefPanel/BriefPanel";
+import { PromptBanner } from "./components/PromptBanner/PromptBanner";
+import { RegionHighlights } from "./components/RegionHighlights/RegionHighlights";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
-import type { ImageData } from "./types";
+import type { ImageData, SuggestedPrompt, RegionHighlight } from "./types";
 import "./styles/app.css";
 
 export const App: React.FC = () => {
@@ -35,6 +38,14 @@ export const App: React.FC = () => {
     total: number;
     currentPrompt: string;
   } | null>(null);
+
+  // Agent/AI state
+  const [briefPanelCollapsed, setBriefPanelCollapsed] = useState(false);
+  const [currentBrief, setCurrentBrief] = useState<string | null>(null);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<SuggestedPrompt[]>([]);
+  const [regionHighlights, setRegionHighlights] = useState<RegionHighlight[]>([]);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const images = useAppStore((state) =>
     state.images.filter((img) => img.visible)
@@ -231,6 +242,12 @@ export const App: React.FC = () => {
         setGenerationProgress(0);
         setGenerationCount(0, 0);
       }, 1000);
+
+      // Auto-analyze after generation if brief is set
+      if (currentBrief) {
+        console.log("🤖 Auto-analyzing canvas after generation...");
+        setTimeout(() => analyzeCanvas(), 2000);
+      }
     }
   };
 
@@ -380,6 +397,12 @@ export const App: React.FC = () => {
     const message = `Batch generation complete!\n\n✅ Success: ${successCount}/${totalPrompts}\n${failCount > 0 ? `❌ Failed: ${failCount}/${totalPrompts}` : ''}`;
     alert(message);
     console.log(`\n🎉 ${message.replace(/\n/g, ' ')}`);
+
+    // Auto-analyze after batch generation if brief is set
+    if (currentBrief && successCount > 0) {
+      console.log("🤖 Auto-analyzing canvas after batch generation...");
+      setTimeout(() => analyzeCanvas(), 2000);
+    }
   };
 
   const handleLoadExternalImages = async (urls: string[], prompt: string) => {
@@ -692,7 +715,143 @@ export const App: React.FC = () => {
         setGenerationProgress(0);
         setGenerationCount(0, 0);
       }, 1000);
+
+      // Auto-analyze after reference generation if brief is set
+      if (currentBrief) {
+        console.log("🤖 Auto-analyzing canvas after reference generation...");
+        setTimeout(() => analyzeCanvas(), 2000);
+      }
     }
+  };
+
+  // Agent handlers
+  const handlePromptsGenerated = (prompts: SuggestedPrompt[], brief: string) => {
+    setSuggestedPrompts(prompts);
+    setCurrentBrief(brief);
+    console.log("✓ Generated prompts from brief:", brief);
+  };
+
+  const handleAcceptPrompt = async (prompt: string, index: number) => {
+    console.log(`Accepting prompt ${index + 1}:`, prompt);
+    setSuggestedPrompts([]); // Dismiss banner after accepting
+
+    // Auto-generate with the accepted prompt
+    const count = 8; // Default count
+    setIsGenerating(true);
+    setGenerationCount(0, count);
+    setGenerationProgress(0);
+
+    try {
+      if (generationMode === 'fal-nanobanana' && !falClient.isConfigured()) {
+        alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file.");
+        return;
+      }
+
+      const estimatedTimeMs = Math.max(8000, count * 2000);
+      const updateIntervalMs = 100;
+      const totalUpdates = estimatedTimeMs / updateIntervalMs;
+      let updates = 0;
+
+      const progressInterval = setInterval(() => {
+        updates++;
+        const progress = Math.min((updates / totalUpdates) * 90, 90);
+        const currentImageEstimate = Math.floor((progress / 90) * count);
+        setGenerationCount(currentImageEstimate, count);
+        setGenerationProgress(progress);
+      }, updateIntervalMs);
+
+      const safetyTimeout = setTimeout(() => {
+        clearInterval(progressInterval);
+        setIsGenerating(false);
+        setGenerationProgress(0);
+        setGenerationCount(0, 0);
+        alert("Generation timed out. Please try again.");
+      }, 300000);
+
+      // Generate using fal.ai
+      const result = await falClient.generateTextToImage({
+        prompt,
+        num_images: count,
+        aspect_ratio: "1:1",
+        output_format: "jpeg"
+      });
+
+      // Send to backend for CLIP embeddings
+      await apiClient.addExternalImages({
+        images: result.images.map(img => ({ url: img.url })),
+        prompt: prompt,
+        generation_method: 'batch',
+        remove_background: removeBackground
+      });
+
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
+
+      clearInterval(progressInterval);
+      clearTimeout(safetyTimeout);
+      setGenerationCount(count, count);
+      setGenerationProgress(100);
+
+      console.log("✓ Generation complete, auto-analyzing canvas...");
+      // Trigger canvas analysis after a delay
+      setTimeout(() => analyzeCanvas(), 2000);
+    } catch (error) {
+      console.error("Generation failed:", error);
+      alert(`Generation failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsGenerating(false);
+      setTimeout(() => {
+        setGenerationProgress(0);
+        setGenerationCount(0, 0);
+      }, 1000);
+    }
+  };
+
+  const handleDismissPrompts = () => {
+    setSuggestedPrompts([]);
+  };
+
+  const analyzeCanvas = async () => {
+    if (!currentBrief || images.length < 5) {
+      console.log("Skipping analysis: no brief or too few images");
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      console.log("🔍 Fetching canvas digest...");
+      const digestResponse = await fetch("http://localhost:8000/api/canvas-digest");
+      const digest = await digestResponse.json();
+
+      console.log("🤖 Analyzing canvas with agent...");
+      const analysisResponse = await fetch("http://localhost:8000/api/agent/analyze-canvas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brief: currentBrief,
+          canvas_summary: digest
+        })
+      });
+
+      const analysis = await analysisResponse.json();
+      setRegionHighlights(analysis.regions || []);
+      console.log("✓ Canvas analysis complete:", analysis.regions?.length, "regions found");
+    } catch (error) {
+      console.error("❌ Canvas analysis failed:", error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleGenerateFromRegion = async (prompt: string, region: RegionHighlight) => {
+    console.log("Generating from region:", region.title, "with prompt:", prompt);
+    // Use the same generation logic as handleAcceptPrompt
+    await handleAcceptPrompt(prompt, 0);
+  };
+
+  const handleDismissRegions = () => {
+    setRegionHighlights([]);
   };
 
   // Click outside to close floating panel
@@ -738,16 +897,34 @@ export const App: React.FC = () => {
   }, [selectedImageIds]);
 
   return (
-    <div className="app-container">
-      {/* Progress Bar */}
-      <ProgressBar
-        isVisible={isGenerating}
-        message={
-          batchProgress
-            ? `Batch generating ${batchProgress.current}/${batchProgress.total}: ${batchProgress.currentPrompt.substring(0, 50)}...`
-            : "Generating images..."
-        }
+    <>
+      {/* Brief Panel (AI Agent) - Fixed sidebar */}
+      <BriefPanel
+        onPromptsGenerated={handlePromptsGenerated}
+        isCollapsed={briefPanelCollapsed}
+        onToggleCollapse={() => setBriefPanelCollapsed(!briefPanelCollapsed)}
       />
+
+      {/* Prompt Banner (AI suggestions) */}
+      {suggestedPrompts.length > 0 && (
+        <PromptBanner
+          prompts={suggestedPrompts}
+          onAcceptPrompt={handleAcceptPrompt}
+          onDismiss={handleDismissPrompts}
+          briefPanelCollapsed={briefPanelCollapsed}
+        />
+      )}
+
+      <div className="app-container">
+        {/* Progress Bar */}
+        <ProgressBar
+          isVisible={isGenerating}
+          message={
+            batchProgress
+              ? `Batch generating ${batchProgress.current}/${batchProgress.total}: ${batchProgress.currentPrompt.substring(0, 50)}...`
+              : "Generating images..."
+          }
+        />
 
       {/* Canvas Container */}
       <div className="canvas-container">
@@ -760,7 +937,45 @@ export const App: React.FC = () => {
           <strong>CLIP ViT-B/32</strong> •{" "}
           {isInitialized ? "✅ Ready" : "⏳ Initializing..."} •{" "}
           <strong>{is3DMode ? "3D" : "2D"}</strong> mode
+          {isAnalyzing && <span style={{ marginLeft: "8px" }}>• 🤖 Analyzing...</span>}
         </div>
+
+        {/* Manual Analysis Button */}
+        {currentBrief && images.length >= 5 && !is3DMode && (
+          <button
+            className="analyze-button"
+            onClick={() => analyzeCanvas()}
+            disabled={isAnalyzing || isGenerating}
+            title="Analyze canvas and suggest exploration regions"
+            style={{
+              position: "absolute",
+              top: "60px",
+              right: "20px",
+              padding: "8px 16px",
+              background: isAnalyzing ? "rgba(88, 166, 255, 0.2)" : "rgba(88, 166, 255, 0.15)",
+              border: "1px solid rgba(88, 166, 255, 0.4)",
+              borderRadius: "6px",
+              color: "#58a6ff",
+              fontSize: "13px",
+              fontWeight: "500",
+              cursor: isAnalyzing || isGenerating ? "not-allowed" : "pointer",
+              transition: "all 0.2s ease",
+              zIndex: 15,
+            }}
+            onMouseEnter={(e) => {
+              if (!isAnalyzing && !isGenerating) {
+                e.currentTarget.style.background = "rgba(88, 166, 255, 0.25)";
+                e.currentTarget.style.borderColor = "rgba(88, 166, 255, 0.6)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = isAnalyzing ? "rgba(88, 166, 255, 0.2)" : "rgba(88, 166, 255, 0.15)";
+              e.currentTarget.style.borderColor = "rgba(88, 166, 255, 0.4)";
+            }}
+          >
+            {isAnalyzing ? "🤖 Analyzing..." : "🔍 Analyze Canvas"}
+          </button>
+        )}
 
         {/* Conditionally render 2D or 3D canvas */}
         {is3DMode ? (
@@ -792,6 +1007,17 @@ export const App: React.FC = () => {
                 setFloatingPanelPos(null);
               }
             }, [])}
+          />
+        )}
+
+        {/* Region Highlights (AI agent overlays) - Only show in 2D mode */}
+        {!is3DMode && regionHighlights.length > 0 && (
+          <RegionHighlights
+            regions={regionHighlights}
+            canvasWidth={canvasDimensions.width || window.innerWidth}
+            canvasHeight={canvasDimensions.height || window.innerHeight - 200}
+            onGenerateFromRegion={handleGenerateFromRegion}
+            onDismiss={handleDismissRegions}
           />
         )}
 
@@ -1234,5 +1460,6 @@ export const App: React.FC = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };

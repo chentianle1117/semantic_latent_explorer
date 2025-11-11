@@ -117,3 +117,45 @@ export interface GenealogyLine {
   color: string;
   type: 'parent' | 'child';
 }
+
+// Agent/AI-related types
+export interface SuggestedPrompt {
+  prompt: string;
+  reasoning: string;
+}
+
+export interface RegionHighlight {
+  center: [number, number]; // Normalized coordinates (0-1)
+  title: string;
+  description: string;
+  suggested_prompts: string[];
+}
+
+export interface InitialPromptsRequest {
+  brief: string;
+}
+
+export interface InitialPromptsResponse {
+  prompts: SuggestedPrompt[];
+}
+
+export interface AnalyzeCanvasRequest {
+  brief: string;
+  canvas_summary: {
+    num_images: number;
+    clusters: Array<{
+      center: [number, number];
+      size: number;
+      avg_prompt: string;
+    }>;
+    axis_labels: AxisLabels;
+    bounds: {
+      x_range: [number, number];
+      y_range: [number, number];
+    };
+  };
+}
+
+export interface AnalyzeCanvasResponse {
+  regions: RegionHighlight[];
+}

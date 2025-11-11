@@ -14,11 +14,11 @@ from config import *
 
 class CLIPEmbedder:
     """Handles CLIP embedding extraction and caching."""
-    
+
     def __init__(self, model_name: str = CLIP_MODEL, pretrained: str = CLIP_PRETRAINED):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
-        
+
         # Load CLIP model
         print(f"Loading CLIP model: {model_name}")
         self.model, _, self.preprocess = open_clip.create_model_and_transforms(
@@ -26,10 +26,10 @@ class CLIPEmbedder:
         )
         self.model = self.model.to(self.device)
         self.model.eval()
-        
+
         # Load tokenizer for text
         self.tokenizer = open_clip.get_tokenizer(model_name)
-        
+
         print("CLIP model loaded successfully!")
     
     def create_cache_key(self, data: Union[str, List[str]]) -> str:
@@ -111,41 +111,41 @@ class CLIPEmbedder:
         return image_features.cpu().numpy()
     
     def extract_text_embeddings(
-        self, 
-        texts: List[str], 
+        self,
+        texts: List[str],
         use_cache: bool = True
     ) -> np.ndarray:
         """Extract CLIP embeddings from text prompts."""
-        
+
         # Check cache first
         if use_cache:
             cache_key = self.create_cache_key(texts)
             cache_file = EMBEDDINGS_CACHE / f"texts_{cache_key}.pkl"
-            
+
             if cache_file.exists():
                 print(f"Loading cached text embeddings for {len(texts)} texts")
                 with open(cache_file, 'rb') as f:
                     return pickle.load(f)
-        
+
         print(f"Extracting text embeddings for {len(texts)} texts...")
-        
+
         # Tokenize texts
         text_tokens = self.tokenizer(texts).to(self.device)
-        
+
         # Extract embeddings
         with torch.no_grad():
             text_features = self.model.encode_text(text_tokens)
             # Normalize embeddings
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-        
+
         embeddings = text_features.cpu().numpy()
-        
+
         # Cache the results
         if use_cache:
             with open(cache_file, 'wb') as f:
                 pickle.dump(embeddings, f)
             print(f"Cached text embeddings to {cache_file}")
-        
+
         return embeddings
     
     def compute_similarity(

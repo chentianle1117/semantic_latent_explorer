@@ -83,8 +83,7 @@ class FalClient {
             prompt: fullPrompt,
             num_images: imagesInThisBatch,
             output_format: request.output_format || "jpeg",
-            aspect_ratio: request.aspect_ratio || "1:1",
-            sync_mode: request.sync_mode
+            aspect_ratio: request.aspect_ratio || "1:1"
           },
           logs: true,
           onQueueUpdate: (update) => {
@@ -126,8 +125,7 @@ class FalClient {
           image_urls: request.image_urls,
           num_images: request.num_images || 1,
           output_format: request.output_format || "jpeg",
-          aspect_ratio: request.aspect_ratio,
-          sync_mode: request.sync_mode
+          aspect_ratio: request.aspect_ratio
         },
         logs: true,
         onQueueUpdate: (update) => {

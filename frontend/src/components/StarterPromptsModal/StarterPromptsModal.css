@@ -1,0 +1,239 @@
+.starter-prompts-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.starter-prompts-modal {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #30363d;
+  background: linear-gradient(135deg, rgba(88, 166, 255, 0.1) 0%, rgba(188, 140, 255, 0.1) 100%);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #c9d1d9;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  background: rgba(248, 81, 73, 0.15);
+  color: #f85149;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-description {
+  color: #8b949e;
+  font-size: 14px;
+  margin: 0 0 20px 0;
+  text-align: center;
+}
+
+.image-count-section {
+  max-width: 400px;
+  margin: 0 auto 24px;
+  padding: 16px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+}
+
+.prompts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.prompt-card {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.prompt-card:hover {
+  border-color: #58a6ff;
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.15);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-number {
+  font-size: 12px;
+  font-weight: 600;
+  color: #58a6ff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.prompt-text {
+  color: #e6edf3;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  padding: 12px;
+  background: #161b22;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  flex: 1;
+}
+
+.reasoning-section {
+  padding-top: 12px;
+  border-top: 1px solid #21262d;
+}
+
+.reasoning-section label {
+  display: block;
+  color: #8b949e;
+  font-size: 11px;
+  margin-bottom: 6px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.reasoning-section p {
+  color: #c9d1d9;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.button-generate {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #58a6ff 0%, #bc8cff 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button-generate:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.4);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding-top: 16px;
+  border-top: 1px solid #30363d;
+}
+
+.button-secondary {
+  padding: 10px 20px;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button-secondary:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+}
+
+/* Scrollbar styling */
+.starter-prompts-modal::-webkit-scrollbar {
+  width: 8px;
+}
+
+.starter-prompts-modal::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+
+.starter-prompts-modal::-webkit-scrollbar-thumb {
+  background: #30363d;
+  border-radius: 4px;
+}
+
+.starter-prompts-modal::-webkit-scrollbar-thumb:hover {
+  background: #484f58;
+}
+

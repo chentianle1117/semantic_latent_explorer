@@ -134,6 +134,7 @@ class StateResponse(BaseModel):
     history_groups: List[Dict]
     axis_labels: Dict[str, Tuple[str, str]]
     is_3d_mode: bool = False  # New: track if in 3D mode
+    design_brief: Optional[str] = None  # New: include design brief in state
 
 
 # Global state
@@ -152,6 +153,7 @@ class AppState:
         self.is_3d_mode = False  # New: track 3D mode
         self.next_id = 0
         self.websocket_connections: List[WebSocket] = []
+        self.design_brief: Optional[str] = None  # New: persist design brief
 
 state = AppState()
 
@@ -247,7 +249,8 @@ async def broadcast_state_update():
                 }
                 for g in state.history_groups
             ],
-            "axis_labels": state.axis_labels
+            "axis_labels": state.axis_labels,
+            "design_brief": state.design_brief  # Include design brief in broadcast
         }
     }
 
@@ -297,7 +300,8 @@ async def get_state():
             for g in state.history_groups
         ],
         axis_labels=state.axis_labels,
-        is_3d_mode=state.is_3d_mode  # New: include 3D mode state
+        is_3d_mode=state.is_3d_mode,  # New: include 3D mode state
+        design_brief=state.design_brief  # New: include design brief
     )
 
 
@@ -580,14 +584,11 @@ async def interpolate_images(request: InterpolateRequest):
 async def update_semantic_axes(request: AxisUpdateRequest):
     """Update semantic axes and recalculate positions."""
     try:
-        if state.axis_builder is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
-
         print(f"\n=== Updating Semantic Axes ===")
         print(f"X: {request.x_negative} → {request.x_positive}")
         print(f"Y: {request.y_negative} → {request.y_positive}")
 
-        # Update axis labels
+        # Update axis labels (always allowed, even if models not initialized)
         state.axis_labels['x'] = (request.x_negative, request.x_positive)
         state.axis_labels['y'] = (request.y_negative, request.y_positive)
 
@@ -596,8 +597,8 @@ async def update_semantic_axes(request: AxisUpdateRequest):
             print(f"Z: {request.z_negative} → {request.z_positive}")
             state.axis_labels['z'] = (request.z_negative, request.z_positive)
 
-        # Recalculate ALL positions using the new axes
-        if len(state.images_metadata) > 0:
+        # Recalculate positions only if models are initialized and we have images
+        if state.axis_builder is not None and state.embedder is not None and len(state.images_metadata) > 0:
             print(f"Recalculating positions for {len(state.images_metadata)} images...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings)
@@ -607,6 +608,9 @@ async def update_semantic_axes(request: AxisUpdateRequest):
                 img_meta.coordinates = tuple(float(c) for c in new_coords[i])
 
             print(f"OK: All positions recalculated")
+        elif len(state.images_metadata) > 0:
+            print("⚠ WARNING: Models not initialized, axis labels updated but positions not recalculated")
+            print("   Positions will be recalculated when models are initialized")
 
         await broadcast_state_update()
 
@@ -651,6 +655,25 @@ async def set_3d_mode(use_3d: bool):
 
     except Exception as e:
         print(f"ERROR setting 3D mode: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class DesignBriefRequest(BaseModel):
+    brief: str
+
+@app.post("/api/update-design-brief")
+async def update_design_brief(request: DesignBriefRequest):
+    """Update the design brief in application state."""
+    try:
+        print(f"\n=== Updating Design Brief ===")
+        print(f"Brief: {request.brief[:100]}..." if len(request.brief) > 100 else f"Brief: {request.brief}")
+        state.design_brief = request.brief.strip() if request.brief else None
+        await broadcast_state_update()
+        return {"status": "success", "message": "Design brief updated", "brief": state.design_brief}
+    except Exception as e:
+        print(f"ERROR updating design brief: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -878,6 +901,12 @@ async def get_canvas_digest():
 
         coords = np.array([img.coordinates for img in visible])
 
+        # Calculate bounds
+        bounds = {
+            "x": [float(coords[:,0].min()), float(coords[:,0].max())],
+            "y": [float(coords[:,1].min()), float(coords[:,1].max())]
+        }
+
         # Quick clustering (k=3-5)
         from sklearn.cluster import KMeans
         k = min(5, max(3, len(visible) // 10))
@@ -888,9 +917,19 @@ async def get_canvas_digest():
             mask = km.labels_ == i
             cluster_imgs = [visible[j] for j in np.where(mask)[0]]
 
+            # Get actual center coordinates
+            actual_center = km.cluster_centers_[i]
+
+            # Normalize to [0-1] range for the AI
+            normalized_center = [
+                (actual_center[0] - bounds["x"][0]) / (bounds["x"][1] - bounds["x"][0]) if bounds["x"][1] != bounds["x"][0] else 0.5,
+                (actual_center[1] - bounds["y"][0]) / (bounds["y"][1] - bounds["y"][0]) if bounds["y"][1] != bounds["y"][0] else 0.5
+            ]
+
             clusters.append({
                 "id": f"cluster_{i}",
-                "center": km.cluster_centers_[i].tolist(),
+                "center": actual_center.tolist(),  # Keep actual coordinates for reference
+                "normalized_center": normalized_center,  # Add normalized [0-1] coordinates
                 "size": int(mask.sum()),
                 "sample_prompts": [img.prompt for img in cluster_imgs[:3]],
                 "generation_methods": list(set(img.generation_method for img in cluster_imgs))
@@ -900,10 +939,7 @@ async def get_canvas_digest():
             "count": len(visible),
             "clusters": clusters,
             "axis_labels": state.axis_labels,
-            "bounds": {
-                "x": [float(coords[:,0].min()), float(coords[:,0].max())],
-                "y": [float(coords[:,1].min()), float(coords[:,1].max())]
-            }
+            "bounds": bounds
         }
     except Exception as e:
         print(f"ERROR in canvas-digest: {e}")
@@ -993,6 +1029,15 @@ async def analyze_canvas(request: AnalyzeCanvasRequest):
 
         print(f"Canvas has {digest['count']} images in {len(digest['clusters'])} clusters")
 
+        # Format cluster info for AI with normalized centers
+        cluster_info = []
+        for c in digest['clusters']:
+            cluster_info.append({
+                "normalized_center": c['normalized_center'],
+                "size": c['size'],
+                "sample_prompts": c['sample_prompts'][:2]  # Just 2 examples
+            })
+
         prompt = f"""You are a design exploration assistant analyzing a shoe design canvas.
 
 DESIGN BRIEF:
@@ -1000,30 +1045,53 @@ DESIGN BRIEF:
 
 CURRENT CANVAS STATE:
 - {digest['count']} shoes displayed
-- Axes: X={digest['axis_labels']['x']}, Y={digest['axis_labels']['y']}
+- X-Axis: {digest['axis_labels']['x'][0]} (left/0.0) ↔ {digest['axis_labels']['x'][1]} (right/1.0)
+- Y-Axis: {digest['axis_labels']['y'][0]} (bottom/0.0) ↔ {digest['axis_labels']['y'][1]} (top/1.0)
 - {len(digest['clusters'])} clusters detected
 
-CLUSTERS:
-{json.dumps(digest['clusters'], indent=2)}
+EXISTING CLUSTERS (normalized positions [x, y] in 0-1 range):
+{json.dumps(cluster_info, indent=2)}
+
+CRITICAL RULES:
+1. For "cluster" type regions: Use the EXACT normalized_center from an existing cluster above
+2. For "gap" type regions: Choose coordinates that are:
+   - BETWEEN existing clusters (not on top of them)
+   - Within reasonable distance (0.2-0.3 units) from nearest cluster
+   - NOT in corners or edges unless clusters are there
+3. Coordinates interpretation:
+   - [0.0, 0.0] = bottom-left: {digest['axis_labels']['x'][0]}, {digest['axis_labels']['y'][0]}
+   - [1.0, 1.0] = top-right: {digest['axis_labels']['x'][1]}, {digest['axis_labels']['y'][1]}
+   - [x, y] where x is position on X-axis, y is position on Y-axis
+4. Prompts MUST match the coordinates semantically (use axis labels as guide)
 
 TASK:
-Suggest 2-3 specific regions on the canvas to explore next.
-Consider:
-1. Gaps in coverage relative to the brief
-2. Promising clusters that could be expanded
-3. New directions that would add diversity
+Suggest 2-3 specific regions to explore. For each region:
+1. Type: "cluster" (expand existing) OR "gap" (fill empty space between clusters)
+2. Center: For clusters, copy exact normalized_center from above. For gaps, calculate position between clusters
+3. Create HIGHLY SPECIFIC prompts that match the coordinate position based on axis meanings
 
 Return JSON ONLY (no markdown):
 {{
   "regions": [
     {{
-      "center": [0.3, 0.7],
-      "title": "Minimal White Zone",
-      "description": "Dense cluster matching brief's minimalism focus, but could use more variations",
+      "center": [0.45, 0.62],
+      "title": "Gap: Mid-range Exploration",
+      "description": "Empty space between clusters - good for diversity",
       "suggested_prompts": [
-        "minimal white leather high-top sneaker",
-        "clean white canvas low-top with subtle texture"
-      ]
+        "Detailed prompt matching x=0.45, y=0.62 based on axis meanings",
+        "Another detailed prompt for same position"
+      ],
+      "type": "gap"
+    }},
+    {{
+      "center": [0.78, 0.23],
+      "title": "Cluster Expansion",
+      "description": "Expand existing cluster with more variations",
+      "suggested_prompts": [
+        "Variation of cluster's existing style",
+        "Another variation similar to cluster"
+      ],
+      "type": "cluster"
     }}
   ]
 }}"""
@@ -1045,6 +1113,458 @@ Return JSON ONLY (no markdown):
 
     except Exception as e:
         print(f"ERROR in analyze-canvas: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AnalyzePreferencesRequest(BaseModel):
+    brief: str
+
+@app.post("/api/agent/analyze-preferences")
+async def analyze_preferences(request: AnalyzePreferencesRequest):
+    """Analyze user's exploration patterns and preferences"""
+    try:
+        if not gemini_api_key:
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+        print(f"\n=== Analyze Preferences Request ===")
+        print(f"Brief: {request.brief}")
+
+        # Get canvas digest
+        digest = await get_canvas_digest()
+
+        if digest['count'] == 0:
+            return {
+                "preferences": {
+                    "favored_attributes": [],
+                    "avoided_attributes": [],
+                    "exploration_style": "Getting started"
+                },
+                "trajectory": {
+                    "current_focus": "No images yet",
+                    "trends": []
+                },
+                "statistics": {
+                    "total_images": 0,
+                    "cluster_distribution": {}
+                }
+            }
+
+        # Collect prompts from all clusters
+        all_prompts = []
+        cluster_sizes = {}
+        for cluster in digest['clusters']:
+            all_prompts.extend(cluster['sample_prompts'])
+            cluster_sizes[cluster['id']] = cluster['size']
+
+        prompt_analysis = f"""You are a design exploration analyst helping understand user preferences.
+
+DESIGN BRIEF:
+{request.brief}
+
+EXPLORATION DATA:
+- Total images: {digest['count']}
+- Number of clusters: {len(digest['clusters'])}
+- Sample prompts: {', '.join(all_prompts[:15])}
+- Cluster sizes: {cluster_sizes}
+
+TASK:
+Analyze the user's exploration patterns and infer their preferences.
+
+Return JSON ONLY (no markdown):
+{{
+  "preferences": {{
+    "favored_attributes": ["Minimalist designs", "Light colors", "Clean lines"],
+    "avoided_attributes": ["Heavy ornamentation", "Dark colors"],
+    "exploration_style": "Focused on specific aesthetic"
+  }},
+  "trajectory": {{
+    "current_focus": "Exploring minimalist white sneakers with subtle variations",
+    "trends": ["Moving toward simpler designs", "Consistent color palette"]
+  }},
+  "statistics": {{
+    "total_images": {digest['count']},
+    "cluster_distribution": {json.dumps(cluster_sizes)},
+    "dominant_themes": ["Minimalism", "White colorways"]
+  }}
+}}"""
+
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt_analysis)
+
+        # Parse JSON
+        json_match = re.search(r'\{[\s\S]*\}', response.text)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            print(f"Analyzed preferences for {digest['count']} images")
+            return result
+
+        # Fallback
+        return {
+            "preferences": {
+                "favored_attributes": ["Contemporary"],
+                "avoided_attributes": [],
+                "exploration_style": "Broad exploration"
+            },
+            "trajectory": {
+                "current_focus": "Exploring various styles",
+                "trends": ["Diverse exploration"]
+            },
+            "statistics": {
+                "total_images": digest['count'],
+                "cluster_distribution": cluster_sizes
+            }
+        }
+
+    except Exception as e:
+        print(f"ERROR in analyze-preferences: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ExtractParametersRequest(BaseModel):
+    brief: str
+
+@app.post("/api/agent/extract-parameters")
+async def extract_parameters(request: ExtractParametersRequest):
+    """Extract design parameters from brief"""
+    try:
+        if not gemini_api_key:
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+        print(f"\n=== Extract Parameters Request ===")
+        print(f"Brief: {request.brief}")
+
+        # Get canvas digest for context
+        digest = await get_canvas_digest()
+        
+        # Get sample prompts from canvas if available
+        sample_prompts = []
+        if digest['count'] > 0:
+            for cluster in digest['clusters'][:3]:
+                sample_prompts.extend(cluster['sample_prompts'][:2])
+
+        prompt = f"""You are a design analysis assistant helping with shoe design.
+
+DESIGN BRIEF:
+{request.brief}
+
+CURRENT EXPLORATION:
+- Total images: {digest['count']}
+- Sample prompts: {', '.join(sample_prompts) if sample_prompts else 'None yet'}
+
+TASK:
+Extract structured design parameters from the brief and current exploration.
+Identify key attributes that define the design space being explored.
+
+Return JSON ONLY (no markdown):
+{{
+  "type": ["Running", "Casual", "Athletic"],
+  "inspiration": ["Minimalist", "Modern", "Retro"],
+  "materials": ["Leather", "Canvas", "Mesh"],
+  "colors": ["White", "Black", "Blue accents"],
+  "style_keywords": ["Clean lines", "Bold", "Performance"],
+  "last_updated": "{json.dumps(sample_prompts) if sample_prompts else 'Initial extraction'}"
+}}"""
+
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+
+        # Parse JSON
+        json_match = re.search(r'\{[\s\S]*\}', response.text)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            print(f"Extracted parameters: {list(result.keys())}")
+            return result
+
+        # Fallback
+        return {
+            "type": ["Sneaker"],
+            "inspiration": ["Modern"],
+            "materials": ["Mixed"],
+            "colors": ["Various"],
+            "style_keywords": ["Contemporary"],
+            "last_updated": "Fallback"
+        }
+
+    except Exception as e:
+        print(f"ERROR in extract-parameters: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SuggestAxesRequest(BaseModel):
+    brief: str
+    current_x_axis: str
+    current_y_axis: str
+
+@app.post("/api/agent/suggest-axes")
+async def suggest_axes(request: SuggestAxesRequest):
+    """Suggest alternative semantic axes to avoid design fixation"""
+    try:
+        print(f"\n=== Suggest Axes Request ===")
+        print(f"Request data: {request}")
+        print(f"Brief: {request.brief}")
+        print(f"Current X-axis type: {type(request.current_x_axis)}, value: {request.current_x_axis}")
+        print(f"Current Y-axis type: {type(request.current_y_axis)}, value: {request.current_y_axis}")
+
+        if not gemini_api_key:
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+        # Ensure axis labels are strings
+        x_axis_str = str(request.current_x_axis) if request.current_x_axis else "formal - sporty"
+        y_axis_str = str(request.current_y_axis) if request.current_y_axis else "dark - colorful"
+
+        print(f"Formatted axes: X={x_axis_str}, Y={y_axis_str}")
+
+        # Get canvas digest for context
+        digest = await get_canvas_digest()
+
+        prompt = f"""You are a design exploration assistant helping with shoe design.
+
+DESIGN BRIEF:
+{request.brief}
+
+CURRENT CANVAS:
+- Images: {digest['count']}
+- Current X-axis: {x_axis_str}
+- Current Y-axis: {y_axis_str}
+
+CRITICAL FORMATTING REQUIREMENT:
+Every axis MUST be formatted as: "opposite1 - opposite2"
+The " - " (space-dash-space) separator is MANDATORY.
+
+TASK:
+Suggest 3 alternative axis configurations. Each axis must:
+1. Be a bipolar semantic spectrum (two opposite terms)
+2. Use the exact format: "term1 - term2" with space-dash-space
+3. Offer different perspectives than current axes
+4. Be relevant to shoe design
+
+VALID AXIS FORMAT EXAMPLES:
+✓ "minimalist - maximalist"
+✓ "casual - formal"
+✓ "muted - vibrant"
+✓ "athletic - fashion"
+✓ "retro - futuristic"
+✓ "comfort-focused - style-focused"
+✓ "simple - complex"
+✓ "traditional - innovative"
+
+INVALID FORMATS (DO NOT USE):
+✗ "Minimalism" (missing opposite)
+✗ "Utilitarian" (missing opposite)
+✗ "Color Intensity" (missing opposite)
+✗ "minimalist-maximalist" (missing spaces around dash)
+
+Return JSON ONLY (no markdown, no code blocks):
+{{
+  "suggestions": [
+    {{
+      "x_axis": "minimalist - maximalist",
+      "y_axis": "casual - formal",
+      "reasoning": "Reveals aesthetic spectrum from simple to complex and everyday to dressy"
+    }},
+    {{
+      "x_axis": "muted - vibrant",
+      "y_axis": "smooth - textured",
+      "reasoning": "Focuses on visual and tactile qualities"
+    }},
+    {{
+      "x_axis": "athletic - fashion-forward",
+      "y_axis": "traditional - innovative",
+      "reasoning": "Balances function vs. aesthetics and design approach"
+    }}
+  ]
+}}
+
+Remember: EVERY x_axis and y_axis value MUST contain " - " (space-dash-space)."""
+
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+
+        # Common semantic opposites for shoe design
+        OPPOSITES = {
+            'minimalist': 'maximalist',
+            'simple': 'complex',
+            'casual': 'formal',
+            'athletic': 'fashion',
+            'sporty': 'dressy',
+            'comfort': 'style',
+            'functional': 'decorative',
+            'classic': 'modern',
+            'traditional': 'innovative',
+            'retro': 'futuristic',
+            'muted': 'vibrant',
+            'subtle': 'bold',
+            'dark': 'light',
+            'neutral': 'colorful',
+            'smooth': 'textured',
+            'plain': 'patterned',
+            'everyday': 'special occasion',
+            'practical': 'fashionable',
+            'understated': 'eye-catching',
+            'minimal': 'ornate',
+            'basic': 'elaborate',
+            'low-key': 'statement',
+            'conservative': 'daring',
+            'timeless': 'trendy',
+            'utilitarian': 'stylish',
+            'performance': 'aesthetic',
+            'technical': 'artistic'
+        }
+        
+        def create_bipolar_axis(term: str) -> str:
+            """Convert a single term into a bipolar axis using opposites dictionary"""
+            term_lower = term.lower().strip()
+            
+            # Check if it's already bipolar
+            if ' - ' in term:
+                return term
+            
+            # Check exact match in opposites dict
+            if term_lower in OPPOSITES:
+                return f"{term_lower} - {OPPOSITES[term_lower]}"
+            
+            # Check reverse mapping
+            for key, val in OPPOSITES.items():
+                if term_lower == val:
+                    return f"{key} - {val}"
+            
+            # Check for partial matches (e.g., "minimalism" matches "minimalist")
+            for key, val in OPPOSITES.items():
+                if term_lower.startswith(key) or key.startswith(term_lower):
+                    return f"{key} - {val}"
+                if term_lower.startswith(val) or val.startswith(term_lower):
+                    return f"{key} - {val}"
+            
+            # Fallback: try to create a sensible opposite based on keywords
+            if 'color' in term_lower or 'hue' in term_lower:
+                return f"muted - vibrant"
+            elif 'intensity' in term_lower or 'brightness' in term_lower:
+                return f"low - high"
+            elif 'texture' in term_lower or 'surface' in term_lower:
+                return f"smooth - rough"
+            elif 'style' in term_lower or 'design' in term_lower or 'aesthetic' in term_lower:
+                return f"simple - complex"
+            elif 'comfort' in term_lower or 'function' in term_lower:
+                return f"comfort-focused - style-focused"
+            elif 'material' in term_lower or 'fabric' in term_lower:
+                return f"natural - synthetic"
+            else:
+                # Last resort: use "low X - high X" pattern (cleaner than "less/more")
+                clean_term = term_lower.replace('_', ' ')
+                return f"low {clean_term} - high {clean_term}"
+        
+        # Parse JSON
+        json_match = re.search(r'\{[\s\S]*\}', response.text)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            suggestions = result.get('suggestions', [])
+            
+            # Validate and fix axis format
+            for suggestion in suggestions:
+                x_axis = suggestion.get('x_axis', '')
+                y_axis = suggestion.get('y_axis', '')
+                
+                # Fix x_axis if needed
+                if ' - ' not in x_axis:
+                    original = x_axis
+                    suggestion['x_axis'] = create_bipolar_axis(x_axis)
+                    print(f"✓ Converted X-axis: '{original}' → '{suggestion['x_axis']}'")
+                
+                # Fix y_axis if needed
+                if ' - ' not in y_axis:
+                    original = y_axis
+                    suggestion['y_axis'] = create_bipolar_axis(y_axis)
+                    print(f"✓ Converted Y-axis: '{original}' → '{suggestion['y_axis']}'")
+                
+                print(f"Validated suggestion: X={suggestion['x_axis']}, Y={suggestion['y_axis']}")
+            
+            print(f"Generated {len(suggestions)} axis suggestions")
+            return result
+
+        # Fallback
+        return {"suggestions": [
+            {"x_axis": "simple - complex", "y_axis": "subtle - bold", "reasoning": "Alternative design complexity view"},
+            {"x_axis": "classic - modern", "y_axis": "traditional - innovative", "reasoning": "Temporal and innovation spectrum"},
+            {"x_axis": "comfort-focused - style-focused", "y_axis": "casual - formal", "reasoning": "Function vs. form and usage context"}
+        ]}
+
+    except Exception as e:
+        print(f"ERROR in suggest-axes: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class GenerateVariationRequest(BaseModel):
+    original_prompt: str
+    brief: str
+    num_variations: int = 2
+
+@app.post("/api/agent/generate-variation")
+async def generate_variation(request: GenerateVariationRequest):
+    """Generate alternative prompt variations to avoid design fixation"""
+    try:
+        if not gemini_api_key:
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+        print(f"\n=== Generate Variation Request ===")
+        print(f"Original prompt: {request.original_prompt}")
+        print(f"Brief: {request.brief}")
+        print(f"Num variations: {request.num_variations}")
+
+        prompt = f"""You are a design exploration assistant helping with shoe design.
+
+DESIGN BRIEF:
+{request.brief}
+
+USER'S CURRENT PROMPT:
+{request.original_prompt}
+
+TASK:
+Generate {request.num_variations} alternative prompts that:
+1. Are RELATED to the user's prompt but explore DIFFERENT design directions
+2. Help avoid design fixation by introducing diversity
+3. Stay within the scope of the design brief
+4. Are specific enough for image generation
+
+The variations should explore different aspects like:
+- Different materials
+- Different color schemes
+- Different silhouettes or forms
+- Different style inspirations
+
+Return JSON ONLY (no markdown):
+{{
+  "variations": [
+    {{"prompt": "...", "reasoning": "Explores different material/color/etc."}},
+    {{"prompt": "...", "reasoning": "Alternative style direction"}}
+  ]
+}}"""
+
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+
+        # Parse JSON
+        json_match = re.search(r'\{[\s\S]*\}', response.text)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            print(f"Generated {len(result.get('variations', []))} variations")
+            return result
+
+        # Fallback
+        return {"variations": [
+            {"prompt": f"{request.original_prompt} with different colors", "reasoning": "Color variation"},
+            {"prompt": f"{request.original_prompt} in alternative style", "reasoning": "Style variation"}
+        ]}
+
+    except Exception as e:
+        print(f"ERROR in generate-variation: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1207,7 +1727,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     }
                     for g in state.history_groups
                 ],
-                "axis_labels": state.axis_labels
+                "axis_labels": state.axis_labels,
+                "design_brief": state.design_brief  # Include design brief in WebSocket initial state
             }
         })
 

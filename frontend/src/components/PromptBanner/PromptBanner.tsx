@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { ImageCountSlider } from "../ImageCountSlider/ImageCountSlider";
 import "./PromptBanner.css";
 
 interface SuggestedPrompt {
@@ -8,26 +9,25 @@ interface SuggestedPrompt {
 
 interface PromptBannerProps {
   prompts: SuggestedPrompt[];
-  onAcceptPrompt: (prompt: string, index: number) => void;
+  onAcceptPrompt: (prompt: string, index: number, count: number) => void;
   onDismiss: () => void;
-  briefPanelCollapsed: boolean;
 }
 
 export const PromptBanner: React.FC<PromptBannerProps> = ({
   prompts,
   onAcceptPrompt,
   onDismiss,
-  briefPanelCollapsed,
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showReasoning, setShowReasoning] = useState(false);
+  const [imageCount, setImageCount] = useState(4);
 
   if (prompts.length === 0) return null;
 
   const currentPrompt = prompts[selectedIndex];
 
   return (
-    <div className={`prompt-banner ${briefPanelCollapsed ? "panel-collapsed" : ""}`}>
+    <div className="prompt-banner">
       <div className="banner-content">
         <div className="banner-icon">✨</div>
 
@@ -39,6 +39,13 @@ export const PromptBanner: React.FC<PromptBannerProps> = ({
               <strong>Why:</strong> {currentPrompt.reasoning}
             </div>
           )}
+          <div className="banner-slider">
+            <ImageCountSlider
+              value={imageCount}
+              onChange={setImageCount}
+              label="Images"
+            />
+          </div>
         </div>
 
         <div className="banner-actions">
@@ -74,7 +81,7 @@ export const PromptBanner: React.FC<PromptBannerProps> = ({
 
           <button
             className="banner-button primary"
-            onClick={() => onAcceptPrompt(currentPrompt.prompt, selectedIndex)}
+            onClick={() => onAcceptPrompt(currentPrompt.prompt, selectedIndex, imageCount)}
           >
             Generate
           </button>

@@ -1,0 +1,130 @@
+.region-prompt-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(4px);
+}
+
+.region-prompt-dialog {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.region-prompt-dialog .dialog-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.region-prompt-dialog .dialog-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.region-prompt-dialog .close-button {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 28px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.region-prompt-dialog .close-button:hover {
+  background: #30363d;
+  color: #e6edf3;
+}
+
+.region-prompt-dialog .dialog-content {
+  padding: 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.region-prompt-dialog .prompt-preview {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(48, 54, 61, 0.3);
+  border: 1px solid #30363d;
+  border-radius: 8px;
+}
+
+.region-prompt-dialog .prompt-preview label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7d8590;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.region-prompt-dialog .prompt-preview p {
+  margin: 0;
+  font-size: 14px;
+  color: #e6edf3;
+  line-height: 1.6;
+}
+
+.region-prompt-dialog .dialog-actions {
+  padding: 16px 24px;
+  border-top: 1px solid #30363d;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.region-prompt-dialog .action-button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.region-prompt-dialog .action-button.primary {
+  background: #238636;
+  color: white;
+}
+
+.region-prompt-dialog .action-button.primary:hover {
+  background: #2ea043;
+}
+
+.region-prompt-dialog .action-button.secondary {
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+}
+
+.region-prompt-dialog .action-button.secondary:hover {
+  background: #30363d;
+}

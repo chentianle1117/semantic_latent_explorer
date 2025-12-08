@@ -8,14 +8,26 @@ import * as d3 from "d3";
 import { useAppStore } from "../../store/appStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
 import { apiClient } from "../../api/client";
-import type { ImageData } from "../../types";
+import type { ImageData, RegionHighlight, PendingImage } from "../../types";
 
 interface SemanticCanvasProps {
   onSelectionChange: (x: number, y: number, count: number) => void;
+  regionHighlights?: RegionHighlight[];
+  onGenerateFromRegion?: (prompt: string, region: RegionHighlight) => void;
+  onDismissRegions?: () => void;
+  pendingImages?: PendingImage[];
+  onAcceptPending?: (pendingId: string) => void;
+  onDiscardPending?: (pendingId: string) => void;
 }
 
 export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   onSelectionChange,
+  regionHighlights = [],
+  onGenerateFromRegion,
+  onDismissRegions,
+  pendingImages = [],
+  onAcceptPending,
+  onDiscardPending,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomTransformRef = useRef<d3.ZoomTransform | null>(null);
@@ -25,6 +37,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const visualSettings = useAppStore((state) => state.visualSettings);
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
   const hoveredGroupId = useAppStore((state) => state.hoveredGroupId);
+  const hoveredImageId = useAppStore((state) => state.hoveredImageId);
   const axisLabels = useAppStore((state) => state.axisLabels);
   const canvasBounds = useAppStore((state) => state.canvasBounds);
 
@@ -178,10 +191,13 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     let xMin, xMax, yMin, yMax;
 
     if (canvasBounds === null) {
-      // Calculate from data extent
+      // Calculate from data extent using TRANSFORMED coordinates
       console.log("📐 Calculating bounds from data extent");
-      const xExtent = d3.extent(images, (d) => d.coordinates[0]) as [number, number];
-      const yExtent = d3.extent(images, (d) => d.coordinates[1]) as [number, number];
+      const coordScale = visualSettings.coordinateScale || 1.0;
+      const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+
+      const xExtent = d3.extent(images, (d) => (d.coordinates[0] + coordOffset[0]) * coordScale) as [number, number];
+      const yExtent = d3.extent(images, (d) => (d.coordinates[1] + coordOffset[1]) * coordScale) as [number, number];
 
       // Add padding based on user preference (layoutPadding setting)
       const paddingFactor = visualSettings.layoutPadding;
@@ -259,6 +275,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         .attr("stroke-width", 1)
         .attr("opacity", gridOpacity);
     }
+
+    // Group for region highlights (behind images)
+    const regionHighlightsGroup = g.append("g").attr("class", "region-highlights");
 
     // Group for genealogy lines
     const linesGroup = g.append("g").attr("class", "genealogy-lines");
@@ -458,6 +477,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           .attr("stroke-width", 3)
           .attr("opacity", 1);
 
+        // Update hoveredImageId for bi-directional highlighting with tree modal
+        useAppStore.getState().setHoveredImageId(d.id);
+
         // Only show hover genealogy if no images are selected
         const currentSelection = useAppStore.getState().selectedImageIds;
         if (currentSelection.length === 0) {
@@ -467,13 +489,15 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         } else {
           console.log("Selection exists, skipping hover genealogy");
         }
-        // Don't update store - it causes re-renders
       })
       .on("mouseleave", function () {
         console.log("👋 Mouse leave");
         d3.select(this.parentNode as SVGGElement)
           .select(".hover-border")
           .attr("opacity", 0);
+
+        // Clear hoveredImageId
+        useAppStore.getState().setHoveredImageId(null);
 
         // Only clear if no selection
         const currentSelection = useAppStore.getState().selectedImageIds;
@@ -540,6 +564,325 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("opacity", 0)
       .style("pointer-events", "none");
 
+    // Render pending/background images with faded opacity
+    if (pendingImages.length > 0) {
+      const pendingGroup = imagesGroup
+        .selectAll(".pending-image")
+        .data(pendingImages, (d: any) => d.id)
+        .join("g")
+        .attr("class", "pending-image")
+        .attr("id", (d) => `pending-${d.id}`)
+        .attr(
+          "transform",
+          (d) =>
+            `translate(${xScale((d.imageData.coordinates[0] + coordOffset[0]) * coordScale)}, ${yScale((d.imageData.coordinates[1] + coordOffset[1]) * coordScale)})`
+        )
+        .attr("opacity", 0.35);  // Faded opacity
+
+      // Add image
+      pendingGroup
+        .append("image")
+        .attr("href", (d) => `data:image/png;base64,${d.imageData.base64_image}`)
+        .attr("x", -imageSize / 2)
+        .attr("y", -imageSize / 2)
+        .attr("width", imageSize)
+        .attr("height", imageSize)
+        .attr("clip-path", "inset(0 round 8px)");
+
+      // Add border
+      pendingGroup
+        .append("rect")
+        .attr("x", -imageSize / 2)
+        .attr("y", -imageSize / 2)
+        .attr("width", imageSize)
+        .attr("height", imageSize)
+        .attr("rx", 8)
+        .attr("fill", "none")
+        .attr("stroke", "#f0e68c")
+        .attr("stroke-width", 2)
+        .attr("stroke-dasharray", "5,5");
+
+      // Add accept/discard buttons
+      pendingGroup.each(function(d) {
+        const group = d3.select(this);
+        const buttonY = imageSize / 2 + 15;
+
+        // Accept button
+        const acceptBtn = group
+          .append("foreignObject")
+          .attr("x", -imageSize / 2)
+          .attr("y", buttonY)
+          .attr("width", imageSize / 2 - 2)
+          .attr("height", 30)
+          .style("pointer-events", "all");
+
+        acceptBtn
+          .append("xhtml:button")
+          .style("width", "100%")
+          .style("height", "100%")
+          .style("background", "#238636")
+          .style("border", "none")
+          .style("border-radius", "4px")
+          .style("color", "white")
+          .style("font-size", "11px")
+          .style("cursor", "pointer")
+          .style("pointer-events", "all")
+          .text("✓ Accept")
+          .on("click", () => {
+            if (onAcceptPending) {
+              onAcceptPending(d.id);
+            }
+          })
+          .on("mouseover", function() {
+            d3.select(this).style("background", "#2ea043");
+          })
+          .on("mouseout", function() {
+            d3.select(this).style("background", "#238636");
+          });
+
+        // Discard button
+        const discardBtn = group
+          .append("foreignObject")
+          .attr("x", imageSize / 2 - (imageSize / 2 - 2))
+          .attr("y", buttonY)
+          .attr("width", imageSize / 2 - 2)
+          .attr("height", 30)
+          .style("pointer-events", "all");
+
+        discardBtn
+          .append("xhtml:button")
+          .style("width", "100%")
+          .style("height", "100%")
+          .style("background", "#da3633")
+          .style("border", "none")
+          .style("border-radius", "4px")
+          .style("color", "white")
+          .style("font-size", "11px")
+          .style("cursor", "pointer")
+          .style("pointer-events", "all")
+          .text("✕ Discard")
+          .on("click", () => {
+            if (onDiscardPending) {
+              onDiscardPending(d.id);
+            }
+          })
+          .on("mouseover", function() {
+            d3.select(this).style("background", "#e5534b");
+          })
+          .on("mouseout", function() {
+            d3.select(this).style("background", "#da3633");
+          });
+
+        // Add hover to show reasoning
+        group
+          .on("mouseover", function() {
+            // Show tooltip with variation reasoning
+            const tooltip = group
+              .append("foreignObject")
+              .attr("class", "variation-tooltip")
+              .attr("x", -imageSize / 2)
+              .attr("y", -imageSize / 2 - 50)
+              .attr("width", 200)
+              .attr("height", 50);
+
+            tooltip
+              .append("xhtml:div")
+              .style("background", "rgba(22, 27, 34, 0.95)")
+              .style("border", "1px solid #f0e68c")
+              .style("border-radius", "4px")
+              .style("padding", "6px")
+              .style("color", "#c9d1d9")
+              .style("font-size", "11px")
+              .text(`Variation: ${d.variation.reasoning}`);
+
+            group.attr("opacity", 0.7);
+          })
+          .on("mouseout", function() {
+            group.selectAll(".variation-tooltip").remove();
+            group.attr("opacity", 0.35);
+          });
+      });
+    }
+
+    // Render region highlights (AI agent exploration suggestions)
+    if (regionHighlights.length > 0) {
+      regionHighlights.forEach((region, index) => {
+        const [normX, normY] = region.center;
+        // Convert normalized coordinates (0-1) to data coordinates
+        const dataX = xMin + normX * (xMax - xMin);
+        const dataY = yMin + normY * (yMax - yMin);
+        // Convert to pixel coordinates using scales
+        const pixelX = xScale(dataX);
+        const pixelY = yScale(dataY);
+
+        // Visual distinction: cluster (blue solid) vs gap (orange dashed)
+        const isCluster = region.type === 'cluster';
+        const fillColor = isCluster ? "rgba(88, 166, 255, 0.15)" : "rgba(255, 166, 88, 0.15)";
+        const strokeColor = isCluster ? "#58a6ff" : "#ffa658";
+        const strokeDasharray = isCluster ? "none" : "5,5";
+
+        // Pulsing circle
+        regionHighlightsGroup
+          .append("circle")
+          .attr("cx", pixelX)
+          .attr("cy", pixelY)
+          .attr("r", 60)
+          .attr("fill", fillColor)
+          .attr("stroke", strokeColor)
+          .attr("stroke-width", 2)
+          .attr("stroke-dasharray", strokeDasharray)
+          .attr("opacity", 0.6);
+
+        // Inner dot
+        regionHighlightsGroup
+          .append("circle")
+          .attr("cx", pixelX)
+          .attr("cy", pixelY)
+          .attr("r", 6)
+          .attr("fill", strokeColor)
+          .attr("opacity", 0.8);
+
+        // Add interactive foreign object for the card
+        const cardWidth = 280;
+        const cardHeight = 120;
+        const cardX = pixelX + 70;
+        const cardY = pixelY - 60;
+
+        const foreignObject = regionHighlightsGroup
+          .append("foreignObject")
+          .attr("x", cardX)
+          .attr("y", cardY)
+          .attr("width", cardWidth)
+          .attr("height", cardHeight)
+          .style("overflow", "visible");
+
+        const cardDiv = foreignObject
+          .append("xhtml:div")
+          .style("background", "rgba(22, 27, 34, 0.95)")
+          .style("border", `1px solid ${strokeColor}`)
+          .style("border-radius", "8px")
+          .style("padding", "12px")
+          .style("color", "#c9d1d9")
+          .style("font-size", "13px")
+          .style("font-family", "system-ui, -apple-system, sans-serif")
+          .style("box-shadow", "0 8px 24px rgba(0, 0, 0, 0.6)")
+          .style("cursor", "default")
+          .style("pointer-events", "all");
+
+        // Card title with type badge
+        const titleDiv = cardDiv
+          .append("xhtml:div")
+          .style("display", "flex")
+          .style("align-items", "center")
+          .style("gap", "8px")
+          .style("margin-bottom", "6px");
+
+        titleDiv
+          .append("xhtml:div")
+          .style("font-weight", "600")
+          .style("color", strokeColor)
+          .text(region.title);
+
+        // Type badge
+        titleDiv
+          .append("xhtml:span")
+          .style("background", `${strokeColor}33`)
+          .style("color", strokeColor)
+          .style("padding", "2px 6px")
+          .style("border-radius", "4px")
+          .style("font-size", "9px")
+          .style("font-weight", "600")
+          .style("text-transform", "uppercase")
+          .text(region.type);
+
+        // Confidence badge for clusters
+        if (isCluster && region.confidence !== undefined) {
+          titleDiv
+            .append("xhtml:span")
+            .style("color", "#7d8590")
+            .style("font-size", "10px")
+            .text(`${Math.round(region.confidence * 100)}%`);
+        }
+
+        // Card description
+        cardDiv
+          .append("xhtml:div")
+          .style("font-size", "12px")
+          .style("margin-bottom", "8px")
+          .style("opacity", "0.8")
+          .text(region.description);
+
+        // Prompts
+        const promptsDiv = cardDiv
+          .append("xhtml:div")
+          .style("display", "flex")
+          .style("flex-wrap", "wrap")
+          .style("gap", "6px");
+
+        region.suggested_prompts.slice(0, 2).forEach((prompt) => {
+          promptsDiv
+            .append("xhtml:button")
+            .style("background", "#1f6feb")
+            .style("border", "none")
+            .style("border-radius", "4px")
+            .style("padding", "4px 8px")
+            .style("color", "white")
+            .style("font-size", "11px")
+            .style("cursor", "pointer")
+            .style("pointer-events", "all")
+            .style("white-space", "nowrap")
+            .style("overflow", "hidden")
+            .style("text-overflow", "ellipsis")
+            .style("max-width", "120px")
+            .text(prompt.substring(0, 25) + (prompt.length > 25 ? "..." : ""))
+            .on("click", () => {
+              if (onGenerateFromRegion) {
+                onGenerateFromRegion(prompt, region);
+              }
+            })
+            .on("mouseover", function () {
+              d3.select(this).style("background", "#2f81f7");
+            })
+            .on("mouseout", function () {
+              d3.select(this).style("background", "#1f6feb");
+            });
+        });
+      });
+
+      // Add dismiss button (positioned at bottom right of canvas bounds)
+      const dismissButton = regionHighlightsGroup
+        .append("foreignObject")
+        .attr("x", xScale(xMax) - 200)
+        .attr("y", yScale(yMax) + 20)
+        .attr("width", 180)
+        .attr("height", 40)
+        .style("pointer-events", "all");
+
+      dismissButton
+        .append("xhtml:button")
+        .style("background", "rgba(88, 166, 255, 0.2)")
+        .style("border", "1px solid #58a6ff")
+        .style("border-radius", "6px")
+        .style("padding", "8px 16px")
+        .style("color", "#58a6ff")
+        .style("font-size", "13px")
+        .style("cursor", "pointer")
+        .style("pointer-events", "all")
+        .style("width", "100%")
+        .text("✕ Dismiss Highlights")
+        .on("click", () => {
+          if (onDismissRegions) {
+            onDismissRegions();
+          }
+        })
+        .on("mouseover", function () {
+          d3.select(this).style("background", "rgba(88, 166, 255, 0.3)");
+        })
+        .on("mouseout", function () {
+          d3.select(this).style("background", "rgba(88, 166, 255, 0.2)");
+        });
+    }
+
     // Click on canvas background to deselect
     svg.on("click", (event) => {
       const target = event.target as Element;
@@ -565,6 +908,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     visualSettings,
     axisLabels,
     canvasBounds,
+    regionHighlights,
+    pendingImages,
     // Note: Excluded selectedImageIds and hoveredGroupId to prevent full redraws on selection/hover changes
     // These are handled in a separate effect below
   ]);
@@ -582,11 +927,12 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     console.log("🎯 Selection/hover update (no redraw):", {
       selectedCount: selectedImageIds.length,
       hoveredGroupId,
+      hoveredImageId,
     });
 
-    // Only clear genealogy lines if we have a selection or hovered group
+    // Only clear genealogy lines if we have a selection, hovered group, or hovered image
     // This allows hover genealogy to persist when there's no selection
-    if (selectedImageIds.length > 0 || hoveredGroupId) {
+    if (selectedImageIds.length > 0 || hoveredGroupId || hoveredImageId) {
       linesGroup.selectAll("*").remove();
     }
 
@@ -616,9 +962,20 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       });
     }
 
-    // Show genealogy for selected images
-    if (selectedImageIds.length > 0) {
-      selectedImageIds.forEach((selectedId) => {
+    // Highlight hovered image from tree modal
+    if (hoveredImageId) {
+      imagesGroup
+        .select(`#image-${hoveredImageId} .selection-border`)
+        .attr("stroke", "#58a6ff")
+        .attr("opacity", 1)
+        .style("filter", "drop-shadow(0 0 16px rgba(88, 166, 255, 0.8))");
+    }
+
+    // Show genealogy for selected images or hovered image from tree
+    const idsToShowGenealogy = selectedImageIds.length > 0 ? selectedImageIds : (hoveredImageId ? [hoveredImageId] : []);
+
+    if (idsToShowGenealogy.length > 0) {
+      idsToShowGenealogy.forEach((selectedId) => {
         const selectedImg = images.find((img) => img.id === selectedId);
         if (selectedImg) {
           // Use same bounds as main render for consistency
@@ -626,13 +983,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const height = svgRef.current!.clientHeight;
           const currentBounds = useAppStore.getState().canvasBounds;
 
+          // Get coordinate transformation settings
+          const coordScale = visualSettings.coordinateScale || 1.0;
+          const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+
           let xMin2, xMax2, yMin2, yMax2;
           if (currentBounds) {
             ({ xMin: xMin2, xMax: xMax2, yMin: yMin2, yMax: yMax2 } = currentBounds);
           } else {
-            // Fallback to data extent if bounds not set
-            const xExtent = d3.extent(images, (d) => d.coordinates[0]) as [number, number];
-            const yExtent = d3.extent(images, (d) => d.coordinates[1]) as [number, number];
+            // Fallback to data extent if bounds not set - use TRANSFORMED coordinates
+            const xExtent = d3.extent(images, (d) => (d.coordinates[0] + coordOffset[0]) * coordScale) as [number, number];
+            const yExtent = d3.extent(images, (d) => (d.coordinates[1] + coordOffset[1]) * coordScale) as [number, number];
             const xPadding = Math.max((xExtent[1] - xExtent[0]) * 0.1, 0.1);
             const yPadding = Math.max((yExtent[1] - yExtent[0]) * 0.1, 0.1);
             xMin2 = xExtent[0] - xPadding;
@@ -640,9 +1001,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             yMin2 = yExtent[0] - yPadding;
             yMax2 = yExtent[1] + yPadding;
           }
-
-          const coordScale = visualSettings.coordinateScale || 1.0;
-          const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
           const xScale = d3
             .scaleLinear()
             .domain([xMin2, xMax2])
@@ -719,7 +1077,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         }
       });
     }
-  }, [selectedImageIds, hoveredGroupId, images]);
+  }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, visualSettings]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>

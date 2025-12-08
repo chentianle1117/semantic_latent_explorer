@@ -1,9 +1,10 @@
 import React, { useState } from "react";
+import { ImageCountSlider } from "../ImageCountSlider/ImageCountSlider";
 import "./BatchPromptDialog.css";
 
 interface BatchPromptDialogProps {
   onClose: () => void;
-  onGenerate: (prompts: string[]) => void;
+  onGenerate: (prompts: string[], countPerPrompt: number) => void;
 }
 
 export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
@@ -12,6 +13,7 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
 }) => {
   const [jsonText, setJsonText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [imagesPerPrompt, setImagesPerPrompt] = useState(4);
 
   const handleGenerate = () => {
     setError(null);
@@ -41,8 +43,8 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
         return;
       }
 
-      // Success - pass the prompts to parent
-      onGenerate(parsed);
+      // Success - pass the prompts and count to parent
+      onGenerate(parsed, imagesPerPrompt);
     } catch (e) {
       setError(`Invalid JSON: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
@@ -90,6 +92,14 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
               ⚠️ {error}
             </div>
           )}
+
+          <div className="batch-slider-section">
+            <ImageCountSlider
+              value={imagesPerPrompt}
+              onChange={setImagesPerPrompt}
+              label="Images per Prompt"
+            />
+          </div>
 
           <div className="dialog-stats">
             {jsonText.trim() && !error && (() => {

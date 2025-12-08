@@ -49,7 +49,6 @@ export interface AppState {
   hoveredGroupId: string | null;
   visualSettings: VisualSettings;
   canvasBounds: CanvasBounds | null; // null = auto-calculate from data
-  generationMode: GenerationMode;
   removeBackground: boolean;
   isGenerating: boolean;
   isInitialized: boolean;
@@ -67,8 +66,6 @@ export interface VisualSettings {
   coordinateScale: number; // Scale multiplier for coordinates (affects spacing between items)
   coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
 }
-
-export type GenerationMode = 'local-sd15' | 'fal-nanobanana';
 
 export interface GenerateRequest {
   prompt: string;
@@ -129,6 +126,8 @@ export interface RegionHighlight {
   title: string;
   description: string;
   suggested_prompts: string[];
+  type: 'cluster' | 'gap'; // Type of region: existing cluster vs unexplored gap
+  confidence?: number; // 0-1, for clusters (how dense/confident the cluster is)
 }
 
 export interface InitialPromptsRequest {
@@ -158,4 +157,17 @@ export interface AnalyzeCanvasRequest {
 
 export interface AnalyzeCanvasResponse {
   regions: RegionHighlight[];
+}
+
+export interface PromptVariation {
+  prompt: string;
+  reasoning: string;
+}
+
+export interface PendingImage {
+  id: string; // temporary ID
+  imageData: ImageData;
+  originalPrompt: string;
+  variation: PromptVariation;
+  isPending: true;
 }

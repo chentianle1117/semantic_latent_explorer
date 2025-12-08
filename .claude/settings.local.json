@@ -16,7 +16,12 @@
       "Bash(timeout:*)",
       "Bash(conda run:*)",
       "Bash(taskkill:*)",
-      "Bash(powershell \"Get-Process python,uvicorn -ErrorAction SilentlyContinue | Stop-Process -Force; Write-Host ''Processes killed''\")"
+      "Bash(powershell \"Get-Process python,uvicorn -ErrorAction SilentlyContinue | Stop-Process -Force; Write-Host ''Processes killed''\")",
+      "Bash(\"w:/CMU_Academics/2025 Fall/Thesis Demo/Zappos50K_semantic_explorer/frontend/src/components/TopProgressBar/TopProgressBar.css\")",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(git reset:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

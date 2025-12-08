@@ -4,18 +4,27 @@ import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
 import { InterpolationDialog } from "./components/InterpolationDialog/InterpolationDialog";
 import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingActionPanel";
-import { ProgressBar } from "./components/ProgressBar/ProgressBar";
-import { ModeToggle } from "./components/ModeToggle/ModeToggle";
-import { Canvas3DToggle } from "./components/Canvas3DToggle/Canvas3DToggle";
+import { ProgressModal } from "./components/ProgressModal/ProgressModal";
+import { IntentPanel } from "./components/IntentPanel/IntentPanel";
+import { RightControlPanel } from "./components/RightControlPanel/RightControlPanel";
+import { useProgressStore } from "./store/progressStore";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
-import { BriefPanel } from "./components/BriefPanel/BriefPanel";
-import { PromptBanner } from "./components/PromptBanner/PromptBanner";
-import { RegionHighlights } from "./components/RegionHighlights/RegionHighlights";
+import { StarterPromptsModal } from "./components/StarterPromptsModal/StarterPromptsModal";
+import { AxisSuggestionModal } from "./components/AxisSuggestionModal/AxisSuggestionModal";
+import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPromptDialog";
+import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
+import { ExplorationMinimap } from "./components/ExplorationMinimap/ExplorationMinimap";
+import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
-import type { ImageData, SuggestedPrompt, RegionHighlight } from "./types";
+import type {
+  ImageData,
+  SuggestedPrompt,
+  RegionHighlight,
+  PendingImage,
+} from "./types";
 import "./styles/app.css";
 
 export const App: React.FC = () => {
@@ -24,28 +33,47 @@ export const App: React.FC = () => {
     y: number;
     count: number;
   } | null>(null);
+  const [showTextToImageDialog, setShowTextToImageDialog] = useState(false);
   const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [promptDialogImageId, setPromptDialogImageId] = useState<number | null>(
     null
   );
-  const [interpolationImageIds, setInterpolationImageIds] = useState<[number, number] | null>(
-    null
-  );
+  const [interpolationImageIds, setInterpolationImageIds] = useState<
+    [number, number] | null
+  >(null);
   const [showBatchPromptDialog, setShowBatchPromptDialog] = useState(false);
   const [showExternalImageLoader, setShowExternalImageLoader] = useState(false);
+  const [showTreeModal, setShowTreeModal] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{
     current: number;
     total: number;
     currentPrompt: string;
   } | null>(null);
+  const [regionPromptDialog, setRegionPromptDialog] = useState<{
+    prompt: string;
+    region: RegionHighlight;
+  } | null>(null);
 
   // Agent/AI state
-  const [briefPanelCollapsed, setBriefPanelCollapsed] = useState(false);
   const [currentBrief, setCurrentBrief] = useState<string | null>(null);
-  const [suggestedPrompts, setSuggestedPrompts] = useState<SuggestedPrompt[]>([]);
-  const [regionHighlights, setRegionHighlights] = useState<RegionHighlight[]>([]);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [suggestedPrompts, setSuggestedPrompts] = useState<SuggestedPrompt[]>(
+    []
+  );
+  const [regionHighlights, setRegionHighlights] = useState<RegionHighlight[]>(
+    []
+  );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
+  const [showAxisSuggestionModal, setShowAxisSuggestionModal] = useState(false);
+  const [axisSuggestions, setAxisSuggestions] = useState<
+    Array<{ x_axis: string; y_axis: string; reasoning: string }>
+  >([]);
+  const [isLoadingAxes, setIsLoadingAxes] = useState(false);
+  const [unexpectedImagesCount, setUnexpectedImagesCount] = useState(2); // Number of additional unexpected images to generate (0-8)
+  const [showLabels, setShowLabels] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [showClusters, setShowClusters] = useState(false);
+  const [backgroundColor, setBackgroundColor] = useState("#0d1117");
 
   const images = useAppStore((state) =>
     state.images.filter((img) => img.visible)
@@ -53,7 +81,6 @@ export const App: React.FC = () => {
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
   const isInitialized = useAppStore((state) => state.isInitialized);
   const isGenerating = useAppStore((state) => state.isGenerating);
-  const generationMode = useAppStore((state) => state.generationMode);
   const removeBackground = useAppStore((state) => state.removeBackground);
   const is3DMode = useAppStore((state) => state.is3DMode);
 
@@ -61,20 +88,18 @@ export const App: React.FC = () => {
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
   const setIsInitialized = useAppStore((state) => state.setIsInitialized);
   const setIsGenerating = useAppStore((state) => state.setIsGenerating);
-  const setGenerationProgress = useAppStore((state) => state.setGenerationProgress);
+  const setGenerationProgress = useAppStore(
+    (state) => state.setGenerationProgress
+  );
   const setGenerationCount = useAppStore((state) => state.setGenerationCount);
   const clearSelection = useAppStore((state) => state.clearSelection);
 
   useEffect(() => {
-    // Reset generating state when switching modes
-    console.log("🔄 Mode changed to:", generationMode);
-    setIsGenerating(false);
-    setGenerationProgress(0);
-    setGenerationCount(0, 0);
+    // Initialize CLIP on mount
+    console.log("🚀 Initializing CLIP embedder...");
 
-    // COMMENTED OUT: Local SD 1.5 initialization - only using fal.ai nanobanana now
-    // Initialize based on mode
-    // if (generationMode === 'local-sd15') {
+    // COMMENTED OUT: Local SD 1.5 initialization - removed completely, only using fal.ai nanobanana now
+    // if (false) {
     //   // Connect WebSocket for real-time updates
     //   apiClient.connectWebSocket((message) => {
     //     if (message.type === "state_update" && message.data) {
@@ -108,30 +133,46 @@ export const App: React.FC = () => {
     //     apiClient.disconnectWebSocket(() => {});
     //   };
     // } else {
-      // For fal.ai mode, only initialize CLIP (for embeddings)
-      // NOTE: This is always used now since we only use fal.ai nanobanana for generation
-      console.log("Initializing CLIP embedder...");
-      apiClient
-        .initializeClipOnly()
-        .then(() => {
-          console.log("CLIP initialization successful");
-          setIsInitialized(true);
-          return apiClient.getState();
-        })
-        .then((state) => {
-          console.log("State fetched:", { images: state.images.length, groups: state.history_groups.length });
-          setImages(state.images);
-          setHistoryGroups(state.history_groups);
-        })
-        .catch((error) => {
-          console.error("Failed to initialize CLIP:", error);
-          setIsInitialized(false);
-          alert(
-            `Failed to initialize CLIP. Make sure backend is running on port 8000.\n\nError: ${error.message || error}`
-          );
+    // For fal.ai mode, only initialize CLIP (for embeddings)
+    // NOTE: This is always used now since we only use fal.ai nanobanana for generation
+    console.log("Initializing CLIP embedder...");
+    useProgressStore
+      .getState()
+      .showProgress("initializing", "Loading CLIP model...", false);
+    apiClient
+      .initializeClipOnly()
+      .then(() => {
+        console.log("CLIP initialization successful");
+        setIsInitialized(true);
+        return apiClient.getState();
+      })
+      .then((state) => {
+        console.log("State fetched:", {
+          images: state.images.length,
+          groups: state.history_groups.length,
+          design_brief: state.design_brief ? "present" : "none",
         });
+        setImages(state.images);
+        setHistoryGroups(state.history_groups);
+        // Load design brief from backend state
+        if (state.design_brief) {
+          setCurrentBrief(state.design_brief);
+          console.log("✓ Loaded design brief from backend:", state.design_brief.substring(0, 50) + "...");
+        }
+        useProgressStore.getState().hideProgress();
+      })
+      .catch((error) => {
+        console.error("Failed to initialize CLIP:", error);
+        setIsInitialized(false);
+        useProgressStore.getState().hideProgress();
+        alert(
+          `Failed to initialize CLIP. Make sure backend is running on port 8000.\n\nError: ${
+            error.message || error
+          }`
+        );
+      });
     // }
-  }, [generationMode, setImages, setHistoryGroups, setIsInitialized, setGenerationProgress, setIsGenerating, setGenerationCount]);
+  }, [setImages, setHistoryGroups, setIsInitialized]);
 
   const handleGenerate = async () => {
     const prompt = window.prompt("Enter prompt for image generation:");
@@ -145,109 +186,137 @@ export const App: React.FC = () => {
       return;
     }
 
-    // Check if fal.ai is configured when using fal-nanobanana mode
-    if (generationMode === 'fal-nanobanana' && !falClient.isConfigured()) {
-      alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file.");
+    // Check if fal.ai is configured
+    if (!falClient.isConfigured()) {
+      alert(
+        "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
+      );
       return;
     }
 
     // Inform user about batching for fal.ai
-    if (generationMode === 'fal-nanobanana' && nImages > 4) {
+    if (nImages > 4) {
       const numBatches = Math.ceil(nImages / 4);
-      console.log(`ℹ️ Generating ${nImages} images in ${numBatches} batches (fal.ai limit: 4 per request)`);
+      console.log(
+        `ℹ️ Generating ${nImages} images in ${numBatches} batches (fal.ai limit: 4 per request)`
+      );
     }
 
     setIsGenerating(true);
-    setGenerationCount(0, nImages);
-    setGenerationProgress(0);
-
-    // Estimate time based on mode and number of images
-    // fal.ai batches in groups of 4, so larger requests take longer
-    let estimatedTimeMs;
-    if (generationMode === 'fal-nanobanana') {
-      const numBatches = Math.ceil(nImages / 4); // fal.ai processes 4 at a time
-      estimatedTimeMs = numBatches * 8000; // ~8 seconds per batch of 4
-      console.log(`Estimated time: ${numBatches} batches × 8s = ${estimatedTimeMs/1000}s`);
-    } else {
-      estimatedTimeMs = nImages * 5000; // 5 seconds per image for local SD
-    }
-
-    const updateIntervalMs = 100; // Update every 100ms for smooth animation
-    const totalUpdates = estimatedTimeMs / updateIntervalMs;
-    let updates = 0;
-
-    const progressInterval = setInterval(() => {
-      updates++;
-      const progress = Math.min((updates / totalUpdates) * 90, 90); // Cap at 90%
-      const currentImageEstimate = Math.floor((progress / 90) * nImages);
-      setGenerationCount(currentImageEstimate, nImages);
-      setGenerationProgress(progress);
-    }, updateIntervalMs);
-
-    // Safety timeout: auto-reset after 5 minutes
-    const safetyTimeout = setTimeout(() => {
-      console.error("⚠️ Generation timed out after 5 minutes");
-      clearInterval(progressInterval);
-      setIsGenerating(false);
-      setGenerationProgress(0);
-      setGenerationCount(0, 0);
-      alert("Generation timed out. Please try again or check your connection.");
-    }, 300000); // 5 minutes
+    useProgressStore
+      .getState()
+      .showProgress(
+        "generating",
+        `Generating ${nImages} image${nImages > 1 ? "s" : ""}...`,
+        true
+      );
+    useProgressStore.getState().updateProgress(0);
 
     try {
-      // COMMENTED OUT: Local SD generation - only using fal.ai nanobanana now
-      // if (generationMode === 'local-sd15') {
+      // COMMENTED OUT: Local SD generation - removed completely
+      // if (false) {
       //   // Use local SD 1.5 backend
       //   await apiClient.generate({ prompt, n_images: nImages });
       // } else {
-        // Use fal.ai nano-banana text-to-image
-        // NOTE: This is always used now
-        const result = await falClient.generateTextToImage({
-          prompt,
-          num_images: nImages,
-          aspect_ratio: "1:1",
-          output_format: "jpeg"
-        });
+      // Use fal.ai nano-banana text-to-image
+      // NOTE: This is always used now
+      useProgressStore
+        .getState()
+        .updateProgress(10, "Generating with fal.ai...");
+      const result = await falClient.generateTextToImage({
+        prompt,
+        num_images: nImages,
+        aspect_ratio: "1:1",
+        output_format: "jpeg",
+      });
 
-        console.log("fal.ai generation result:", result);
+      console.log("fal.ai generation result:", result);
 
-        // Send images to backend for CLIP embedding extraction
-        await apiClient.addExternalImages({
-          images: result.images.map(img => ({ url: img.url })),
-          prompt: prompt,
-          generation_method: 'batch',
-          remove_background: removeBackground
-        });
+      // Send images to backend for CLIP embedding extraction
+      useProgressStore.getState().updateProgress(60, "Computing embeddings...");
+      await apiClient.addExternalImages({
+        images: result.images.map((img) => ({ url: img.url })),
+        prompt: prompt,
+        generation_method: "batch",
+        remove_background: removeBackground,
+      });
 
-        console.log(`✓ Added ${result.images.length} fal.ai images to canvas`);
+      console.log(`✓ Added ${result.images.length} fal.ai images to canvas`);
 
-        // Fetch updated state since we're not using WebSocket
-        const state = await apiClient.getState();
-        setImages(state.images);
-        setHistoryGroups(state.history_groups);
+      // Fetch updated state since we're not using WebSocket
+      useProgressStore.getState().updateProgress(90, "Updating canvas...");
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
       // }
 
-      clearInterval(progressInterval);
-      clearTimeout(safetyTimeout);
-      setGenerationCount(nImages, nImages);
-      setGenerationProgress(100);
+      useProgressStore.getState().updateProgress(100);
+
+      // Auto-generate variations if brief is set
+      if (currentBrief && unexpectedImagesCount > 0) {
+        console.log(`🎨 Generating ${unexpectedImagesCount} variations in background...`);
+        useProgressStore
+          .getState()
+          .updateProgress(100, "Generating variations...");
+        try {
+          const variationResponse = await apiClient.generateVariation(
+            prompt,
+            currentBrief,
+            unexpectedImagesCount
+          );
+          console.log("Generated variations:", variationResponse.variations);
+
+          // Generate images for each variation in background
+          for (const variation of variationResponse.variations) {
+            const varResult = await falClient.generateTextToImage({
+              prompt: variation.prompt,
+              num_images: 1,
+              aspect_ratio: "1:1",
+              output_format: "jpeg",
+            });
+
+            // Add to backend to get embeddings
+            await apiClient.addExternalImages({
+              images: varResult.images.map((img) => ({ url: img.url })),
+              prompt: variation.prompt,
+              generation_method: "variation",
+              remove_background: removeBackground,
+            });
+
+            // Get the newly added image from state
+            const updatedState = await apiClient.getState();
+            const newImage =
+              updatedState.images[updatedState.images.length - 1];
+
+            // Add to pending images list
+            setPendingImages((prev) => [
+              ...prev,
+              {
+                id: `pending-${Date.now()}-${Math.random()}`,
+                imageData: newImage,
+                originalPrompt: prompt,
+                variation: variation,
+                isPending: true,
+              },
+            ]);
+          }
+
+          console.log("✓ Variations generated in background");
+        } catch (error) {
+          console.error("Failed to generate variations:", error);
+        }
+      }
     } catch (error) {
-      clearInterval(progressInterval);
-      clearTimeout(safetyTimeout);
-      console.error("Generation failed:", error);
-      alert(`Generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error("Prompt generation failed:", error);
+      useProgressStore.getState().hideProgress();
+      alert(
+        `Generation failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsGenerating(false);
-      setTimeout(() => {
-        setGenerationProgress(0);
-        setGenerationCount(0, 0);
-      }, 1000);
-
-      // Auto-analyze after generation if brief is set
-      if (currentBrief) {
-        console.log("🤖 Auto-analyzing canvas after generation...");
-        setTimeout(() => analyzeCanvas(), 2000);
-      }
+      useProgressStore.getState().hideProgress();
     }
   };
 
@@ -280,13 +349,15 @@ export const App: React.FC = () => {
     setGenerationProgress(50);
 
     try {
-      console.log(`📦 Exporting ${images.length} images and metadata as ZIP...`);
+      console.log(
+        `📦 Exporting ${images.length} images and metadata as ZIP...`
+      );
       console.log("Fetching from: http://localhost:8000/api/export-zip");
 
       const response = await fetch("http://localhost:8000/api/export-zip", {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Accept': 'application/zip',
+          Accept: "application/zip",
         },
       });
 
@@ -295,7 +366,9 @@ export const App: React.FC = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Export error response:", errorText);
-        throw new Error(`Export failed: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(
+          `Export failed: ${response.status} ${response.statusText} - ${errorText}`
+        );
       }
 
       console.log("Creating blob from response...");
@@ -310,27 +383,47 @@ export const App: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `zappos_export_${new Date().toISOString().replace(/[:.]/g, "-")}.zip`;
+      a.download = `zappos_export_${new Date()
+        .toISOString()
+        .replace(/[:.]/g, "-")}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
-      console.log(`✅ Successfully exported ${images.length} images with metadata!`);
+      console.log(
+        `✅ Successfully exported ${images.length} images with metadata!`
+      );
       alert(`✅ Successfully exported ${images.length} images with metadata!`);
     } catch (error) {
       console.error("❌ Export ZIP failed:", error);
-      alert(`Failed to export ZIP: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(
+        `Failed to export ZIP: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsGenerating(false);
       setGenerationProgress(0);
     }
   };
 
-  const handleBatchGenerate = async (prompts: string[]) => {
-    console.log(`🚀 Starting batch generation for ${prompts.length} prompts`);
+  const handleBatchGenerate = async (
+    prompts: string[],
+    countPerPrompt: number = 4
+  ) => {
+    console.log(
+      `🚀 Starting batch generation for ${prompts.length} prompts (${countPerPrompt} images each)`
+    );
     setShowBatchPromptDialog(false);
     setIsGenerating(true);
+    useProgressStore
+      .getState()
+      .showProgress(
+        "generating",
+        `Batch generating ${prompts.length} prompts...`,
+        true
+      );
 
     const totalPrompts = prompts.length;
     let successCount = 0;
@@ -338,41 +431,55 @@ export const App: React.FC = () => {
 
     for (let i = 0; i < prompts.length; i++) {
       const prompt = prompts[i];
-      console.log(`\n📝 [${i + 1}/${totalPrompts}] Generating: "${prompt.substring(0, 50)}..."`);
+      console.log(
+        `\n📝 [${i + 1}/${totalPrompts}] Generating: "${prompt.substring(
+          0,
+          50
+        )}..."`
+      );
 
-      setBatchProgress({
-        current: i + 1,
-        total: totalPrompts,
-        currentPrompt: prompt
-      });
+      const overallProgress = (i / totalPrompts) * 100;
+      useProgressStore
+        .getState()
+        .updateProgress(
+          overallProgress,
+          `Prompt ${i + 1}/${totalPrompts}: ${prompt.substring(0, 40)}...`
+        );
 
       try {
-        // Generate image using fal.ai
+        // Generate images using fal.ai
         const result = await falClient.generateTextToImage({
           prompt,
-          num_images: 1,
+          num_images: countPerPrompt,
           aspect_ratio: "1:1",
-          output_format: "jpeg"
+          output_format: "jpeg",
         });
 
-        console.log(`✓ Generated image for prompt ${i + 1}`);
+        console.log(
+          `✓ Generated ${countPerPrompt} image(s) for prompt ${i + 1}`
+        );
 
         // Send to backend for CLIP embedding
         await apiClient.addExternalImages({
-          images: result.images.map(img => ({ url: img.url })),
+          images: result.images.map((img) => ({ url: img.url })),
           prompt: prompt,
-          generation_method: 'batch',
-          remove_background: removeBackground
+          generation_method: "batch",
+          remove_background: removeBackground,
         });
 
         console.log(`✓ Added to canvas (${i + 1}/${totalPrompts})`);
         successCount++;
 
-        // Fetch updated state
+        // Fetch updated state after EACH prompt to update UI
+        useProgressStore
+          .getState()
+          .updateProgress(
+            overallProgress + (100 / totalPrompts) * 0.5,
+            "Updating canvas..."
+          );
         const state = await apiClient.getState();
         setImages(state.images);
         setHistoryGroups(state.history_groups);
-
       } catch (error) {
         console.error(`✗ Failed prompt ${i + 1}:`, error);
         failCount++;
@@ -380,7 +487,11 @@ export const App: React.FC = () => {
         // Ask user if they want to continue
         if (i < prompts.length - 1) {
           const shouldContinue = window.confirm(
-            `Failed to generate image ${i + 1}/${totalPrompts}:\n"${prompt.substring(0, 50)}..."\n\nError: ${error instanceof Error ? error.message : 'Unknown error'}\n\nContinue with remaining ${totalPrompts - i - 1} prompts?`
+            `Failed to generate image ${
+              i + 1
+            }/${totalPrompts}:\n"${prompt.substring(0, 50)}..."\n\nError: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }\n\nContinue with remaining ${totalPrompts - i - 1} prompts?`
           );
 
           if (!shouldContinue) {
@@ -391,17 +502,78 @@ export const App: React.FC = () => {
       }
     }
 
+    useProgressStore.getState().updateProgress(100, "Batch complete!");
     setBatchProgress(null);
     setIsGenerating(false);
 
-    const message = `Batch generation complete!\n\n✅ Success: ${successCount}/${totalPrompts}\n${failCount > 0 ? `❌ Failed: ${failCount}/${totalPrompts}` : ''}`;
-    alert(message);
-    console.log(`\n🎉 ${message.replace(/\n/g, ' ')}`);
+    setTimeout(() => {
+      useProgressStore.getState().hideProgress();
+      const message = `Batch generation complete!\n\n✅ Success: ${successCount}/${totalPrompts}\n${
+        failCount > 0 ? `❌ Failed: ${failCount}/${totalPrompts}` : ""
+      }`;
+      alert(message);
+    }, 500);
 
-    // Auto-analyze after batch generation if brief is set
-    if (currentBrief && successCount > 0) {
-      console.log("🤖 Auto-analyzing canvas after batch generation...");
-      setTimeout(() => analyzeCanvas(), 2000);
+    console.log(
+      `\n🎉 Batch complete - Success: ${successCount}/${totalPrompts}`
+    );
+
+    // Auto-generate variations for first few prompts if brief is set
+    if (currentBrief && successCount > 0 && unexpectedImagesCount > 0) {
+      console.log(`🎨 Generating ${unexpectedImagesCount} auto-variations per prompt...`);
+      const promptsToVary = prompts.slice(0, Math.min(3, prompts.length)); // Only first 3 to avoid spam
+
+      for (const prompt of promptsToVary) {
+        try {
+          const variations = await apiClient.generateVariation(
+            prompt,
+            currentBrief,
+            unexpectedImagesCount
+          );
+          console.log(
+            `Generated ${
+              variations.variations.length
+            } variations for: "${prompt.substring(0, 30)}..."`
+          );
+
+          for (const variation of variations.variations) {
+            try {
+              const result = await falClient.generateTextToImage({
+                prompt: variation.prompt,
+                num_images: 1,
+                aspect_ratio: "1:1",
+                output_format: "jpeg",
+              });
+
+              const imageData = await apiClient.addExternalImages({
+                images: result.images.map((img) => ({ url: img.url })),
+                prompt: variation.prompt,
+                generation_method: "auto-variation",
+                remove_background: removeBackground,
+              });
+
+              // Add to pending images with accept/discard controls
+              setPendingImages((prev) => [
+                ...prev,
+                {
+                  id: `pending-${Date.now()}-${Math.random()}`,
+                  imageData: imageData.images[0],
+                  originalPrompt: prompt,
+                  variation: variation,
+                  isPending: true,
+                },
+              ]);
+            } catch (error) {
+              console.error("Failed to generate variation image:", error);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to generate variations:", error);
+        }
+      }
+
+      // Note: Canvas analysis is now manual-only (triggered via button)
+      // Auto-generation of unexpected images remains active
     }
   };
 
@@ -409,8 +581,14 @@ export const App: React.FC = () => {
     console.log(`📥 Loading ${urls.length} external images...`);
     setShowExternalImageLoader(false);
     setIsGenerating(true);
-    setGenerationProgress(0);
-    setGenerationCount(0, urls.length);
+    useProgressStore
+      .getState()
+      .showProgress(
+        "loading",
+        `Loading ${urls.length} image${urls.length > 1 ? "s" : ""}...`,
+        true
+      );
+    useProgressStore.getState().updateProgress(0);
 
     try {
       // Process images one at a time to avoid overwhelming the server
@@ -430,10 +608,10 @@ export const App: React.FC = () => {
 
         // Send batch to backend for CLIP embedding extraction
         await apiClient.addExternalImages({
-          images: batchUrls.map(url => ({ url })),
+          images: batchUrls.map((url) => ({ url })),
           prompt: prompt,
-          generation_method: 'external',
-          remove_background: removeBackground
+          generation_method: "external",
+          remove_background: removeBackground,
         });
 
         console.log(`✓ Image ${i + 1}/${numBatches} complete`);
@@ -445,25 +623,28 @@ export const App: React.FC = () => {
 
         // Update progress
         const processed = end;
-        setGenerationCount(processed, urls.length);
-        setGenerationProgress((processed / urls.length) * 100);
+        const progress = (processed / urls.length) * 100;
+        useProgressStore
+          .getState()
+          .updateProgress(progress, `Image ${processed}/${urls.length}`);
       }
 
       console.log(`✓ All ${urls.length} images loaded successfully`);
 
-      setGenerationProgress(100);
-      setGenerationCount(urls.length, urls.length);
+      useProgressStore.getState().updateProgress(100, "Complete");
 
       alert(`✅ Successfully loaded ${urls.length} images to canvas!`);
     } catch (error) {
       console.error("Failed to load external images:", error);
-      alert(`Failed to load images: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      useProgressStore.getState().hideProgress();
+      alert(
+        `Failed to load images: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsGenerating(false);
-      setTimeout(() => {
-        setGenerationProgress(0);
-        setGenerationCount(0, 0);
-      }, 1000);
+      useProgressStore.getState().hideProgress();
     }
   };
 
@@ -475,7 +656,9 @@ export const App: React.FC = () => {
     alpha: number,
     steps?: number
   ) => {
-    alert("Interpolation is only available with Local SD 1.5 mode. This feature is disabled when using fal.ai nanobanana.");
+    alert(
+      "Interpolation is only available with Local SD 1.5 mode. This feature is disabled when using fal.ai nanobanana."
+    );
     return;
 
     // console.log(`Interpolating between images ${idA} and ${idB} (alpha: ${alpha}, steps: ${steps || 1})...`);
@@ -543,17 +726,18 @@ export const App: React.FC = () => {
   };
 
   // Get all selected images for the prompt dialog
-  const promptDialogImages = selectedImageIds.length > 0
-    ? images.filter((img) => selectedImageIds.includes(img.id))
-    : promptDialogImageId !== null
-    ? images.filter((img) => img.id === promptDialogImageId)
-    : [];
+  const promptDialogImages =
+    selectedImageIds.length > 0
+      ? images.filter((img) => selectedImageIds.includes(img.id))
+      : promptDialogImageId !== null
+      ? images.filter((img) => img.id === promptDialogImageId)
+      : [];
 
   const interpolationImages = interpolationImageIds
-    ? [
+    ? ([
         images.find((img) => img.id === interpolationImageIds[0]),
         images.find((img) => img.id === interpolationImageIds[1]),
-      ].filter(Boolean) as [ImageData, ImageData]
+      ].filter(Boolean) as [ImageData, ImageData])
     : null;
 
   const handleGenerateFromReferenceClick = () => {
@@ -582,9 +766,11 @@ export const App: React.FC = () => {
       `Generating from ${referenceIds.length} reference(s) with prompt: "${prompt}", count: ${numImages}`
     );
 
-    // Check if fal.ai is configured when using fal-nanobanana mode
-    if (generationMode === 'fal-nanobanana' && !falClient.isConfigured()) {
-      alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file.");
+    // Check if fal.ai is configured
+    if (!falClient.isConfigured()) {
+      alert(
+        "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
+      );
       return;
     }
 
@@ -592,42 +778,20 @@ export const App: React.FC = () => {
     setShowPromptDialog(false);
     setIsGenerating(true);
     setFloatingPanelPos(null);
-    setGenerationCount(0, numImages);
-    setGenerationProgress(0);
-
-    // Estimate time based on mode and number of images
-    let estimatedTimeMs;
-    if (generationMode === 'fal-nanobanana') {
-      estimatedTimeMs = Math.max(8000, numImages * 2000); // ~2 seconds per image, min 8s
-    } else {
-      estimatedTimeMs = 5000; // Local SD takes ~5 seconds
-    }
-
-    const updateIntervalMs = 100;
-    const totalUpdates = estimatedTimeMs / updateIntervalMs;
-    let updates = 0;
-
-    const progressInterval = setInterval(() => {
-      updates++;
-      const progress = Math.min((updates / totalUpdates) * 90, 90);
-      const currentImageEstimate = Math.floor((progress / 90) * numImages);
-      setGenerationCount(currentImageEstimate, numImages);
-      setGenerationProgress(progress);
-    }, updateIntervalMs);
-
-    // Safety timeout: auto-reset after 5 minutes
-    const safetyTimeout = setTimeout(() => {
-      console.error("⚠️ Reference generation timed out after 5 minutes");
-      clearInterval(progressInterval);
-      setIsGenerating(false);
-      setGenerationProgress(0);
-      setGenerationCount(0, 0);
-      alert("Generation timed out. Please try again.");
-    }, 300000);
+    useProgressStore
+      .getState()
+      .showProgress(
+        "generating",
+        `Generating ${numImages} image${
+          numImages > 1 ? "s" : ""
+        } from reference...`,
+        true
+      );
+    useProgressStore.getState().updateProgress(0);
 
     try {
-      // COMMENTED OUT: Local SD reference generation - only using fal.ai nanobanana now
-      // if (generationMode === 'local-sd15') {
+      // COMMENTED OUT: Local SD reference generation - removed completely
+      // if (false) {
       //   // Use local SD 1.5 backend (only supports single reference)
       //   const result = await apiClient.generateFromReference({
       //     reference_id: referenceIds[0],  // Use first reference
@@ -640,165 +804,290 @@ export const App: React.FC = () => {
       //   setGenerationProgress(100);
       //   clearSelection();
       // } else {
-        // Use fal.ai nano-banana image editing
-        // NOTE: This is always used now
-        // Get reference images from IDs
-        const selectedImages = images.filter(img => referenceIds.includes(img.id));
+      // Use fal.ai nano-banana image editing
+      // NOTE: This is always used now
+      // Get reference images from IDs
+      const selectedImages = images.filter((img) =>
+        referenceIds.includes(img.id)
+      );
 
-        if (selectedImages.length === 0) {
-          throw new Error("No reference images found");
-        }
-
-        console.log(`Using ${selectedImages.length} reference images to generate ${numImages} variations`);
-
-        // Convert base64 images to URLs that fal.ai can use
-        // For now, we'll use the text-to-image endpoint since we have base64 data
-        // In a production app, you'd upload these images to fal.ai storage first
-        const imageUrls: string[] = [];
-
-        for (const img of selectedImages) {
-          // Create a blob from base64
-          const base64Data = img.base64_image;
-          const blob = await (await fetch(`data:image/png;base64,${base64Data}`)).blob();
-          const file = new File([blob], `reference-${img.id}.png`, { type: 'image/png' });
-
-          // Upload to fal.ai storage
-          const url = await falClient.uploadFile(file);
-          imageUrls.push(url);
-        }
-
-        // Use image edit endpoint with reference images
-        const result = await falClient.generateImageEdit({
-          prompt,
-          image_urls: imageUrls,
-          num_images: numImages,  // Changed from hardcoded 1
-          aspect_ratio: "1:1",
-          output_format: "jpeg"
-        });
-
-        console.log("fal.ai image edit result:", result);
-
-        // Send images to backend for CLIP embedding extraction
-        // Include parent IDs for genealogy tracking
-        const parentIds = selectedImages.map(img => img.id);
-        console.log("Setting parent IDs:", parentIds);
-
-        await apiClient.addExternalImages({
-          images: result.images.map(img => ({ url: img.url })),
-          prompt: prompt,
-          generation_method: 'reference',
-          remove_background: removeBackground,
-          parent_ids: parentIds
-        });
-
-        console.log(`✓ Added ${result.images.length} fal.ai edited image(s) to canvas with ${parentIds.length} parent(s)`);
-
-        // Fetch updated state since we're not using WebSocket
-        const state = await apiClient.getState();
-        setImages(state.images);
-        setHistoryGroups(state.history_groups);
-
-        clearInterval(progressInterval);
-        clearTimeout(safetyTimeout);
-        setGenerationCount(numImages, numImages);
-        setGenerationProgress(100);
-        clearSelection();
-      // }
-    } catch (error) {
-      clearInterval(progressInterval);
-      clearTimeout(safetyTimeout);
-      console.error("Reference generation failed:", error);
-      alert(`Generation failed: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setIsGenerating(false);
-      setTimeout(() => {
-        setGenerationProgress(0);
-        setGenerationCount(0, 0);
-      }, 1000);
-
-      // Auto-analyze after reference generation if brief is set
-      if (currentBrief) {
-        console.log("🤖 Auto-analyzing canvas after reference generation...");
-        setTimeout(() => analyzeCanvas(), 2000);
-      }
-    }
-  };
-
-  // Agent handlers
-  const handlePromptsGenerated = (prompts: SuggestedPrompt[], brief: string) => {
-    setSuggestedPrompts(prompts);
-    setCurrentBrief(brief);
-    console.log("✓ Generated prompts from brief:", brief);
-  };
-
-  const handleAcceptPrompt = async (prompt: string, index: number) => {
-    console.log(`Accepting prompt ${index + 1}:`, prompt);
-    setSuggestedPrompts([]); // Dismiss banner after accepting
-
-    // Auto-generate with the accepted prompt
-    const count = 8; // Default count
-    setIsGenerating(true);
-    setGenerationCount(0, count);
-    setGenerationProgress(0);
-
-    try {
-      if (generationMode === 'fal-nanobanana' && !falClient.isConfigured()) {
-        alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file.");
-        return;
+      if (selectedImages.length === 0) {
+        throw new Error("No reference images found");
       }
 
-      const estimatedTimeMs = Math.max(8000, count * 2000);
-      const updateIntervalMs = 100;
-      const totalUpdates = estimatedTimeMs / updateIntervalMs;
-      let updates = 0;
+      console.log(
+        `Using ${selectedImages.length} reference images to generate ${numImages} variations`
+      );
 
-      const progressInterval = setInterval(() => {
-        updates++;
-        const progress = Math.min((updates / totalUpdates) * 90, 90);
-        const currentImageEstimate = Math.floor((progress / 90) * count);
-        setGenerationCount(currentImageEstimate, count);
-        setGenerationProgress(progress);
-      }, updateIntervalMs);
+      // Convert base64 images to URLs that fal.ai can use
+      useProgressStore
+        .getState()
+        .updateProgress(10, "Uploading reference images...");
+      const imageUrls: string[] = [];
 
-      const safetyTimeout = setTimeout(() => {
-        clearInterval(progressInterval);
-        setIsGenerating(false);
-        setGenerationProgress(0);
-        setGenerationCount(0, 0);
-        alert("Generation timed out. Please try again.");
-      }, 300000);
+      for (const img of selectedImages) {
+        // Create a blob from base64
+        const base64Data = img.base64_image;
+        const blob = await (
+          await fetch(`data:image/png;base64,${base64Data}`)
+        ).blob();
+        const file = new File([blob], `reference-${img.id}.png`, {
+          type: "image/png",
+        });
 
-      // Generate using fal.ai
-      const result = await falClient.generateTextToImage({
+        // Upload to fal.ai storage
+        const url = await falClient.uploadFile(file);
+        imageUrls.push(url);
+      }
+
+      // Use image edit endpoint with reference images
+      useProgressStore
+        .getState()
+        .updateProgress(30, "Generating variations...");
+      const result = await falClient.generateImageEdit({
         prompt,
-        num_images: count,
+        image_urls: imageUrls,
+        num_images: numImages, // Changed from hardcoded 1
         aspect_ratio: "1:1",
-        output_format: "jpeg"
+        output_format: "jpeg",
       });
 
-      // Send to backend for CLIP embeddings
+      console.log("fal.ai image edit result:", result);
+
+      // Send images to backend for CLIP embedding extraction
+      // Include parent IDs for genealogy tracking
+      const parentIds = selectedImages.map((img) => img.id);
+      console.log("Setting parent IDs:", parentIds);
+
+      useProgressStore.getState().updateProgress(70, "Computing embeddings...");
       await apiClient.addExternalImages({
-        images: result.images.map(img => ({ url: img.url })),
+        images: result.images.map((img) => ({ url: img.url })),
         prompt: prompt,
-        generation_method: 'batch',
-        remove_background: removeBackground
+        generation_method: "reference",
+        remove_background: removeBackground,
+        parent_ids: parentIds,
       });
 
+      console.log(
+        `✓ Added ${result.images.length} fal.ai edited image(s) to canvas with ${parentIds.length} parent(s)`
+      );
+
+      // Fetch updated state since we're not using WebSocket
+      useProgressStore.getState().updateProgress(90, "Updating canvas...");
       const state = await apiClient.getState();
       setImages(state.images);
       setHistoryGroups(state.history_groups);
 
-      clearInterval(progressInterval);
-      clearTimeout(safetyTimeout);
-      setGenerationCount(count, count);
-      setGenerationProgress(100);
+      useProgressStore.getState().updateProgress(100);
 
-      console.log("✓ Generation complete, auto-analyzing canvas...");
-      // Trigger canvas analysis after a delay
-      setTimeout(() => analyzeCanvas(), 2000);
+      // Auto-generate variations if brief is set (only if images were successfully added)
+      if (currentBrief && unexpectedImagesCount > 0 && state.images.length > 0) {
+        console.log(`🎨 Generating ${unexpectedImagesCount} variations from reference...`);
+        useProgressStore
+          .getState()
+          .updateProgress(100, "Generating variations...");
+        try {
+          const variations = await apiClient.generateVariation(
+            prompt,
+            currentBrief,
+            unexpectedImagesCount
+          );
+
+          for (const variation of variations.variations) {
+            try {
+              const result = await falClient.generateImageEdit({
+                prompt: variation.prompt,
+                image_urls: imageUrls, // Reuse the uploaded reference images
+                num_images: 1,
+                aspect_ratio: "1:1",
+                output_format: "jpeg",
+              });
+
+              await apiClient.addExternalImages({
+                images: result.images.map((img) => ({ url: img.url })),
+                prompt: variation.prompt,
+                generation_method: "auto-variation",
+                remove_background: removeBackground,
+                parent_ids: parentIds,
+              });
+
+              // Refresh state to get the new image
+              const updatedState = await apiClient.getState();
+              const newImage =
+                updatedState.images[updatedState.images.length - 1];
+
+              setPendingImages((prev) => [
+                ...prev,
+                {
+                  id: `pending-${Date.now()}-${Math.random()}`,
+                  imageData: newImage,
+                  originalPrompt: prompt,
+                  variation: variation,
+                  isPending: true,
+                },
+              ]);
+            } catch (error) {
+              console.error("Failed to generate variation image:", error);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to generate variations:", error);
+        }
+      }
+
+      clearSelection();
+      // }
+    } catch (error) {
+      console.error("Reference generation failed:", error);
+      useProgressStore.getState().hideProgress();
+      alert(
+        `Generation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setIsGenerating(false);
+      useProgressStore.getState().hideProgress();
+
+      // Note: Auto-variations and analysis happen after progress modal closes
+    }
+  };
+
+  // Agent handlers
+  const handlePromptsGenerated = async (
+    prompts: SuggestedPrompt[],
+    brief: string
+  ) => {
+    setSuggestedPrompts(prompts);
+    setCurrentBrief(brief);
+    // Persist brief to backend
+    try {
+      await apiClient.updateDesignBrief(brief);
+      console.log("✓ Generated prompts from brief and saved:", brief);
+    } catch (error) {
+      console.error("Failed to save design brief:", error);
+    }
+  };
+
+  const handleAcceptPrompt = async (
+    prompt: string,
+    index: number,
+    count: number = 4
+  ) => {
+    console.log(`Accepting prompt ${index + 1}:`, prompt, `(${count} images)`);
+    setSuggestedPrompts([]); // Dismiss banner after accepting
+
+    // Auto-generate with the accepted prompt
+    setIsGenerating(true);
+    useProgressStore
+      .getState()
+      .showProgress(
+        "generating",
+        `Generating ${count} image${count > 1 ? "s" : ""} from suggestion...`,
+        true
+      );
+    useProgressStore.getState().updateProgress(0);
+
+    try {
+      if (!falClient.isConfigured()) {
+        alert(
+          "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
+        );
+        setIsGenerating(false);
+        useProgressStore.getState().hideProgress();
+        return;
+      }
+
+      // Generate using fal.ai
+      useProgressStore
+        .getState()
+        .updateProgress(10, "Generating with fal.ai...");
+      const result = await falClient.generateTextToImage({
+        prompt,
+        num_images: count,
+        aspect_ratio: "1:1",
+        output_format: "jpeg",
+      });
+
+      // Send to backend for CLIP embeddings
+      useProgressStore.getState().updateProgress(60, "Computing embeddings...");
+      await apiClient.addExternalImages({
+        images: result.images.map((img) => ({ url: img.url })),
+        prompt: prompt,
+        generation_method: "batch",
+        remove_background: removeBackground,
+      });
+
+      useProgressStore.getState().updateProgress(90, "Updating canvas...");
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
+
+      useProgressStore.getState().updateProgress(100);
+
+      // Auto-generate variations if brief is set
+      if (currentBrief && unexpectedImagesCount > 0) {
+        console.log(`🎨 Generating ${unexpectedImagesCount} variations for accepted prompt...`);
+        useProgressStore
+          .getState()
+          .updateProgress(100, "Generating variations...");
+        try {
+          const variations = await apiClient.generateVariation(
+            prompt,
+            currentBrief,
+            unexpectedImagesCount
+          );
+
+          for (const variation of variations.variations) {
+            try {
+              const result = await falClient.generateTextToImage({
+                prompt: variation.prompt,
+                num_images: 1,
+                aspect_ratio: "1:1",
+                output_format: "jpeg",
+              });
+
+              await apiClient.addExternalImages({
+                images: result.images.map((img) => ({ url: img.url })),
+                prompt: variation.prompt,
+                generation_method: "auto-variation",
+                remove_background: removeBackground,
+              });
+
+              // Refresh state to get the new image
+              const updatedState = await apiClient.getState();
+              const newImage =
+                updatedState.images[updatedState.images.length - 1];
+
+              setPendingImages((prev) => [
+                ...prev,
+                {
+                  id: `pending-${Date.now()}-${Math.random()}`,
+                  imageData: newImage,
+                  originalPrompt: prompt,
+                  variation: variation,
+                  isPending: true,
+                },
+              ]);
+            } catch (error) {
+              console.error("Failed to generate variation image:", error);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to generate variations:", error);
+        }
+      }
+
+      console.log("✓ Generation complete");
+      // Note: Canvas analysis is now manual-only (triggered via button)
+      // Auto-generation of unexpected images remains active
     } catch (error) {
       console.error("Generation failed:", error);
-      alert(`Generation failed: ${error instanceof Error ? error.message : String(error)}`);
+      alert(
+        `Generation failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     } finally {
       setIsGenerating(false);
       setTimeout(() => {
@@ -813,45 +1102,323 @@ export const App: React.FC = () => {
   };
 
   const analyzeCanvas = async () => {
-    if (!currentBrief || images.length < 5) {
-      console.log("Skipping analysis: no brief or too few images");
+    if (images.length < 5) {
+      console.log("Skipping analysis: too few images (need at least 5)");
+      alert("Please generate at least 5 images before analyzing the canvas");
       return;
     }
 
     setIsAnalyzing(true);
+    useProgressStore
+      .getState()
+      .showProgress("analyzing", "AI analyzing canvas...", true);
     try {
       console.log("🔍 Fetching canvas digest...");
-      const digestResponse = await fetch("http://localhost:8000/api/canvas-digest");
+      useProgressStore
+        .getState()
+        .updateProgress(30, "Analyzing image clusters...");
+      const digestResponse = await fetch(
+        "http://localhost:8000/api/canvas-digest"
+      );
       const digest = await digestResponse.json();
 
       console.log("🤖 Analyzing canvas with agent...");
-      const analysisResponse = await fetch("http://localhost:8000/api/agent/analyze-canvas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          brief: currentBrief,
-          canvas_summary: digest
-        })
-      });
+      useProgressStore
+        .getState()
+        .updateProgress(60, "Finding exploration opportunities...");
+      const analysisResponse = await fetch(
+        "http://localhost:8000/api/agent/analyze-canvas",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            brief: currentBrief || "Explore shoe design variations",
+            canvas_summary: digest,
+          }),
+        }
+      );
 
       const analysis = await analysisResponse.json();
       setRegionHighlights(analysis.regions || []);
-      console.log("✓ Canvas analysis complete:", analysis.regions?.length, "regions found");
+      useProgressStore.getState().updateProgress(100, "Analysis complete");
+      console.log(
+        "✓ Canvas analysis complete:",
+        analysis.regions?.length,
+        "regions found"
+      );
     } catch (error) {
       console.error("❌ Canvas analysis failed:", error);
+      useProgressStore.getState().hideProgress();
     } finally {
       setIsAnalyzing(false);
+      useProgressStore.getState().hideProgress();
     }
   };
 
-  const handleGenerateFromRegion = async (prompt: string, region: RegionHighlight) => {
-    console.log("Generating from region:", region.title, "with prompt:", prompt);
-    // Use the same generation logic as handleAcceptPrompt
-    await handleAcceptPrompt(prompt, 0);
+  const handleRegionPromptClick = (prompt: string, region: RegionHighlight) => {
+    setRegionPromptDialog({ prompt, region });
+  };
+
+  const handleConfirmRegionGeneration = async (count: number) => {
+    if (!regionPromptDialog) return;
+
+    const { prompt, region } = regionPromptDialog;
+    setRegionPromptDialog(null); // Close dialog
+
+    console.log(
+      "Generating from region:",
+      region.title,
+      "with prompt:",
+      prompt,
+      `(${count} images)`
+    );
+    setIsGenerating(true);
+    useProgressStore
+      .getState()
+      .showProgress(
+        "generating",
+        `Generating from ${region.type} region...`,
+        true
+      );
+    useProgressStore.getState().updateProgress(0);
+
+    try {
+      if (!falClient.isConfigured()) {
+        alert(
+          "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
+        );
+        setIsGenerating(false);
+        useProgressStore.getState().hideProgress();
+        return;
+      }
+
+      // Generate using fal.ai
+      useProgressStore
+        .getState()
+        .updateProgress(10, "Generating with fal.ai...");
+      const result = await falClient.generateTextToImage({
+        prompt,
+        num_images: count,
+        aspect_ratio: "1:1",
+        output_format: "jpeg",
+      });
+
+      // Send to backend for CLIP embeddings
+      useProgressStore.getState().updateProgress(60, "Computing embeddings...");
+      await apiClient.addExternalImages({
+        images: result.images.map((img) => ({ url: img.url })),
+        prompt: prompt,
+        generation_method: "batch",
+        remove_background: removeBackground,
+      });
+
+      useProgressStore.getState().updateProgress(90, "Updating canvas...");
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
+
+      useProgressStore.getState().updateProgress(100);
+      console.log("✓ Region generation complete");
+
+      // Auto-generate variations if brief is set
+      if (currentBrief && unexpectedImagesCount > 0) {
+        console.log(`🎨 Generating ${unexpectedImagesCount} variations for region...`);
+        useProgressStore
+          .getState()
+          .updateProgress(100, "Generating variations...");
+        try {
+          const variations = await apiClient.generateVariation(
+            prompt,
+            currentBrief,
+            unexpectedImagesCount
+          );
+
+          for (const variation of variations.variations) {
+            try {
+              const result = await falClient.generateTextToImage({
+                prompt: variation.prompt,
+                num_images: 1,
+                aspect_ratio: "1:1",
+                output_format: "jpeg",
+              });
+
+              await apiClient.addExternalImages({
+                images: result.images.map((img) => ({ url: img.url })),
+                prompt: variation.prompt,
+                generation_method: "auto-variation",
+                remove_background: removeBackground,
+              });
+
+              // Refresh state to get the new image
+              const updatedState = await apiClient.getState();
+              const newImage =
+                updatedState.images[updatedState.images.length - 1];
+
+              setPendingImages((prev) => [
+                ...prev,
+                {
+                  id: `pending-${Date.now()}-${Math.random()}`,
+                  imageData: newImage,
+                  originalPrompt: prompt,
+                  variation: variation,
+                  isPending: true,
+                },
+              ]);
+            } catch (error) {
+              console.error("Failed to generate variation image:", error);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to generate variations:", error);
+        }
+      }
+    } catch (error) {
+      console.error("Region generation failed:", error);
+      useProgressStore.getState().hideProgress();
+      alert(
+        `Generation failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsGenerating(false);
+      useProgressStore.getState().hideProgress();
+    }
   };
 
   const handleDismissRegions = () => {
     setRegionHighlights([]);
+  };
+
+  const handleAcceptPending = async (pendingId: string) => {
+    console.log("Accepting pending image:", pendingId);
+
+    try {
+      // Remove from pending list (it's already in the main images list)
+      setPendingImages((prev) => prev.filter((p) => p.id !== pendingId));
+
+      // Refresh state to show the image in the main canvas
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
+    } catch (error) {
+      console.error("Failed to accept pending image:", error);
+    }
+  };
+
+  const handleDiscardPending = async (pendingId: string) => {
+    console.log("Discarding pending image:", pendingId);
+    const pending = pendingImages.find((p) => p.id === pendingId);
+    if (!pending) return;
+
+    try {
+      // Delete from backend
+      await apiClient.deleteImage(pending.imageData.id);
+
+      // Remove from pending list
+      setPendingImages((prev) => prev.filter((p) => p.id !== pendingId));
+
+      // Refresh state
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
+    } catch (error) {
+      console.error("Failed to discard pending image:", error);
+    }
+  };
+
+  const handleSuggestAxes = async () => {
+    // Prevent overlapping requests
+    if (isLoadingAxes || showAxisSuggestionModal) {
+      console.log("⚠️ Axis suggestion already in progress, skipping...");
+      return;
+    }
+
+    const axisLabels = useAppStore.getState().axisLabels;
+    setIsLoadingAxes(true);
+    useProgressStore
+      .getState()
+      .showProgress("analyzing", "Suggesting alternative axes...", true);
+
+    try {
+      // Format axis labels as "negative - positive"
+      const xLabel = `${axisLabels.x[0]} - ${axisLabels.x[1]}`;
+      const yLabel = `${axisLabels.y[0]} - ${axisLabels.y[1]}`;
+
+      const result = await apiClient.suggestAxes(
+        currentBrief || "Explore shoe design variations",
+        xLabel,
+        yLabel
+      );
+      setAxisSuggestions(result.suggestions);
+      setShowAxisSuggestionModal(true);
+      useProgressStore.getState().hideProgress();
+    } catch (error) {
+      console.error("Failed to suggest axes:", error);
+      useProgressStore.getState().hideProgress();
+      alert("Failed to generate axis suggestions");
+    } finally {
+      setIsLoadingAxes(false);
+    }
+  };
+
+  const handleApplyAxes = async (xAxis: string, yAxis: string) => {
+    try {
+      // Parse axis - handle both "negative - positive" format and single-word format
+      const parseAxis = (axis: string): [string, string] => {
+        const parts = axis
+          .split(" - ")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
+        if (parts.length === 2) {
+          // Already in "negative - positive" format
+          return [parts[0], parts[1]];
+        } else if (parts.length === 1) {
+          // Single word - convert to "Low X - High X" format
+          const word = parts[0];
+          return [`Low ${word}`, `High ${word}`];
+        } else {
+          throw new Error(`Invalid axis format: "${axis}"`);
+        }
+      };
+
+      const [xNeg, xPos] = parseAxis(xAxis);
+      const [yNeg, yPos] = parseAxis(yAxis);
+
+      console.log("Applying axes:", { xNeg, xPos, yNeg, yPos });
+
+      useProgressStore
+        .getState()
+        .showProgress("reprojecting", "Updating canvas axes...", false);
+
+      await apiClient.updateAxes({
+        x_positive: xPos,
+        x_negative: xNeg,
+        y_positive: yPos,
+        y_negative: yNeg,
+      });
+
+      useProgressStore.getState().updateProgress(50, "Reprojecting images...");
+      const state = await apiClient.getState();
+
+      // Update both axis labels AND images with new coordinates
+      useAppStore.getState().setAxisLabels(state.axis_labels);
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
+
+      useProgressStore.getState().updateProgress(100);
+      useProgressStore.getState().hideProgress();
+
+      setShowAxisSuggestionModal(false);
+      console.log(
+        `✓ Applied new axes: X=${xAxis}, Y=${yAxis} - Canvas reprojected with ${state.images.length} images`
+      );
+    } catch (error) {
+      console.error("Failed to apply axes:", error);
+      useProgressStore.getState().hideProgress();
+      alert("Failed to apply new axes. Check console for details.");
+    }
   };
 
   // Click outside to close floating panel
@@ -898,568 +1465,480 @@ export const App: React.FC = () => {
 
   return (
     <>
-      {/* Brief Panel (AI Agent) - Fixed sidebar */}
-      <BriefPanel
-        onPromptsGenerated={handlePromptsGenerated}
-        isCollapsed={briefPanelCollapsed}
-        onToggleCollapse={() => setBriefPanelCollapsed(!briefPanelCollapsed)}
-      />
+      {/* Progress Modal */}
+      <ProgressModal />
 
-      {/* Prompt Banner (AI suggestions) */}
-      {suggestedPrompts.length > 0 && (
-        <PromptBanner
-          prompts={suggestedPrompts}
-          onAcceptPrompt={handleAcceptPrompt}
-          onDismiss={handleDismissPrompts}
-          briefPanelCollapsed={briefPanelCollapsed}
+      {/* Exploration Tree Modal */}
+      {showTreeModal && (
+        <ExplorationTreeModal
+          images={images}
+          onClose={() => setShowTreeModal(false)}
+          onNodeClick={(id) => {
+            useAppStore.getState().setSelectedImageIds([id]);
+            setShowTreeModal(false);
+          }}
+          onNodeHover={(id) => {
+            if (id !== null) {
+              useAppStore.getState().setHoveredImageId(id);
+            } else {
+              useAppStore.getState().setHoveredImageId(null);
+            }
+          }}
         />
       )}
 
-      <div className="app-container">
-        {/* Progress Bar */}
-        <ProgressBar
-          isVisible={isGenerating}
-          message={
-            batchProgress
-              ? `Batch generating ${batchProgress.current}/${batchProgress.total}: ${batchProgress.currentPrompt.substring(0, 50)}...`
-              : "Generating images..."
-          }
+      {/* Starter Prompts Modal */}
+      {suggestedPrompts.length > 0 && (
+        <StarterPromptsModal
+          prompts={suggestedPrompts}
+          onAccept={handleAcceptPrompt}
+          onClose={handleDismissPrompts}
         />
+      )}
 
-      {/* Canvas Container */}
-      <div className="canvas-container">
-        <div className="canvas-header">
-          <h1>👟 Semantic Latent Space</h1>
-        </div>
-
-        <div className="canvas-stats">
-          <strong>{images.length}</strong> images •{" "}
-          <strong>CLIP ViT-B/32</strong> •{" "}
-          {isInitialized ? "✅ Ready" : "⏳ Initializing..."} •{" "}
-          <strong>{is3DMode ? "3D" : "2D"}</strong> mode
-          {isAnalyzing && <span style={{ marginLeft: "8px" }}>• 🤖 Analyzing...</span>}
-        </div>
-
-        {/* Manual Analysis Button */}
-        {currentBrief && images.length >= 5 && !is3DMode && (
-          <button
-            className="analyze-button"
-            onClick={() => analyzeCanvas()}
-            disabled={isAnalyzing || isGenerating}
-            title="Analyze canvas and suggest exploration regions"
-            style={{
-              position: "absolute",
-              top: "60px",
-              right: "20px",
-              padding: "8px 16px",
-              background: isAnalyzing ? "rgba(88, 166, 255, 0.2)" : "rgba(88, 166, 255, 0.15)",
-              border: "1px solid rgba(88, 166, 255, 0.4)",
-              borderRadius: "6px",
-              color: "#58a6ff",
-              fontSize: "13px",
-              fontWeight: "500",
-              cursor: isAnalyzing || isGenerating ? "not-allowed" : "pointer",
-              transition: "all 0.2s ease",
-              zIndex: 15,
-            }}
-            onMouseEnter={(e) => {
-              if (!isAnalyzing && !isGenerating) {
-                e.currentTarget.style.background = "rgba(88, 166, 255, 0.25)";
-                e.currentTarget.style.borderColor = "rgba(88, 166, 255, 0.6)";
+      <div className="app-layout">
+        {/* Left Panel - Intent */}
+        <div className="left-panel">
+          <IntentPanel
+            brief={currentBrief || ""}
+            onBriefChange={async (newBrief: string) => {
+              setCurrentBrief(newBrief);
+              // Persist brief to backend
+              try {
+                await apiClient.updateDesignBrief(newBrief);
+                console.log("✓ Design brief saved to backend");
+              } catch (error) {
+                console.error("Failed to save design brief:", error);
               }
             }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = isAnalyzing ? "rgba(88, 166, 255, 0.2)" : "rgba(88, 166, 255, 0.15)";
-              e.currentTarget.style.borderColor = "rgba(88, 166, 255, 0.4)";
-            }}
-          >
-            {isAnalyzing ? "🤖 Analyzing..." : "🔍 Analyze Canvas"}
-          </button>
-        )}
-
-        {/* Conditionally render 2D or 3D canvas */}
-        {is3DMode ? (
-          <SemanticCanvas3D
-            onSelectionChange={React.useCallback((x, y, count) => {
-              console.log("🎯 App received 3D onSelectionChange:", { x, y, count });
-              if (count > 0) {
-                if (x === -1 && y === -1) {
-                  setFloatingPanelPos(prev => prev ? { ...prev, count } : { x: 0, y: 0, count });
-                } else {
-                  setFloatingPanelPos({ x, y, count });
-                }
-              } else {
-                setFloatingPanelPos(null);
+            onGeneratePrompts={async () => {
+              if (!currentBrief) return;
+              try {
+                const response = await fetch(
+                  "http://localhost:8000/api/agent/initial-prompts",
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ brief: currentBrief.trim() }),
+                  }
+                );
+                const data = await response.json();
+                setSuggestedPrompts(data.prompts);
+              } catch (err) {
+                console.error("Failed to generate prompts:", err);
               }
-            }, [])}
-          />
-        ) : (
-          <SemanticCanvas
-            onSelectionChange={React.useCallback((x, y, count) => {
-              console.log("🎯 App received 2D onSelectionChange:", { x, y, count });
-              if (count > 0) {
-                if (x === -1 && y === -1) {
-                  setFloatingPanelPos(prev => prev ? { ...prev, count } : { x: 0, y: 0, count });
-                } else {
-                  setFloatingPanelPos({ x, y, count });
-                }
-              } else {
-                setFloatingPanelPos(null);
-              }
-            }, [])}
-          />
-        )}
-
-        {/* Region Highlights (AI agent overlays) - Only show in 2D mode */}
-        {!is3DMode && regionHighlights.length > 0 && (
-          <RegionHighlights
-            regions={regionHighlights}
-            canvasWidth={canvasDimensions.width || window.innerWidth}
-            canvasHeight={canvasDimensions.height || window.innerHeight - 200}
-            onGenerateFromRegion={handleGenerateFromRegion}
-            onDismiss={handleDismissRegions}
-          />
-        )}
-
-        {/* Floating Action Panel (primary interaction) */}
-        {floatingPanelPos && floatingPanelPos.count > 0 && (
-          <FloatingActionPanel
-            x={floatingPanelPos.x}
-            y={floatingPanelPos.y}
-            selectedCount={floatingPanelPos.count}
-            onGenerateFromReference={() => {
-              // Open dialog with all selected images
-              handleGenerateFromReferenceClick();
-              setFloatingPanelPos(null);
             }}
-            // COMMENTED OUT: Interpolation disabled - only available with local SD 1.5
-            onInterpolate={
-              undefined
-              // floatingPanelPos.count === 2 && generationMode === 'local-sd15'
-              //   ? handleInterpolateClick
-              //   : undefined
+            isGeneratingPrompts={false}
+            onAnalyzeCanvas={analyzeCanvas}
+            isAnalyzing={isAnalyzing}
+            onSuggestAxes={handleSuggestAxes}
+            isLoadingAxes={isLoadingAxes}
+            unexpectedImagesCount={unexpectedImagesCount}
+            onUnexpectedImagesCountChange={setUnexpectedImagesCount}
+            focusRegions={regionHighlights}
+            onSelectFocus={(idx) =>
+              console.log("Focus on region:", regionHighlights[idx])
             }
-            onViewDetails={() => {
-              // Show details of selected images
-              const selectedImages = images.filter((img) =>
-                selectedImageIds.includes(img.id)
-              );
-              const details = selectedImages
-                .map(
-                  (img) =>
-                    `ID: ${img.id}\nMethod: ${img.generation_method}\nPrompt: ${img.prompt}`
-                )
-                .join("\n\n---\n\n");
-              alert(`Selected Images:\n\n${details}`);
-            }}
-            onRemove={() => {
-              selectedImageIds.forEach((id) => {
-                useAppStore.getState().removeImage(id);
-              });
-              clearSelection();
-              setFloatingPanelPos(null);
-            }}
-            onClearSelection={() => {
-              clearSelection();
-              setFloatingPanelPos(null);
+            preferences={{
+              liked: selectedImageIds.length,
+              generated: images.length,
+              exploration:
+                images.length === 0
+                  ? "Empty"
+                  : images.length < 20
+                  ? "Starting"
+                  : images.length < 100
+                  ? "Building"
+                  : "Extensive",
             }}
           />
-        )}
-
-        {/* Prompt Dialog */}
-        {showPromptDialog && promptDialogImages.length > 0 && (
-          <PromptDialog
-            referenceImages={promptDialogImages}
-            onClose={() => {
-              setPromptDialogImageId(null);
-              setShowPromptDialog(false);
-              clearSelection(); // Clear selection to close the dialog
-            }}
-            onGenerate={handlePromptDialogGenerate}
-          />
-        )}
-
-        {/* Interpolation Dialog */}
-        {interpolationImages && interpolationImages.length === 2 && (
-          <InterpolationDialog
-            imageA={interpolationImages[0]}
-            imageB={interpolationImages[1]}
-            onClose={() => setInterpolationImageIds(null)}
-            onInterpolate={handleInterpolate}
-          />
-        )}
-
-        {/* Batch Prompt Dialog */}
-        {showBatchPromptDialog && (
-          <BatchPromptDialog
-            onClose={() => setShowBatchPromptDialog(false)}
-            onGenerate={handleBatchGenerate}
-          />
-        )}
-
-        {/* External Image Loader Dialog */}
-        {showExternalImageLoader && (
-          <ExternalImageLoader
-            onClose={() => setShowExternalImageLoader(false)}
-            onLoad={handleLoadExternalImages}
-          />
-        )}
-
-        {/* Minimal Visual Settings */}
-        <div className="visual-settings">
-          <div className="settings-header">Visual Settings</div>
-          <div className="setting-item">
-            <div className="setting-label">
-              <span>
-                Image Size: {useAppStore.getState().visualSettings.imageSize}px
-              </span>
-            </div>
-            <input
-              type="range"
-              min="30"
-              max="400"
-              value={useAppStore.getState().visualSettings.imageSize}
-              onChange={(e) => {
-                useAppStore.getState().updateVisualSettings({
-                  imageSize: parseInt(e.target.value, 10),
-                });
-              }}
-              style={{ width: "100%" }}
-            />
-          </div>
-
-          <div className="setting-item">
-            <div className="setting-label">
-              <span>
-                Opacity:{" "}
-                {useAppStore.getState().visualSettings.imageOpacity.toFixed(1)}
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0.3"
-              max="1"
-              step="0.1"
-              value={useAppStore.getState().visualSettings.imageOpacity}
-              onChange={(e) => {
-                useAppStore.getState().updateVisualSettings({
-                  imageOpacity: parseFloat(e.target.value),
-                });
-              }}
-              style={{ width: "100%" }}
-            />
-          </div>
-
-          <div className="setting-item">
-            <div className="setting-label">
-              <span>
-                Layout Padding:{" "}
-                {(useAppStore.getState().visualSettings.layoutPadding * 100).toFixed(0)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0.05"
-              max="0.3"
-              step="0.05"
-              value={useAppStore.getState().visualSettings.layoutPadding}
-              onChange={(e) => {
-                useAppStore.getState().updateVisualSettings({
-                  layoutPadding: parseFloat(e.target.value),
-                });
-              }}
-              style={{ width: "100%" }}
-              title="Controls spacing around images when rescaling (5% = tight, 30% = spacious)"
-            />
-            <div style={{ fontSize: "11px", color: "#8b949e", marginTop: "4px" }}>
-              {useAppStore.getState().visualSettings.layoutPadding <= 0.1
-                ? "Tight spacing"
-                : useAppStore.getState().visualSettings.layoutPadding <= 0.2
-                ? "Moderate spacing"
-                : "Spacious layout"}
-            </div>
-          </div>
-
-          <div className="setting-item">
-            <div className="setting-label">
-              <span>
-                Coordinate Scale:{" "}
-                {useAppStore.getState().visualSettings.coordinateScale.toFixed(2)}x
-              </span>
-            </div>
-            <input
-              type="range"
-              min="0.1"
-              max="5"
-              step="0.1"
-              value={useAppStore.getState().visualSettings.coordinateScale}
-              onChange={(e) => {
-                useAppStore.getState().updateVisualSettings({
-                  coordinateScale: parseFloat(e.target.value),
-                });
-                useAppStore.getState().resetCanvasBounds(); // Trigger bounds recalculation
-              }}
-              style={{ width: "100%" }}
-              title="Scale coordinates (0.1x = tight, 5x = spread out)"
-            />
-            <div style={{ fontSize: "11px", color: "#8b949e", marginTop: "4px" }}>
-              {useAppStore.getState().visualSettings.coordinateScale < 0.5
-                ? "Very tight spacing"
-                : useAppStore.getState().visualSettings.coordinateScale < 1
-                ? "Tight spacing"
-                : useAppStore.getState().visualSettings.coordinateScale === 1
-                ? "Original spacing"
-                : useAppStore.getState().visualSettings.coordinateScale < 2
-                ? "Spread out"
-                : "Very spread out"}
-            </div>
-          </div>
-
-          <div className="setting-item">
-            <button
-              className="action-button secondary"
-              onClick={() => {
-                // Calculate centroid of all visible images
-                const visibleImages = images.filter(img => img.visible);
-                if (visibleImages.length === 0) return;
-
-                const sum = visibleImages.reduce((acc, img) => {
-                  return [
-                    acc[0] + img.coordinates[0],
-                    acc[1] + img.coordinates[1],
-                    acc[2] + (img.coordinates[2] || 0)
-                  ];
-                }, [0, 0, 0]);
-
-                const centroid = sum.map(s => s / visibleImages.length);
-
-                // Set offset to negative centroid to move cluster to origin
-                useAppStore.getState().updateVisualSettings({
-                  coordinateOffset: [-centroid[0], -centroid[1], -centroid[2]] as [number, number, number]
-                });
-                useAppStore.getState().resetCanvasBounds();
-
-                console.log("🎯 Recentered cluster. Centroid was:", centroid);
-              }}
-              disabled={images.length === 0}
-              style={{ width: "100%", marginTop: "8px" }}
-              title="Move cluster center to coordinate origin"
-            >
-              🎯 Recenter Cluster
-            </button>
-          </div>
-
-          <div className="setting-item">
-            <button
-              className="action-button secondary"
-              onClick={() => {
-                useAppStore.getState().resetCanvasBounds();
-                console.log("🔄 Canvas bounds reset - will rescale on next render");
-              }}
-              disabled={images.length === 0}
-              style={{ width: "100%", marginTop: "8px" }}
-              title="Rescale canvas to fit all images with current padding setting"
-            >
-              📐 Rescale Canvas
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Control Panel */}
-      <div className="control-panel">
-        {/* Mode Toggles */}
-        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-          <ModeToggle />
-          <Canvas3DToggle />
         </div>
 
-        {/* Quick Actions */}
-        <div className="quick-actions">
-          <h3>Quick Actions</h3>
-
-          <div className="action-row">
-            <button
-              className="action-button"
-              onClick={handleGenerate}
-              disabled={!isInitialized || isGenerating}
-              style={{ flex: 1 }}
-            >
-              🎨 Generate Images
-            </button>
-            <button
-              className="action-button secondary"
-              onClick={handleClearCanvas}
-              disabled={images.length === 0}
-              style={{ flex: 0, whiteSpace: "nowrap" }}
-              title="Clear all images from canvas"
-            >
-              🗑️ Clear All
-            </button>
+        {/* Center Canvas */}
+        <div className="center-canvas">
+          <div className="canvas-header">
+            <h1>👟 Semantic Latent Space</h1>
           </div>
 
-          {/* Batch & Import Actions */}
-          <div className="action-row" style={{ marginTop: "8px" }}>
-            <button
-              className="action-button"
-              onClick={() => setShowBatchPromptDialog(true)}
-              disabled={!isInitialized || isGenerating}
-              style={{ flex: 1 }}
-              title="Generate multiple images from a JSON list of prompts"
-            >
-              📝 Batch Generate
-            </button>
-            <button
-              className="action-button"
-              onClick={() => setShowExternalImageLoader(true)}
-              disabled={!isInitialized || isGenerating}
-              style={{ flex: 1 }}
-              title="Load images from external URLs"
-            >
-              📥 Load Images
-            </button>
+          <div className="canvas-stats">
+            <strong>{images.length}</strong> images •{" "}
+            <strong>CLIP ViT-B/32</strong> •{" "}
+            {isInitialized ? "✅ Ready" : "⏳ Initializing..."} •{" "}
+            <strong>{is3DMode ? "3D" : "2D"}</strong> mode
+            {isAnalyzing && (
+              <span style={{ marginLeft: "8px" }}>• 🤖 Analyzing...</span>
+            )}
           </div>
 
-          {/* Export Actions */}
-          <div className="action-row" style={{ marginTop: "8px" }}>
-            <button
-              className="action-button"
-              onClick={handleExportZip}
-              disabled={images.length === 0}
-              style={{ flex: 1 }}
-              title="Export all images with metadata as ZIP (timestamp-named files + JSON)"
-            >
-              📦 Export ZIP
-            </button>
-          </div>
-
-          {isGenerating && (
-            <button
-              className="action-button secondary"
-              onClick={() => {
-                console.warn("⚠️ Force stopping generation");
-                setIsGenerating(false);
-                setGenerationProgress(0);
-                setGenerationCount(0, 0);
-              }}
-              style={{
-                width: "100%",
-                marginTop: "8px",
-                background: "rgba(248, 81, 73, 0.2)",
-                color: "#f85149",
-                border: "1px solid rgba(248, 81, 73, 0.3)"
-              }}
-              title="Force stop if generation is stuck"
-            >
-              ⏹️ Force Stop Generation
-            </button>
+          {showAxisSuggestionModal && (
+            <AxisSuggestionModal
+              suggestions={axisSuggestions}
+              onApply={handleApplyAxes}
+              onClose={() => setShowAxisSuggestionModal(false)}
+              isLoading={isLoadingAxes}
+            />
           )}
 
-          {selectedImageIds.length > 0 && (
-            <div
-              style={{
-                marginTop: "8px",
-                padding: "8px 12px",
-                background: "rgba(88, 166, 255, 0.1)",
-                borderRadius: "6px",
-                fontSize: "13px",
-                color: "#58a6ff",
-              }}
-            >
-              {selectedImageIds.length} image
-              {selectedImageIds.length !== 1 ? "s" : ""} selected • Use floating
-              panel to interact
-            </div>
-          )}
+          <div className="canvas-container">
+            {/* Conditionally render 2D or 3D canvas */}
+            {is3DMode ? (
+              <SemanticCanvas3D
+                onSelectionChange={React.useCallback((x, y, count) => {
+                  console.log("🎯 App received 3D onSelectionChange:", {
+                    x,
+                    y,
+                    count,
+                  });
+                  if (count > 0) {
+                    if (x === -1 && y === -1) {
+                      setFloatingPanelPos((prev) =>
+                        prev ? { ...prev, count } : { x: 0, y: 0, count }
+                      );
+                    } else {
+                      setFloatingPanelPos({ x, y, count });
+                    }
+                  } else {
+                    setFloatingPanelPos(null);
+                  }
+                }, [])}
+              />
+            ) : (
+              <SemanticCanvas
+                onSelectionChange={React.useCallback((x, y, count) => {
+                  console.log("🎯 App received 2D onSelectionChange:", {
+                    x,
+                    y,
+                    count,
+                  });
+                  if (count > 0) {
+                    if (x === -1 && y === -1) {
+                      setFloatingPanelPos((prev) =>
+                        prev ? { ...prev, count } : { x: 0, y: 0, count }
+                      );
+                    } else {
+                      setFloatingPanelPos({ x, y, count });
+                    }
+                  } else {
+                    setFloatingPanelPos(null);
+                  }
+                }, [])}
+                regionHighlights={regionHighlights}
+                onGenerateFromRegion={(prompt, region) =>
+                  handleRegionPromptClick(prompt, region)
+                }
+                onDismissRegions={handleDismissRegions}
+                pendingImages={pendingImages}
+                onAcceptPending={handleAcceptPending}
+                onDiscardPending={handleDiscardPending}
+              />
+            )}
 
-          {!isInitialized && (
-            <div
-              style={{ marginTop: "12px", fontSize: "12px", color: "#8b949e" }}
-            >
-              Initializing models... This may take a minute.
-            </div>
-          )}
-        </div>
+            {/* Floating Action Panel (primary interaction) */}
+            {floatingPanelPos && floatingPanelPos.count > 0 && (
+              <FloatingActionPanel
+                x={floatingPanelPos.x}
+                y={floatingPanelPos.y}
+                selectedCount={floatingPanelPos.count}
+                onGenerateFromReference={() => {
+                  // Open dialog with all selected images
+                  handleGenerateFromReferenceClick();
+                  setFloatingPanelPos(null);
+                }}
+                // COMMENTED OUT: Interpolation disabled - only available with local SD 1.5
+                onInterpolate={
+                  undefined
+                  // Interpolation disabled - not supported with fal.ai
+                }
+                onViewDetails={() => {
+                  // Show details of selected images
+                  const selectedImages = images.filter((img) =>
+                    selectedImageIds.includes(img.id)
+                  );
+                  const details = selectedImages
+                    .map(
+                      (img) =>
+                        `ID: ${img.id}\nMethod: ${img.generation_method}\nPrompt: ${img.prompt}`
+                    )
+                    .join("\n\n---\n\n");
+                  alert(`Selected Images:\n\n${details}`);
+                }}
+                onRemove={() => {
+                  selectedImageIds.forEach((id) => {
+                    useAppStore.getState().removeImage(id);
+                  });
+                  clearSelection();
+                  setFloatingPanelPos(null);
+                }}
+                onClearSelection={() => {
+                  clearSelection();
+                  setFloatingPanelPos(null);
+                }}
+              />
+            )}
 
-        {/* History Timeline with Bidirectional Hover */}
-        <div className="history-timeline">
-          <h3>Generation History</h3>
-          <div className="timeline-container">
-            {useAppStore.getState().historyGroups.map((group) => {
-              const hoveredGroupId = useAppStore.getState().hoveredGroupId;
-              const setHoveredGroupId =
-                useAppStore.getState().setHoveredGroupId;
-              const thumbnailImage =
-                group.thumbnail_id !== null
-                  ? images.find((img) => img.id === group.thumbnail_id)
-                  : null;
+            {/* Prompt Dialog */}
+            {showPromptDialog && promptDialogImages.length > 0 && (
+              <PromptDialog
+                referenceImages={promptDialogImages}
+                onClose={() => {
+                  setPromptDialogImageId(null);
+                  setShowPromptDialog(false);
+                  clearSelection();
+                }}
+                onGenerate={handlePromptDialogGenerate}
+              />
+            )}
 
-              return (
-                <div
-                  key={group.id}
-                  className={`timeline-group ${
-                    hoveredGroupId === group.id ? "highlighting" : ""
-                  }`}
-                  onClick={() => {
-                    // Select all images in group
-                    useAppStore.getState().setSelectedImageIds(group.image_ids);
-                  }}
-                  onMouseEnter={() => setHoveredGroupId(group.id)}
-                  onMouseLeave={() => setHoveredGroupId(null)}
-                >
-                  <div className="group-header">
-                    <span className="group-title">{group.type}</span>
-                    <span className="group-badge">
-                      {group.image_ids.length}
-                    </span>
-                  </div>
-                  <div className="group-content">
-                    {group.prompt.substring(0, 50)}...
-                  </div>
-                  {thumbnailImage ? (
-                    <img
-                      src={`data:image/png;base64,${thumbnailImage.base64_image}`}
-                      alt={group.type}
-                      className="group-thumbnail"
-                    />
-                  ) : (
-                    <div
-                      className="group-thumbnail"
-                      style={{
-                        background:
-                          group.type === "batch"
-                            ? "linear-gradient(135deg, #58a6ff 0%, #bc8cff 100%)"
-                            : group.type === "reference"
-                            ? "linear-gradient(135deg, #bc8cff 0%, #d29922 100%)"
-                            : group.type === "interpolation"
-                            ? "linear-gradient(135deg, #3fb950 0%, #58a6ff 100%)"
-                            : "linear-gradient(135deg, #d29922 0%, #f85149 100%)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "11px",
-                        fontWeight: "600",
-                        color: "white",
-                      }}
-                    >
-                      {group.type.toUpperCase()}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {/* Interpolation Dialog */}
+            {interpolationImages && interpolationImages.length === 2 && (
+              <InterpolationDialog
+                imageA={interpolationImages[0]}
+                imageB={interpolationImages[1]}
+                onClose={() => setInterpolationImageIds(null)}
+                onInterpolate={handleInterpolate}
+              />
+            )}
 
-            {useAppStore.getState().historyGroups.length === 0 && (
-              <div
-                style={{ padding: "20px", color: "#8b949e", fontSize: "13px" }}
-              >
-                No history yet. Generate some images to get started!
-              </div>
+            {/* Batch Prompt Dialog */}
+            {showBatchPromptDialog && (
+              <BatchPromptDialog
+                onClose={() => setShowBatchPromptDialog(false)}
+                onGenerate={handleBatchGenerate}
+              />
+            )}
+
+            {/* External Image Loader Dialog */}
+            {showExternalImageLoader && (
+              <ExternalImageLoader
+                onClose={() => setShowExternalImageLoader(false)}
+                onLoad={handleLoadExternalImages}
+              />
+            )}
+
+            {/* Text-to-Image Dialog */}
+            {showTextToImageDialog && (
+              <TextToImageDialog
+                onClose={() => setShowTextToImageDialog(false)}
+                onGenerate={async (prompt, count) => {
+                  setShowTextToImageDialog(false);
+                  setIsGenerating(true);
+                  useProgressStore
+                    .getState()
+                    .showProgress(
+                      "generating",
+                      `Generating ${count} image${count > 1 ? "s" : ""}...`,
+                      true
+                    );
+                  useProgressStore.getState().updateProgress(0);
+
+                  try {
+                    if (!falClient.isConfigured()) {
+                      alert(
+                        "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
+                      );
+                      setIsGenerating(false);
+                      useProgressStore.getState().hideProgress();
+                      return;
+                    }
+
+                    useProgressStore
+                      .getState()
+                      .updateProgress(10, "Generating with fal.ai...");
+                    const result = await falClient.generateTextToImage({
+                      prompt,
+                      num_images: count,
+                      aspect_ratio: "1:1",
+                      output_format: "jpeg",
+                    });
+
+                    useProgressStore
+                      .getState()
+                      .updateProgress(60, "Computing embeddings...");
+                    await apiClient.addExternalImages({
+                      images: result.images.map((img) => ({ url: img.url })),
+                      prompt: prompt,
+                      generation_method: "batch",
+                      remove_background: removeBackground,
+                    });
+
+                    useProgressStore
+                      .getState()
+                      .updateProgress(90, "Updating canvas...");
+                    const state = await apiClient.getState();
+                    setImages(state.images);
+                    setHistoryGroups(state.history_groups);
+
+                    useProgressStore.getState().updateProgress(100);
+                  } catch (error) {
+                    console.error("Generation failed:", error);
+                    useProgressStore.getState().hideProgress();
+                    alert(
+                      `Generation failed: ${
+                        error instanceof Error ? error.message : "Unknown error"
+                      }`
+                    );
+                  } finally {
+                    setIsGenerating(false);
+                    useProgressStore.getState().hideProgress();
+                  }
+                }}
+              />
+            )}
+
+            {/* Region Prompt Dialog */}
+            {regionPromptDialog && (
+              <RegionPromptDialog
+                prompt={regionPromptDialog.prompt}
+                regionTitle={regionPromptDialog.region.title}
+                regionType={regionPromptDialog.region.type}
+                onConfirm={handleConfirmRegionGeneration}
+                onCancel={() => setRegionPromptDialog(null)}
+              />
             )}
           </div>
         </div>
+
+        {/* Right Panel - Controls (Non-collapsible) */}
+        <div className="right-panel">
+          <RightControlPanel
+            onGenerateFromPrompt={() => setShowTextToImageDialog(true)}
+            onBatchGenerate={() => setShowBatchPromptDialog(true)}
+            onLoadImages={() => setShowExternalImageLoader(true)}
+            onExport={handleExportZip}
+            onClearAll={handleClearCanvas}
+            isGenerating={isGenerating}
+            showLabels={showLabels}
+            showGrid={showGrid}
+            showClusters={showClusters}
+            backgroundColor={backgroundColor}
+            onToggleLabels={() => setShowLabels(!showLabels)}
+            onToggleGrid={() => setShowGrid(!showGrid)}
+            onToggleClusters={() => setShowClusters(!showClusters)}
+            onBackgroundColorChange={setBackgroundColor}
+            images={images}
+          />
+        </div>
+
+        {/* Bottom History Panel */}
+        <div className="bottom-history-panel">
+          <div className="history-header">
+            <h3>Generation History & Exploration Map</h3>
+            <div className="history-stats">
+              <span>{useAppStore.getState().historyGroups.length} batches</span>
+              <span>•</span>
+              <span>{images.length} total images</span>
+            </div>
+          </div>
+          <div className="history-content">
+            <div className="minimap-container">
+              <ExplorationMinimap
+                images={images}
+                historyGroups={useAppStore.getState().historyGroups}
+                onImageClick={(id) =>
+                  useAppStore.getState().setSelectedImageIds([id])
+                }
+                onExpandClick={() => setShowTreeModal(true)}
+              />
+            </div>
+            <div className="history-timeline">
+              {useAppStore.getState().historyGroups.map((group) => {
+                const hoveredGroupId = useAppStore.getState().hoveredGroupId;
+                const setHoveredGroupId =
+                  useAppStore.getState().setHoveredGroupId;
+                const thumbnailImage =
+                  group.thumbnail_id !== null
+                    ? images.find((img) => img.id === group.thumbnail_id)
+                    : null;
+
+                // Get reference images for metadata display
+                const referenceImages =
+                  group.type === "reference"
+                    ? group.image_ids
+                        .map((id) => images.find((img) => img.id === id))
+                        .filter(Boolean)
+                        .filter(
+                          (img, index, self) =>
+                            img &&
+                            img.parent_id &&
+                            self.findIndex(
+                              (i) => i?.parent_id === img.parent_id
+                            ) === index
+                        )
+                    : [];
+
+                const referenceCount = referenceImages.length;
+                const timestamp = new Date(group.timestamp).toLocaleTimeString(
+                  [],
+                  { hour: "2-digit", minute: "2-digit" }
+                );
+
+                return (
+                  <div
+                    key={group.id}
+                    className={`history-group ${
+                      hoveredGroupId === group.id ? "highlighting" : ""
+                    }`}
+                    onClick={() =>
+                      useAppStore
+                        .getState()
+                        .setSelectedImageIds(group.image_ids)
+                    }
+                    onMouseEnter={() => setHoveredGroupId(group.id)}
+                    onMouseLeave={() => setHoveredGroupId(null)}
+                    title={`${group.type.toUpperCase()} - ${
+                      group.prompt
+                    }\nGenerated: ${timestamp}\nImages: ${
+                      group.image_ids.length
+                    }`}
+                  >
+                    <div className="group-header">
+                      <span className="group-title">
+                        {group.type === "reference"
+                          ? "🔄"
+                          : group.type === "batch"
+                          ? "🎲"
+                          : "📁"}{" "}
+                        {group.type.toUpperCase()}
+                      </span>
+                      <span className="group-badge">
+                        {group.image_ids.length}
+                      </span>
+                    </div>
+                    <div className="group-content">
+                      <div className="group-prompt" title={group.prompt}>
+                        {group.prompt.substring(0, 40)}
+                        {group.prompt.length > 40 ? "..." : ""}
+                      </div>
+                      {group.type === "reference" && referenceCount > 0 && (
+                        <div className="group-metadata">
+                          From {referenceCount} ref
+                          {referenceCount > 1 ? "s" : ""}
+                        </div>
+                      )}
+                      <div className="group-timestamp">{timestamp}</div>
+                    </div>
+                    {thumbnailImage ? (
+                      <img
+                        src={`data:image/png;base64,${thumbnailImage.base64_image}`}
+                        alt={group.type}
+                        className="group-thumbnail"
+                      />
+                    ) : (
+                      <div className="group-thumbnail group-placeholder" />
+                    )}
+                  </div>
+                );
+              })}
+
+              {useAppStore.getState().historyGroups.length === 0 && (
+                <div className="history-empty">
+                  No history yet. Generate some images to get started!
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
     </>
   );
 };

@@ -72,22 +72,47 @@ Interactive tool for exploring and generating images in semantic latent spaces u
 
 ### Prerequisites
 
-- **Python 3.8+** (with PyTorch, transformers)
+- **Python 3.10+** (recommended with conda/miniconda)
 - **Node.js 18+** (with npm)
 - **fal.ai API Key** ([Get one free](https://fal.ai))
+- **Google Gemini API Key** ([Get one free](https://makersuite.google.com/app/apikey))
 
-### 1. Clone & Setup
+### 1. Clone Repository
 
 ```bash
 git clone <repository-url>
 cd Zappos50K_semantic_explorer
 ```
 
-### 2. Backend Setup
+### 2. Setup Python Environment (Conda)
+
+**Option A: Using Conda (Recommended)**
 
 ```bash
+# Create conda environment from environment.yml
+conda env create -f environment.yml
+
+# Activate the environment
+conda activate semantic_explorer
+```
+
+**Option B: Using pip**
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 cd backend
 pip install -r requirements.txt
+cd ..
 ```
 
 ### 3. Frontend Setup
@@ -97,9 +122,16 @@ cd frontend
 npm install
 ```
 
-### 4. Configure fal.ai API Key
+### 4. Configure API Keys
 
-Create `frontend/.env`:
+**Backend Configuration** - Create `backend/.env`:
+
+```bash
+GOOGLE_API_KEY=your_gemini_api_key_here
+FAL_KEY=your_fal_api_key_here
+```
+
+**Frontend Configuration** - Create `frontend/.env`:
 
 ```bash
 VITE_FAL_API_KEY=your_fal_api_key_here
@@ -110,6 +142,9 @@ VITE_FAL_API_KEY=your_fal_api_key_here
 **Terminal 1 - Backend:**
 
 ```bash
+# Make sure conda environment is activated
+conda activate semantic_explorer
+
 cd backend
 python api.py
 ```
@@ -184,7 +219,16 @@ Open http://localhost:5173
 
 ## 🛠️ Tech Stack
 
-### Frontend
+### Generation
+- **fal.ai nano-banana API** - Fast text-to-image generation (~2-8s per batch)
+- **fal.ai nano-banana/edit** - Image editing with reference images
+
+### Embedding & Projection
+- **CLIP ViT-B-32** (OpenAI pretrained) - Image and text embeddings (512-dim)
+- **UMAP** (umap-learn) - 2D/3D dimensionality reduction for visualization
+- **Semantic Axis Projection** - Custom projection using CLIP text embeddings
+
+### Frontend / UI
 
 | Technology                       | Purpose                 |
 | -------------------------------- | ----------------------- |
@@ -195,7 +239,9 @@ Open http://localhost:5173
 | **Three.js + React Three Fiber** | 3D canvas visualization |
 | **Zustand**                      | State management        |
 | **Axios**                        | HTTP client             |
-| **fal.ai Client**                | Image generation API    |
+| **@fal-ai/client**               | Image generation API    |
+| Real-time thumbnail rendering    | Canvas image display    |
+| Interaction logging              | User action tracking   |
 
 ### Backend
 
@@ -203,16 +249,24 @@ Open http://localhost:5173
 | ------------------------ | ------------------------ |
 | **FastAPI**              | REST API server          |
 | **Uvicorn**              | ASGI server              |
+| **WebSockets**           | Real-time state updates  |
 | **PyTorch**              | ML framework             |
-| **transformers**         | CLIP ViT-B/32 embeddings |
+| **open-clip-torch**      | CLIP ViT-B-32 embeddings |
 | **rembg**                | Background removal       |
-| **NumPy & scikit-learn** | Numerical operations     |
+| **NumPy, scikit-learn**  | Numerical operations     |
+| **Pillow (PIL)**         | Image processing         |
+
+### Agent
+- **Gemini 2.5 Flash Lite** (google-generativeai) - AI agent for design exploration
+- Receives digest of: brief, recent generations, canvas clusters
+- Outputs: prompt variants, axes, semantic observations, exploration cues
 
 ### External Services
 
 | Service               | Purpose                                   |
 | --------------------- | ----------------------------------------- |
 | **fal.ai nanobanana** | Fast text-to-image generation (~2s/image) |
+| **Google Gemini API** | AI agent service for design exploration  |
 
 ## 📁 Project Structure
 

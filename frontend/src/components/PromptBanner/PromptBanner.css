@@ -175,6 +175,11 @@
   border-color: rgba(248, 81, 73, 0.3);
 }
 
+.banner-slider {
+  margin-top: 12px;
+  max-width: 300px;
+}
+
 /* Responsive adjustments */
 @media (max-width: 1200px) {
   .banner-prompt {

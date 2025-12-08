@@ -138,6 +138,14 @@
   gap: 8px;
 }
 
+.batch-slider-section {
+  margin: 16px 0;
+  padding: 16px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+
 .dialog-stats {
   margin-top: 12px;
   padding: 10px 12px;

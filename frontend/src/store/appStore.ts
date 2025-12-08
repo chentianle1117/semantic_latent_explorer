@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, GenerationMode, CanvasBounds } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds } from '../types';
 
 interface AppStore extends AppState {
   // Actions
@@ -35,7 +35,6 @@ interface AppStore extends AppState {
   setGenerationProgress: (progress: number | ((prev: number) => number)) => void;
   setGenerationCount: (current: number, total: number) => void;
 
-  setGenerationMode: (mode: GenerationMode) => void;
   setRemoveBackground: (remove: boolean) => void;
 
   setIs3DMode: (is3D: boolean) => void;  // New: toggle 3D mode
@@ -63,7 +62,6 @@ const initialState: AppState = {
     coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
   },
   canvasBounds: null, // Will auto-calculate on first render
-  generationMode: 'local-sd15',
   removeBackground: true,
   isGenerating: false,
   isInitialized: false,
@@ -166,8 +164,6 @@ export const useAppStore = create<AppStore>((set) => ({
   setGenerationCount: (current, total) =>
     set({ generationCurrent: current, generationTotal: total }),
 
-  // Generation mode
-  setGenerationMode: (mode) => set({ generationMode: mode }),
   setRemoveBackground: (remove) => set({ removeBackground: remove }),
 
   // 3D mode

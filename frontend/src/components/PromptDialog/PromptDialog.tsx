@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import type { ImageData } from '../../types';
+import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
 import './PromptDialog.css';
 
 interface PromptDialogProps {
@@ -77,25 +78,11 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
               autoFocus
             />
 
-            {generationMode === 'fal-nanobanana' && (
-              <>
-                <label>
-                  Number of variations: <span className="strength-value">{numImages}</span>
-                </label>
-                <input
-                  type="range"
-                  min="1"
-                  max="8"
-                  step="1"
-                  value={numImages}
-                  onChange={(e) => setNumImages(parseInt(e.target.value, 10))}
-                  disabled={isGenerating}
-                />
-                <p className="helper-text">
-                  Generate {numImages} variation{numImages > 1 ? 's' : ''} based on {referenceImages.length} reference{referenceImages.length > 1 ? 's' : ''}
-                </p>
-              </>
-            )}
+            <ImageCountSlider
+              value={numImages}
+              onChange={setNumImages}
+              label="Number of Variations"
+            />
           </div>
         </div>
 

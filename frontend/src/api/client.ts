@@ -38,6 +38,8 @@ class APIClient {
     images: ImageData[];
     history_groups: HistoryGroup[];
     axis_labels: AxisLabels;
+    design_brief?: string | null;
+    is_3d_mode?: boolean;
   }> {
     const response = await axios.get(`${API_BASE}/state`);
     return response.data;
@@ -152,6 +154,35 @@ class APIClient {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     }
+  }
+
+  // Agent endpoints
+  async generateVariation(originalPrompt: string, brief: string, numVariations: number = 2): Promise<{
+    variations: Array<{ prompt: string; reasoning: string }>;
+  }> {
+    const response = await axios.post('http://localhost:8000/api/agent/generate-variation', {
+      original_prompt: originalPrompt,
+      brief,
+      num_variations: numVariations
+    });
+    return response.data;
+  }
+
+  async suggestAxes(brief: string, currentXAxis: string, currentYAxis: string): Promise<{
+    suggestions: Array<{ x_axis: string; y_axis: string; reasoning: string }>;
+  }> {
+    const response = await axios.post('http://localhost:8000/api/agent/suggest-axes', {
+      brief,
+      current_x_axis: currentXAxis,
+      current_y_axis: currentYAxis
+    });
+    return response.data;
+  }
+
+  // Update design brief
+  async updateDesignBrief(brief: string): Promise<{ status: string; message: string; brief: string | null }> {
+    const response = await axios.post(`${API_BASE}/update-design-brief`, { brief });
+    return response.data;
   }
 }
 

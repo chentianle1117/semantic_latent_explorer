@@ -16,6 +16,7 @@ import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPrompt
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
 import { ExplorationMinimap } from "./components/ExplorationMinimap/ExplorationMinimap";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
+import { Canvas3DToggle } from "./components/Canvas3DToggle/Canvas3DToggle";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
@@ -157,7 +158,10 @@ export const App: React.FC = () => {
         // Load design brief from backend state
         if (state.design_brief) {
           setCurrentBrief(state.design_brief);
-          console.log("✓ Loaded design brief from backend:", state.design_brief.substring(0, 50) + "...");
+          console.log(
+            "✓ Loaded design brief from backend:",
+            state.design_brief.substring(0, 50) + "..."
+          );
         }
         useProgressStore.getState().hideProgress();
       })
@@ -254,7 +258,9 @@ export const App: React.FC = () => {
 
       // Auto-generate variations if brief is set
       if (currentBrief && unexpectedImagesCount > 0) {
-        console.log(`🎨 Generating ${unexpectedImagesCount} variations in background...`);
+        console.log(
+          `🎨 Generating ${unexpectedImagesCount} variations in background...`
+        );
         useProgressStore
           .getState()
           .updateProgress(100, "Generating variations...");
@@ -520,7 +526,9 @@ export const App: React.FC = () => {
 
     // Auto-generate variations for first few prompts if brief is set
     if (currentBrief && successCount > 0 && unexpectedImagesCount > 0) {
-      console.log(`🎨 Generating ${unexpectedImagesCount} auto-variations per prompt...`);
+      console.log(
+        `🎨 Generating ${unexpectedImagesCount} auto-variations per prompt...`
+      );
       const promptsToVary = prompts.slice(0, Math.min(3, prompts.length)); // Only first 3 to avoid spam
 
       for (const prompt of promptsToVary) {
@@ -881,8 +889,14 @@ export const App: React.FC = () => {
       useProgressStore.getState().updateProgress(100);
 
       // Auto-generate variations if brief is set (only if images were successfully added)
-      if (currentBrief && unexpectedImagesCount > 0 && state.images.length > 0) {
-        console.log(`🎨 Generating ${unexpectedImagesCount} variations from reference...`);
+      if (
+        currentBrief &&
+        unexpectedImagesCount > 0 &&
+        state.images.length > 0
+      ) {
+        console.log(
+          `🎨 Generating ${unexpectedImagesCount} variations from reference...`
+        );
         useProgressStore
           .getState()
           .updateProgress(100, "Generating variations...");
@@ -1027,7 +1041,9 @@ export const App: React.FC = () => {
 
       // Auto-generate variations if brief is set
       if (currentBrief && unexpectedImagesCount > 0) {
-        console.log(`🎨 Generating ${unexpectedImagesCount} variations for accepted prompt...`);
+        console.log(
+          `🎨 Generating ${unexpectedImagesCount} variations for accepted prompt...`
+        );
         useProgressStore
           .getState()
           .updateProgress(100, "Generating variations...");
@@ -1222,7 +1238,9 @@ export const App: React.FC = () => {
 
       // Auto-generate variations if brief is set
       if (currentBrief && unexpectedImagesCount > 0) {
-        console.log(`🎨 Generating ${unexpectedImagesCount} variations for region...`);
+        console.log(
+          `🎨 Generating ${unexpectedImagesCount} variations for region...`
+        );
         useProgressStore
           .getState()
           .updateProgress(100, "Generating variations...");
@@ -1568,6 +1586,9 @@ export const App: React.FC = () => {
             {isAnalyzing && (
               <span style={{ marginLeft: "8px" }}>• 🤖 Analyzing...</span>
             )}
+            <span style={{ marginLeft: "12px" }}>
+              <Canvas3DToggle />
+            </span>
           </div>
 
           {showAxisSuggestionModal && (
@@ -1859,9 +1880,9 @@ export const App: React.FC = () => {
                         .filter(
                           (img, index, self) =>
                             img &&
-                            img.parent_id &&
+                            img.parents?.length > 0 &&
                             self.findIndex(
-                              (i) => i?.parent_id === img.parent_id
+                              (i) => i?.parents?.[0] === img.parents?.[0]
                             ) === index
                         )
                     : [];

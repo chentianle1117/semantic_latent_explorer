@@ -41,8 +41,8 @@ else:
 parent_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(parent_dir))
 
-# Import our models
-from models import CLIPEmbedder, SemanticAxisBuilder, SemanticGenerator
+# Import our models (SemanticGenerator removed - using fal.ai for generation)
+from models import CLIPEmbedder, SemanticAxisBuilder
 from models.data_structures import ImageMetadata, HistoryGroup
 
 app = FastAPI(title="Zappos Semantic Explorer API")
@@ -78,23 +78,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 # Pydantic models for API
-class GenerateRequest(BaseModel):
-    prompt: str
-    n_images: int = 8
-    seed: Optional[int] = None
-
-
-class GenerateFromReferenceRequest(BaseModel):
-    reference_id: int
-    prompt: str
-
-
-class InterpolateRequest(BaseModel):
-    id_a: int
-    id_b: int
-    alpha: float = 0.5
-
-
 class AxisUpdateRequest(BaseModel):
     x_positive: str
     x_negative: str
@@ -141,7 +124,6 @@ class StateResponse(BaseModel):
 class AppState:
     def __init__(self):
         self.embedder: Optional[CLIPEmbedder] = None
-        self.generator: Optional[SemanticGenerator] = None
         self.axis_builder: Optional[SemanticAxisBuilder] = None
         self.images_metadata: List[ImageMetadata] = []
         self.history_groups: List[HistoryGroup] = []
@@ -305,38 +287,6 @@ async def get_state():
     )
 
 
-@app.post("/api/initialize")
-async def initialize_models():
-    """Initialize ML models (SD 1.5 + CLIP)."""
-    try:
-        if state.embedder is None:
-            print("Loading CLIP embedder...")
-            state.embedder = CLIPEmbedder()
-            print("OK: CLIP loaded")
-
-        if state.generator is None:
-            print("Loading Stable Diffusion generator...")
-            # Try CUDA first, fall back to CPU if it fails
-            try:
-                state.generator = SemanticGenerator(device='cuda')
-                print("OK: Generator loaded (GPU)")
-            except Exception as gpu_error:
-                print(f"GPU failed: {gpu_error}")
-                print("Falling back to CPU mode...")
-                state.generator = SemanticGenerator(device='cpu')
-                print("OK: Generator loaded (CPU)")
-
-        if state.axis_builder is None:
-            state.axis_builder = SemanticAxisBuilder(state.embedder)
-
-        return {"status": "success", "message": "Models initialized"}
-    except Exception as e:
-        print(f"ERROR initializing models: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/api/initialize-clip-only")
 async def initialize_clip_only():
     """Initialize only CLIP embedder (for fal.ai mode)."""
@@ -355,228 +305,6 @@ async def initialize_clip_only():
         print(f"ERROR initializing CLIP: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/generate")
-async def generate_images(request: GenerateRequest):
-    """Generate images from text prompt."""
-    try:
-        print(f"\n=== Generate Request ===")
-        print(f"Prompt: {request.prompt}")
-        print(f"Count: {request.n_images}")
-
-        if state.generator is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
-
-        # Generate images
-        print("Generating images...")
-        images = []
-        for i in range(request.n_images):
-            print(f"  Generating image {i+1}/{request.n_images}...")
-            img = state.generator.generate_from_text(request.prompt)
-            images.append(img)
-            print(f"  OK: Image {i+1} generated")
-
-        # Extract embeddings
-        embeddings = state.embedder.extract_image_embeddings_from_pil(images)
-
-        # Project embeddings onto semantic axes
-        coords = project_embeddings_to_coordinates(embeddings)
-
-        # Create ImageMetadata objects
-        group_id = f"batch_{len(state.history_groups)}"
-        new_metadata = []
-
-        for i, (img, emb, coord) in enumerate(zip(images, embeddings, coords)):
-            img_meta = ImageMetadata(
-                id=state.next_id,
-                group_id=group_id,
-                pil_image=img,
-                embedding=emb,
-                coordinates=tuple(float(c) for c in coord),  # Support 2D or 3D
-                parents=[],
-                children=[],
-                generation_method='batch',
-                prompt=request.prompt,
-                reference_ids=[],
-                timestamp=datetime.now(),
-                visible=True
-            )
-            new_metadata.append(img_meta)
-            state.next_id += 1
-
-        state.images_metadata.extend(new_metadata)
-
-        # Create history group
-        image_ids = [m.id for m in new_metadata]
-        history_group = HistoryGroup(
-            id=group_id,
-            type='batch',
-            image_ids=image_ids,
-            prompt=request.prompt,
-            visible=True,
-            thumbnail_id=image_ids[0] if image_ids else None,
-            timestamp=datetime.now()
-        )
-        state.history_groups.append(history_group)
-
-        # Broadcast update
-        await broadcast_state_update()
-
-        print(f"OK: Generation complete! Created {len(new_metadata)} images")
-        return {
-            "status": "success",
-            "images": [image_metadata_to_response(img).dict() for img in new_metadata]
-        }
-
-    except Exception as e:
-        print(f"\n!!! ERROR in generate_images !!!")
-        print(f"Error type: {type(e).__name__}")
-        print(f"Error message: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/generate-from-reference")
-async def generate_from_reference(request: GenerateFromReferenceRequest):
-    """Generate image from reference."""
-    try:
-        if state.generator is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
-
-        # Find reference image
-        ref_img = next((img for img in state.images_metadata if img.id == request.reference_id), None)
-        if not ref_img:
-            raise HTTPException(status_code=404, detail="Reference image not found")
-
-        # Generate new image
-        new_img = state.generator.generate_from_reference(ref_img.pil_image, request.prompt)
-
-        # Extract embedding
-        new_embedding = state.embedder.extract_image_embeddings_from_pil([new_img])[0]
-
-        # Project onto semantic axes
-        new_coord = project_embeddings_to_coordinates(new_embedding.reshape(1, -1))[0]
-
-        # Create metadata
-        group_id = f"reference_{len(state.history_groups)}"
-        img_meta = ImageMetadata(
-            id=state.next_id,
-            group_id=group_id,
-            pil_image=new_img,
-            embedding=new_embedding,
-            coordinates=tuple(float(c) for c in new_coord),  # Support 2D or 3D
-            parents=[request.reference_id],
-            children=[],
-            generation_method='reference',
-            prompt=request.prompt,
-            reference_ids=[request.reference_id],
-            timestamp=datetime.now(),
-            visible=True
-        )
-
-        # Update parent
-        ref_img.children.append(state.next_id)
-        state.next_id += 1
-
-        state.images_metadata.append(img_meta)
-
-        # Create history group
-        history_group = HistoryGroup(
-            id=group_id,
-            type='reference',
-            image_ids=[img_meta.id],
-            prompt=request.prompt,
-            visible=True,
-            thumbnail_id=img_meta.id,
-            timestamp=datetime.now()
-        )
-        state.history_groups.append(history_group)
-
-        await broadcast_state_update()
-
-        return {"status": "success", "image": image_metadata_to_response(img_meta).dict()}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/interpolate")
-async def interpolate_images(request: InterpolateRequest):
-    """Generate interpolated image."""
-    try:
-        if state.generator is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Interpolation requires local Stable Diffusion. Please switch to 'local-sd15' mode and initialize models."
-            )
-
-        if state.embedder is None:
-            raise HTTPException(status_code=400, detail="CLIP embedder not initialized")
-
-        # Find both images
-        img_a = next((img for img in state.images_metadata if img.id == request.id_a), None)
-        img_b = next((img for img in state.images_metadata if img.id == request.id_b), None)
-
-        if not img_a or not img_b:
-            raise HTTPException(status_code=404, detail="One or both images not found")
-
-        # Generate interpolated image
-        new_img = state.generator.generate_interpolated(
-            img_a.pil_image,
-            img_b.pil_image,
-            alpha=request.alpha
-        )
-
-        # Extract embedding
-        new_embedding = state.embedder.extract_image_embeddings_from_pil([new_img])[0]
-
-        # Project onto semantic axes
-        new_coord = project_embeddings_to_coordinates(new_embedding.reshape(1, -1))[0]
-
-        # Create metadata
-        group_id = f"interpolation_{len(state.history_groups)}"
-        img_meta = ImageMetadata(
-            id=state.next_id,
-            group_id=group_id,
-            pil_image=new_img,
-            embedding=new_embedding,
-            coordinates=tuple(float(c) for c in new_coord),  # Support 2D or 3D
-            parents=[request.id_a, request.id_b],
-            children=[],
-            generation_method='interpolation',
-            prompt=f"Interpolation between {request.id_a} and {request.id_b}",
-            reference_ids=[request.id_a, request.id_b],
-            timestamp=datetime.now(),
-            visible=True
-        )
-
-        # Update parents
-        img_a.children.append(state.next_id)
-        img_b.children.append(state.next_id)
-        state.next_id += 1
-
-        state.images_metadata.append(img_meta)
-
-        # Create history group
-        history_group = HistoryGroup(
-            id=group_id,
-            type='interpolation',
-            image_ids=[img_meta.id],
-            prompt=f"Between #{request.id_a} & #{request.id_b}",
-            visible=True,
-            thumbnail_id=img_meta.id,
-            timestamp=datetime.now()
-        )
-        state.history_groups.append(history_group)
-
-        await broadcast_state_update()
-
-        return {"status": "success", "image": image_metadata_to_response(img_meta).dict()}
-
-    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

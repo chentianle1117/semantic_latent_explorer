@@ -108,11 +108,8 @@ venv\Scripts\activate
 # macOS/Linux:
 source venv/bin/activate
 
-# Install dependencies
+# Install dependencies (root requirements.txt includes backend deps)
 pip install -r requirements.txt
-cd backend
-pip install -r requirements.txt
-cd ..
 ```
 
 ### 3. Frontend Setup
@@ -139,29 +136,34 @@ VITE_FAL_API_KEY=your_fal_api_key_here
 
 ### 5. Run the Application
 
-**Terminal 1 - Backend:**
+**Option A: One-click start (Windows)**
 
-```bash
-# Make sure conda environment is activated
-conda activate semantic_explorer
+Double-click `start_app.bat` (activates conda and starts both servers).
 
-cd backend
-python api.py
+**Option B: PowerShell script**
+
+```powershell
+.\scripts\start_app.ps1
 ```
 
-Wait for: `✅ Application startup complete on http://0.0.0.0:8000`
+**Option C: Manual (two terminals)**
 
-**Terminal 2 - Frontend:**
+Terminal 1 - Backend:
+
+```bash
+conda activate semantic_explorer
+cd backend
+python -m uvicorn api:app --reload
+```
+
+Terminal 2 - Frontend:
 
 ```bash
 cd frontend
 npm run dev
 ```
 
-Wait for: `➜ Local: http://localhost:5173`
-
-**Browser:**
-Open http://localhost:5173
+**Browser:** Open http://localhost:3000 (or http://localhost:5173 depending on Vite config)
 
 ## 🎮 Usage Guide
 
@@ -204,7 +206,7 @@ Open http://localhost:5173
 
 #### 4. 3D Mode
 
-1. Click **"📦 3D Mode"** toggle
+1. Click the **2D/3D toggle** button in the canvas stats bar
 2. Canvas switches to Three.js 3D view
 3. Click + Drag to rotate, Scroll to zoom
 4. Z-axis editor appears for third semantic dimension
@@ -220,13 +222,14 @@ Open http://localhost:5173
 ## 🛠️ Tech Stack
 
 ### Generation
+
 - **fal.ai nano-banana API** - Fast text-to-image generation (~2-8s per batch)
 - **fal.ai nano-banana/edit** - Image editing with reference images
 
 ### Embedding & Projection
+
 - **CLIP ViT-B-32** (OpenAI pretrained) - Image and text embeddings (512-dim)
-- **UMAP** (umap-learn) - 2D/3D dimensionality reduction for visualization
-- **Semantic Axis Projection** - Custom projection using CLIP text embeddings
+- **Semantic Axis Projection** - Custom projection using CLIP text embeddings (no UMAP)
 
 ### Frontend / UI
 
@@ -241,22 +244,23 @@ Open http://localhost:5173
 | **Axios**                        | HTTP client             |
 | **@fal-ai/client**               | Image generation API    |
 | Real-time thumbnail rendering    | Canvas image display    |
-| Interaction logging              | User action tracking   |
+| Interaction logging              | User action tracking    |
 
 ### Backend
 
-| Technology               | Purpose                  |
-| ------------------------ | ------------------------ |
-| **FastAPI**              | REST API server          |
-| **Uvicorn**              | ASGI server              |
-| **WebSockets**           | Real-time state updates  |
-| **PyTorch**              | ML framework             |
-| **open-clip-torch**      | CLIP ViT-B-32 embeddings |
-| **rembg**                | Background removal       |
-| **NumPy, scikit-learn**  | Numerical operations     |
-| **Pillow (PIL)**         | Image processing         |
+| Technology              | Purpose                  |
+| ----------------------- | ------------------------ |
+| **FastAPI**             | REST API server          |
+| **Uvicorn**             | ASGI server              |
+| **WebSockets**          | Real-time state updates  |
+| **PyTorch**             | ML framework             |
+| **open-clip-torch**     | CLIP ViT-B-32 embeddings |
+| **rembg**               | Background removal       |
+| **NumPy, scikit-learn** | Numerical operations     |
+| **Pillow (PIL)**        | Image processing         |
 
 ### Agent
+
 - **Gemini 2.5 Flash Lite** (google-generativeai) - AI agent for design exploration
 - Receives digest of: brief, recent generations, canvas clusters
 - Outputs: prompt variants, axes, semantic observations, exploration cues
@@ -266,7 +270,7 @@ Open http://localhost:5173
 | Service               | Purpose                                   |
 | --------------------- | ----------------------------------------- |
 | **fal.ai nanobanana** | Fast text-to-image generation (~2s/image) |
-| **Google Gemini API** | AI agent service for design exploration  |
+| **Google Gemini API** | AI agent service for design exploration   |
 
 ## 📁 Project Structure
 
@@ -274,41 +278,32 @@ Open http://localhost:5173
 Zappos50K_semantic_explorer/
 ├── backend/
 │   ├── api.py                    # FastAPI server & endpoints
-│   ├── requirements.txt          # Python dependencies
-│   └── cache/                    # Embeddings & UMAP cache
+│   └── requirements.txt          # Python dependencies
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── Canvas/
-│   │   │   │   ├── SemanticCanvas.tsx      # 2D D3.js canvas
-│   │   │   │   └── SemanticCanvas3D.tsx    # 3D Three.js canvas
-│   │   │   ├── FloatingActionPanel/        # Context-sensitive actions
-│   │   │   ├── PromptDialog/               # Reference generation UI
-│   │   │   ├── ModeToggle/                 # 2D/3D mode switcher
+│   │   │   ├── Canvas/           # SemanticCanvas, SemanticCanvas3D
+│   │   │   ├── Canvas3DToggle/    # 2D/3D mode switcher
+│   │   │   ├── FloatingActionPanel/
+│   │   │   ├── IntentPanel/      # Design brief + AI actions
 │   │   │   └── ...
-│   │   ├── store/
-│   │   │   └── appStore.ts                 # Zustand global state
-│   │   ├── api/
-│   │   │   ├── client.ts                   # Backend API client
-│   │   │   └── falClient.ts                # fal.ai API client
-│   │   └── App.tsx                         # Main app component
-│   ├── package.json              # Node dependencies
-│   └── .env                      # API keys (not in git)
+│   │   ├── store/                # Zustand (appStore, progressStore)
+│   │   ├── api/                  # client.ts, falClient.ts
+│   │   └── App.tsx
+│   └── package.json
 ├── models/
 │   ├── embeddings.py             # CLIP embedder
 │   ├── semantic_axes.py          # Semantic axis projection
-│   ├── generator.py              # (Legacy local SD, unused)
-│   └── data_structures.py        # Data models
+│   └── data_structures.py        # ImageMetadata, HistoryGroup
 ├── data/
-│   ├── loader.py                 # Zappos50K dataset loader
-│   └── dataset_explorer.py       # Dataset utilities
-├── raw_data/
-│   └── ut-zap50k-images/         # Original Zappos50K dataset
+│   └── loader.py                 # Zappos50K dataset loader (for tests)
+├── config.py                     # Paths, CLIP config
+├── start_app.bat                 # One-click start (activates conda)
 ├── scripts/
-│   ├── start_app.bat             # Windows: Start both servers
-│   ├── start_backend.bat         # Windows: Start backend only
-│   └── start_frontend.bat        # Windows: Start frontend only
-└── README.md                     # This file
+│   ├── start_app.ps1             # PowerShell launcher
+│   ├── start_backend.bat
+│   └── start_frontend.bat
+└── ARCHITECTURE.md               # Detailed architecture doc
 ```
 
 ## 🧪 How It Works
@@ -435,7 +430,6 @@ VITE_FAL_API_KEY=your_actual_key_here
 | --------------------------- | --------- | --------------------------- |
 | `/api/state`                | GET       | Get current canvas state    |
 | `/api/initialize-clip-only` | POST      | Initialize CLIP embedder    |
-| `/api/generate`             | POST      | (Legacy local SD)           |
 | `/api/add-external-images`  | POST      | Add images from fal.ai URLs |
 | `/api/update-axes`          | POST      | Change semantic axes        |
 | `/api/set-3d-mode`          | POST      | Toggle 2D/3D mode           |

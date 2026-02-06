@@ -67,23 +67,6 @@ export interface VisualSettings {
   coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
 }
 
-export interface GenerateRequest {
-  prompt: string;
-  n_images: number;
-  seed?: number;
-}
-
-export interface GenerateFromReferenceRequest {
-  reference_id: number;
-  prompt: string;
-}
-
-export interface InterpolateRequest {
-  id_a: number;
-  id_b: number;
-  alpha: number;
-}
-
 export interface AxisUpdateRequest {
   x_positive: string;
   x_negative: string;

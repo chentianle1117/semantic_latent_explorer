@@ -47,24 +47,17 @@ def test_imports():
         return False
     
     try:
-        import streamlit as st
-        print("✅ Streamlit imported successfully")
+        import fastapi
+        print("✅ FastAPI imported successfully")
     except ImportError as e:
-        print(f"❌ Streamlit import failed: {e}")
+        print(f"❌ FastAPI import failed: {e}")
         return False
     
     try:
-        import plotly
-        print("✅ Plotly imported successfully")
+        import uvicorn
+        print("✅ Uvicorn imported successfully")
     except ImportError as e:
-        print(f"❌ Plotly import failed: {e}")
-        return False
-    
-    try:
-        import umap
-        print("✅ UMAP imported successfully")
-    except ImportError as e:
-        print(f"❌ UMAP import failed: {e}")
+        print(f"❌ Uvicorn import failed: {e}")
         return False
     
     return True
@@ -100,13 +93,6 @@ def test_basic_functionality():
         print("✅ SemanticAxisBuilder imported successfully")
     except Exception as e:
         print(f"❌ SemanticAxisBuilder import failed: {e}")
-        return False
-    
-    try:
-        from visualization.interactive_plot import InteractivePlotter
-        print("✅ InteractivePlotter imported successfully")
-    except Exception as e:
-        print(f"❌ InteractivePlotter import failed: {e}")
         return False
     
     return True
@@ -145,9 +131,9 @@ if __name__ == "__main__":
         print("\n" + "="*50)
         if imports_ok and functionality_ok and device_ok:
             print("🎉 All tests passed! Installation is working correctly.")
-            print("\nYou can now run: streamlit run app.py")
+            print("\nYou can now run: start_app.bat or scripts/start_app.ps1")
         else:
             print("❌ Some tests failed. Please check the error messages above.")
     else:
         print("\n❌ Import tests failed. Please install missing dependencies.")
-        print("Run: pip install -r requirements.txt")
+        print("Run: pip install -r requirements.txt (or use conda env create -f environment.yml)")

@@ -4,9 +4,6 @@
 
 import axios from 'axios';
 import type {
-  GenerateRequest,
-  GenerateFromReferenceRequest,
-  InterpolateRequest,
   AxisUpdateRequest,
   ImageData,
   HistoryGroup,
@@ -20,12 +17,6 @@ const WS_URL = `ws://${window.location.host}/ws`;
 class APIClient {
   private ws: WebSocket | null = null;
   private wsCallbacks: Set<(message: WebSocketMessage) => void> = new Set();
-
-  // Initialize models (SD 1.5 + CLIP)
-  async initialize(): Promise<void> {
-    const response = await axios.post(`${API_BASE}/initialize`);
-    return response.data;
-  }
 
   // Initialize CLIP only (for fal.ai mode)
   async initializeClipOnly(): Promise<void> {
@@ -42,26 +33,6 @@ class APIClient {
     is_3d_mode?: boolean;
   }> {
     const response = await axios.get(`${API_BASE}/state`);
-    return response.data;
-  }
-
-  // Generate images from prompt
-  async generate(request: GenerateRequest): Promise<{ status: string; images: ImageData[] }> {
-    const response = await axios.post(`${API_BASE}/generate`, request);
-    return response.data;
-  }
-
-  // Generate from reference image
-  async generateFromReference(
-    request: GenerateFromReferenceRequest
-  ): Promise<{ status: string; image: ImageData }> {
-    const response = await axios.post(`${API_BASE}/generate-from-reference`, request);
-    return response.data;
-  }
-
-  // Interpolate between two images
-  async interpolate(request: InterpolateRequest): Promise<{ status: string; image: ImageData }> {
-    const response = await axios.post(`${API_BASE}/interpolate`, request);
     return response.data;
   }
 

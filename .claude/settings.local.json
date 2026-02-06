@@ -21,7 +21,9 @@
       "Bash(grep:*)",
       "Bash(ls:*)",
       "Bash(git reset:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(xargs ls:*)",
+      "Bash(cd:*)"
     ],
     "deny": [],
     "ask": []

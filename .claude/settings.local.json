@@ -23,7 +23,10 @@
       "Bash(git reset:*)",
       "Bash(git add:*)",
       "Bash(xargs ls:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(wc:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build)"
     ],
     "deny": [],
     "ask": []

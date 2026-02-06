@@ -1,0 +1,156 @@
+.bottom-drawer {
+  grid-row: 3;
+  grid-column: 1 / -1;
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 50;
+}
+
+.bottom-drawer:not(.expanded) {
+  height: 40px;
+}
+
+.bottom-drawer.expanded {
+  height: 250px;
+}
+
+.drawer-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 40px;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.drawer-bar:hover {
+  background: #21262d;
+}
+
+.drawer-toggle {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.drawer-stats {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+}
+
+.drawer-thumbs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+
+.drawer-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 1px solid #30363d;
+  transition: border-color 0.15s;
+}
+
+.drawer-thumb:hover {
+  border-color: #58a6ff;
+}
+
+.drawer-content {
+  flex: 1;
+  overflow: hidden;
+  border-top: 1px solid #30363d;
+}
+
+.drawer-timeline {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  height: 100%;
+}
+
+.drawer-group {
+  flex-shrink: 0;
+  width: 150px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.drawer-group:hover,
+.drawer-group.highlighting {
+  border-color: #58a6ff;
+  background: #161b22;
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.group-type-badge {
+  font-size: 10px;
+  color: #c9d1d9;
+  font-weight: 500;
+}
+
+.group-count {
+  font-size: 10px;
+  color: #8b949e;
+  background: #21262d;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.group-prompt {
+  font-size: 10px;
+  color: #8b949e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-time {
+  font-size: 9px;
+  color: #484f58;
+}
+
+.group-thumb {
+  width: 100%;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.drawer-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #484f58;
+  font-size: 12px;
+  width: 100%;
+  height: 100%;
+}

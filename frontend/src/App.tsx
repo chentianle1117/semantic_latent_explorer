@@ -2,11 +2,12 @@ import React, { useEffect, useState } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
 import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
-import { InterpolationDialog } from "./components/InterpolationDialog/InterpolationDialog";
 import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingActionPanel";
 import { ProgressModal } from "./components/ProgressModal/ProgressModal";
-import { IntentPanel } from "./components/IntentPanel/IntentPanel";
-import { RightControlPanel } from "./components/RightControlPanel/RightControlPanel";
+import { HeaderBar } from "./components/HeaderBar/HeaderBar";
+import { LeftToolbar } from "./components/LeftToolbar/LeftToolbar";
+import { RightInspector } from "./components/RightInspector/RightInspector";
+import { BottomDrawer } from "./components/BottomDrawer/BottomDrawer";
 import { useProgressStore } from "./store/progressStore";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
@@ -14,14 +15,10 @@ import { StarterPromptsModal } from "./components/StarterPromptsModal/StarterPro
 import { AxisSuggestionModal } from "./components/AxisSuggestionModal/AxisSuggestionModal";
 import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPromptDialog";
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
-import { ExplorationMinimap } from "./components/ExplorationMinimap/ExplorationMinimap";
-import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
-import { Canvas3DToggle } from "./components/Canvas3DToggle/Canvas3DToggle";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
 import type {
-  ImageData,
   SuggestedPrompt,
   RegionHighlight,
   PendingImage,
@@ -39,12 +36,9 @@ export const App: React.FC = () => {
   const [promptDialogImageId, setPromptDialogImageId] = useState<number | null>(
     null
   );
-  const [interpolationImageIds, setInterpolationImageIds] = useState<
-    [number, number] | null
-  >(null);
   const [showBatchPromptDialog, setShowBatchPromptDialog] = useState(false);
   const [showExternalImageLoader, setShowExternalImageLoader] = useState(false);
-  const [showTreeModal, setShowTreeModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{
     current: number;
     total: number;
@@ -99,43 +93,6 @@ export const App: React.FC = () => {
     // Initialize CLIP on mount
     console.log("🚀 Initializing CLIP embedder...");
 
-    // COMMENTED OUT: Local SD 1.5 initialization - removed completely, only using fal.ai nanobanana now
-    // if (false) {
-    //   // Connect WebSocket for real-time updates
-    //   apiClient.connectWebSocket((message) => {
-    //     if (message.type === "state_update" && message.data) {
-    //       setImages(message.data.images);
-    //       setHistoryGroups(message.data.history_groups);
-    //     } else if (message.type === "progress" && message.progress !== undefined) {
-    //       setGenerationProgress(message.progress);
-    //     }
-    //   });
-
-    //   // Initialize backend models (SD 1.5 + CLIP)
-    //   apiClient
-    //     .initialize()
-    //     .then(() => {
-    //       setIsInitialized(true);
-    //       return apiClient.getState();
-    //     })
-    //     .then((state) => {
-    //       setImages(state.images);
-    //       setHistoryGroups(state.history_groups);
-    //     })
-    //     .catch((error) => {
-    //       console.error("Failed to initialize:", error);
-    //       setIsInitialized(false);
-    //       alert(
-    //         "Failed to connect to backend. Make sure backend is running on port 8000."
-    //       );
-    //     });
-
-    //   return () => {
-    //     apiClient.disconnectWebSocket(() => {});
-    //   };
-    // } else {
-    // For fal.ai mode, only initialize CLIP (for embeddings)
-    // NOTE: This is always used now since we only use fal.ai nanobanana for generation
     console.log("Initializing CLIP embedder...");
     useProgressStore
       .getState()
@@ -175,7 +132,6 @@ export const App: React.FC = () => {
           }`
         );
       });
-    // }
   }, [setImages, setHistoryGroups, setIsInitialized]);
 
   const handleGenerate = async () => {
@@ -217,13 +173,6 @@ export const App: React.FC = () => {
     useProgressStore.getState().updateProgress(0);
 
     try {
-      // COMMENTED OUT: Local SD generation - removed completely
-      // if (false) {
-      //   // Use local SD 1.5 backend
-      //   await apiClient.generate({ prompt, n_images: nImages });
-      // } else {
-      // Use fal.ai nano-banana text-to-image
-      // NOTE: This is always used now
       useProgressStore
         .getState()
         .updateProgress(10, "Generating with fal.ai...");
@@ -252,7 +201,6 @@ export const App: React.FC = () => {
       const state = await apiClient.getState();
       setImages(state.images);
       setHistoryGroups(state.history_groups);
-      // }
 
       useProgressStore.getState().updateProgress(100);
 
@@ -656,83 +604,6 @@ export const App: React.FC = () => {
     }
   };
 
-  // COMMENTED OUT: Local SD interpolation - not supported in fal.ai nanobanana
-  // This feature requires local SD 1.5 with latent space interpolation
-  const handleInterpolate = async (
-    idA: number,
-    idB: number,
-    alpha: number,
-    steps?: number
-  ) => {
-    alert(
-      "Interpolation is only available with Local SD 1.5 mode. This feature is disabled when using fal.ai nanobanana."
-    );
-    return;
-
-    // console.log(`Interpolating between images ${idA} and ${idB} (alpha: ${alpha}, steps: ${steps || 1})...`);
-    // setInterpolationImageIds(null);
-    // setIsGenerating(true);
-    // setFloatingPanelPos(null);
-
-    // const totalSteps = steps || 1;
-    // setGenerationCount(0, totalSteps);
-    // setGenerationProgress(0);
-
-    // // Estimate 5 seconds per interpolation
-    // const estimatedTimeMs = totalSteps * 5000;
-    // const updateIntervalMs = 100;
-    // const totalUpdates = estimatedTimeMs / updateIntervalMs;
-    // let updates = 0;
-
-    // const progressInterval = setInterval(() => {
-    //   updates++;
-    //   const progress = Math.min((updates / totalUpdates) * 90, 90);
-    //   const currentStepEstimate = Math.floor((progress / 90) * totalSteps);
-    //   setGenerationCount(currentStepEstimate, totalSteps);
-    //   setGenerationProgress(progress);
-    // }, updateIntervalMs);
-
-    // // Safety timeout: auto-reset after 5 minutes
-    // const safetyTimeout = setTimeout(() => {
-    //   console.error("⚠️ Interpolation timed out after 5 minutes");
-    //   clearInterval(progressInterval);
-    //   setIsGenerating(false);
-    //   setGenerationProgress(0);
-    //   setGenerationCount(0, 0);
-    //   alert("Interpolation timed out. Please try again.");
-    // }, 300000);
-
-    // try {
-    //   if (steps && steps > 1) {
-    //     // Generate multiple interpolations
-    //     for (let i = 0; i < steps; i++) {
-    //       const currentAlpha = i / (steps - 1);
-    //       await apiClient.interpolate({ id_a: idA, id_b: idB, alpha: currentAlpha });
-    //     }
-    //   } else {
-    //     // Single interpolation
-    //     await apiClient.interpolate({ id_a: idA, id_b: idB, alpha });
-    //   }
-    //   clearInterval(progressInterval);
-    //   clearTimeout(safetyTimeout);
-    //   setGenerationCount(totalSteps, totalSteps);
-    //   setGenerationProgress(100);
-    //   console.log("Interpolation successful");
-    //   clearSelection();
-    // } catch (error) {
-    //   clearInterval(progressInterval);
-    //   clearTimeout(safetyTimeout);
-    //   console.error("Interpolation failed:", error);
-    //   alert(`Interpolation failed: ${error}`);
-    // } finally {
-    //   setIsGenerating(false);
-    //   setTimeout(() => {
-    //     setGenerationProgress(0);
-    //     setGenerationCount(0, 0);
-    //   }, 1000);
-    // }
-  };
-
   // Get all selected images for the prompt dialog
   const promptDialogImages =
     selectedImageIds.length > 0
@@ -740,13 +611,6 @@ export const App: React.FC = () => {
       : promptDialogImageId !== null
       ? images.filter((img) => img.id === promptDialogImageId)
       : [];
-
-  const interpolationImages = interpolationImageIds
-    ? ([
-        images.find((img) => img.id === interpolationImageIds[0]),
-        images.find((img) => img.id === interpolationImageIds[1]),
-      ].filter(Boolean) as [ImageData, ImageData])
-    : null;
 
   const handleGenerateFromReferenceClick = () => {
     // Use selected images, or if none selected, single image ID will be set
@@ -756,13 +620,6 @@ export const App: React.FC = () => {
       return;
     }
     setShowPromptDialog(true);
-  };
-
-  const handleInterpolateClick = () => {
-    if (selectedImageIds.length === 2) {
-      setInterpolationImageIds([selectedImageIds[0], selectedImageIds[1]]);
-      setFloatingPanelPos(null);
-    }
   };
 
   const handlePromptDialogGenerate = async (
@@ -798,23 +655,6 @@ export const App: React.FC = () => {
     useProgressStore.getState().updateProgress(0);
 
     try {
-      // COMMENTED OUT: Local SD reference generation - removed completely
-      // if (false) {
-      //   // Use local SD 1.5 backend (only supports single reference)
-      //   const result = await apiClient.generateFromReference({
-      //     reference_id: referenceIds[0],  // Use first reference
-      //     prompt,
-      //   });
-      //   clearInterval(progressInterval);
-      //   clearTimeout(safetyTimeout);
-      //   console.log("Generation from reference successful:", result);
-      //   setGenerationCount(1, 1);
-      //   setGenerationProgress(100);
-      //   clearSelection();
-      // } else {
-      // Use fal.ai nano-banana image editing
-      // NOTE: This is always used now
-      // Get reference images from IDs
       const selectedImages = images.filter((img) =>
         referenceIds.includes(img.id)
       );
@@ -1463,7 +1303,6 @@ export const App: React.FC = () => {
       if (e.key === "Escape") {
         setPromptDialogImageId(null);
         setShowPromptDialog(false);
-        setInterpolationImageIds(null);
         setFloatingPanelPos(null);
         clearSelection(); // Also clear selection to close dialogs
       }
@@ -1486,25 +1325,6 @@ export const App: React.FC = () => {
       {/* Progress Modal */}
       <ProgressModal />
 
-      {/* Exploration Tree Modal */}
-      {showTreeModal && (
-        <ExplorationTreeModal
-          images={images}
-          onClose={() => setShowTreeModal(false)}
-          onNodeClick={(id) => {
-            useAppStore.getState().setSelectedImageIds([id]);
-            setShowTreeModal(false);
-          }}
-          onNodeHover={(id) => {
-            if (id !== null) {
-              useAppStore.getState().setHoveredImageId(id);
-            } else {
-              useAppStore.getState().setHoveredImageId(null);
-            }
-          }}
-        />
-      )}
-
       {/* Starter Prompts Modal */}
       {suggestedPrompts.length > 0 && (
         <StarterPromptsModal
@@ -1515,82 +1335,33 @@ export const App: React.FC = () => {
       )}
 
       <div className="app-layout">
-        {/* Left Panel - Intent */}
-        <div className="left-panel">
-          <IntentPanel
-            brief={currentBrief || ""}
-            onBriefChange={async (newBrief: string) => {
-              setCurrentBrief(newBrief);
-              // Persist brief to backend
-              try {
-                await apiClient.updateDesignBrief(newBrief);
-                console.log("✓ Design brief saved to backend");
-              } catch (error) {
-                console.error("Failed to save design brief:", error);
-              }
-            }}
-            onGeneratePrompts={async () => {
-              if (!currentBrief) return;
-              try {
-                const response = await fetch(
-                  "http://localhost:8000/api/agent/initial-prompts",
-                  {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ brief: currentBrief.trim() }),
-                  }
-                );
-                const data = await response.json();
-                setSuggestedPrompts(data.prompts);
-              } catch (err) {
-                console.error("Failed to generate prompts:", err);
-              }
-            }}
-            isGeneratingPrompts={false}
-            onAnalyzeCanvas={analyzeCanvas}
-            isAnalyzing={isAnalyzing}
-            onSuggestAxes={handleSuggestAxes}
-            isLoadingAxes={isLoadingAxes}
-            unexpectedImagesCount={unexpectedImagesCount}
-            onUnexpectedImagesCountChange={setUnexpectedImagesCount}
-            focusRegions={regionHighlights}
-            onSelectFocus={(idx) =>
-              console.log("Focus on region:", regionHighlights[idx])
-            }
-            preferences={{
-              liked: selectedImageIds.length,
-              generated: images.length,
-              exploration:
-                images.length === 0
-                  ? "Empty"
-                  : images.length < 20
-                  ? "Starting"
-                  : images.length < 100
-                  ? "Building"
-                  : "Extensive",
-            }}
-          />
-        </div>
+        {/* Header Bar */}
+        <HeaderBar
+          imageCount={images.length}
+          isInitialized={isInitialized}
+          isAnalyzing={isAnalyzing}
+          isLoadingAxes={isLoadingAxes}
+          is3DMode={is3DMode}
+          onToggle3D={() => useAppStore.getState().setIs3DMode(!is3DMode)}
+          onOpenSettings={() => setShowSettingsModal(true)}
+        />
+
+        {/* Left Toolbar */}
+        <LeftToolbar
+          onGenerate={() => setShowTextToImageDialog(true)}
+          onBatchGenerate={() => setShowBatchPromptDialog(true)}
+          onLoadImages={() => setShowExternalImageLoader(true)}
+          onExport={handleExportZip}
+          onClearAll={handleClearCanvas}
+          onAnalyzeCanvas={analyzeCanvas}
+          onSuggestAxes={handleSuggestAxes}
+          isGenerating={isGenerating}
+          isAnalyzing={isAnalyzing}
+          isLoadingAxes={isLoadingAxes}
+        />
 
         {/* Center Canvas */}
         <div className="center-canvas">
-          <div className="canvas-header">
-            <h1>👟 Semantic Latent Space</h1>
-          </div>
-
-          <div className="canvas-stats">
-            <strong>{images.length}</strong> images •{" "}
-            <strong>CLIP ViT-B/32</strong> •{" "}
-            {isInitialized ? "✅ Ready" : "⏳ Initializing..."} •{" "}
-            <strong>{is3DMode ? "3D" : "2D"}</strong> mode
-            {isAnalyzing && (
-              <span style={{ marginLeft: "8px" }}>• 🤖 Analyzing...</span>
-            )}
-            <span style={{ marginLeft: "12px" }}>
-              <Canvas3DToggle />
-            </span>
-          </div>
-
           {showAxisSuggestionModal && (
             <AxisSuggestionModal
               suggestions={axisSuggestions}
@@ -1665,11 +1436,6 @@ export const App: React.FC = () => {
                   handleGenerateFromReferenceClick();
                   setFloatingPanelPos(null);
                 }}
-                // COMMENTED OUT: Interpolation disabled - only available with local SD 1.5
-                onInterpolate={
-                  undefined
-                  // Interpolation disabled - not supported with fal.ai
-                }
                 onViewDetails={() => {
                   // Show details of selected images
                   const selectedImages = images.filter((img) =>
@@ -1707,16 +1473,6 @@ export const App: React.FC = () => {
                   clearSelection();
                 }}
                 onGenerate={handlePromptDialogGenerate}
-              />
-            )}
-
-            {/* Interpolation Dialog */}
-            {interpolationImages && interpolationImages.length === 2 && (
-              <InterpolationDialog
-                imageA={interpolationImages[0]}
-                imageB={interpolationImages[1]}
-                onClose={() => setInterpolationImageIds(null)}
-                onInterpolate={handleInterpolate}
               />
             )}
 
@@ -1819,146 +1575,20 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Panel - Controls (Non-collapsible) */}
-        <div className="right-panel">
-          <RightControlPanel
-            onGenerateFromPrompt={() => setShowTextToImageDialog(true)}
-            onBatchGenerate={() => setShowBatchPromptDialog(true)}
-            onLoadImages={() => setShowExternalImageLoader(true)}
-            onExport={handleExportZip}
-            onClearAll={handleClearCanvas}
-            isGenerating={isGenerating}
-            showLabels={showLabels}
-            showGrid={showGrid}
-            showClusters={showClusters}
-            backgroundColor={backgroundColor}
-            onToggleLabels={() => setShowLabels(!showLabels)}
-            onToggleGrid={() => setShowGrid(!showGrid)}
-            onToggleClusters={() => setShowClusters(!showClusters)}
-            onBackgroundColorChange={setBackgroundColor}
-            images={images}
-          />
-        </div>
+        {/* Right Inspector */}
+        <RightInspector
+          showLabels={showLabels}
+          showGrid={showGrid}
+          showClusters={showClusters}
+          backgroundColor={backgroundColor}
+          onToggleLabels={() => setShowLabels(!showLabels)}
+          onToggleGrid={() => setShowGrid(!showGrid)}
+          onToggleClusters={() => setShowClusters(!showClusters)}
+          onBackgroundColorChange={setBackgroundColor}
+        />
 
-        {/* Bottom History Panel */}
-        <div className="bottom-history-panel">
-          <div className="history-header">
-            <h3>Generation History & Exploration Map</h3>
-            <div className="history-stats">
-              <span>{useAppStore.getState().historyGroups.length} batches</span>
-              <span>•</span>
-              <span>{images.length} total images</span>
-            </div>
-          </div>
-          <div className="history-content">
-            <div className="minimap-container">
-              <ExplorationMinimap
-                images={images}
-                historyGroups={useAppStore.getState().historyGroups}
-                onImageClick={(id) =>
-                  useAppStore.getState().setSelectedImageIds([id])
-                }
-                onExpandClick={() => setShowTreeModal(true)}
-              />
-            </div>
-            <div className="history-timeline">
-              {useAppStore.getState().historyGroups.map((group) => {
-                const hoveredGroupId = useAppStore.getState().hoveredGroupId;
-                const setHoveredGroupId =
-                  useAppStore.getState().setHoveredGroupId;
-                const thumbnailImage =
-                  group.thumbnail_id !== null
-                    ? images.find((img) => img.id === group.thumbnail_id)
-                    : null;
-
-                // Get reference images for metadata display
-                const referenceImages =
-                  group.type === "reference"
-                    ? group.image_ids
-                        .map((id) => images.find((img) => img.id === id))
-                        .filter(Boolean)
-                        .filter(
-                          (img, index, self) =>
-                            img &&
-                            img.parents?.length > 0 &&
-                            self.findIndex(
-                              (i) => i?.parents?.[0] === img.parents?.[0]
-                            ) === index
-                        )
-                    : [];
-
-                const referenceCount = referenceImages.length;
-                const timestamp = new Date(group.timestamp).toLocaleTimeString(
-                  [],
-                  { hour: "2-digit", minute: "2-digit" }
-                );
-
-                return (
-                  <div
-                    key={group.id}
-                    className={`history-group ${
-                      hoveredGroupId === group.id ? "highlighting" : ""
-                    }`}
-                    onClick={() =>
-                      useAppStore
-                        .getState()
-                        .setSelectedImageIds(group.image_ids)
-                    }
-                    onMouseEnter={() => setHoveredGroupId(group.id)}
-                    onMouseLeave={() => setHoveredGroupId(null)}
-                    title={`${group.type.toUpperCase()} - ${
-                      group.prompt
-                    }\nGenerated: ${timestamp}\nImages: ${
-                      group.image_ids.length
-                    }`}
-                  >
-                    <div className="group-header">
-                      <span className="group-title">
-                        {group.type === "reference"
-                          ? "🔄"
-                          : group.type === "batch"
-                          ? "🎲"
-                          : "📁"}{" "}
-                        {group.type.toUpperCase()}
-                      </span>
-                      <span className="group-badge">
-                        {group.image_ids.length}
-                      </span>
-                    </div>
-                    <div className="group-content">
-                      <div className="group-prompt" title={group.prompt}>
-                        {group.prompt.substring(0, 40)}
-                        {group.prompt.length > 40 ? "..." : ""}
-                      </div>
-                      {group.type === "reference" && referenceCount > 0 && (
-                        <div className="group-metadata">
-                          From {referenceCount} ref
-                          {referenceCount > 1 ? "s" : ""}
-                        </div>
-                      )}
-                      <div className="group-timestamp">{timestamp}</div>
-                    </div>
-                    {thumbnailImage ? (
-                      <img
-                        src={`data:image/png;base64,${thumbnailImage.base64_image}`}
-                        alt={group.type}
-                        className="group-thumbnail"
-                      />
-                    ) : (
-                      <div className="group-thumbnail group-placeholder" />
-                    )}
-                  </div>
-                );
-              })}
-
-              {useAppStore.getState().historyGroups.length === 0 && (
-                <div className="history-empty">
-                  No history yet. Generate some images to get started!
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Bottom Drawer */}
+        <BottomDrawer />
       </div>
     </>
   );

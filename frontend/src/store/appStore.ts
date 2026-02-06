@@ -37,7 +37,13 @@ interface AppStore extends AppState {
 
   setRemoveBackground: (remove: boolean) => void;
 
-  setIs3DMode: (is3D: boolean) => void;  // New: toggle 3D mode
+  setIs3DMode: (is3D: boolean) => void;
+
+  // UI layout
+  setIsInspectorCollapsed: (collapsed: boolean) => void;
+  setIsDrawerExpanded: (expanded: boolean) => void;
+  setActiveToolbarFlyout: (flyout: string | null) => void;
+  setFlyToImageId: (id: number | null) => void;
 
   clearAll: () => void;
 }
@@ -68,7 +74,13 @@ const initialState: AppState = {
   generationProgress: 0,
   generationCurrent: 0,
   generationTotal: 0,
-  is3DMode: false,  // New: default to 2D mode
+  is3DMode: false,
+
+  // UI layout defaults
+  isInspectorCollapsed: false,
+  isDrawerExpanded: false,
+  activeToolbarFlyout: null,
+  flyToImageId: null,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -168,6 +180,14 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // 3D mode
   setIs3DMode: (is3D) => set({ is3DMode: is3D }),
+
+  // UI layout
+  setIsInspectorCollapsed: (collapsed) => set({ isInspectorCollapsed: collapsed }),
+  setIsDrawerExpanded: (expanded) => set({ isDrawerExpanded: expanded }),
+  setActiveToolbarFlyout: (flyout) => set((state) => ({
+    activeToolbarFlyout: state.activeToolbarFlyout === flyout ? null : flyout,
+  })),
+  setFlyToImageId: (id) => set({ flyToImageId: id }),
 
   // Clear all
   clearAll: () =>

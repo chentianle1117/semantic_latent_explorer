@@ -55,7 +55,13 @@ export interface AppState {
   generationProgress: number;
   generationCurrent: number;
   generationTotal: number;
-  is3DMode: boolean;  // New: track 3D visualization mode
+  is3DMode: boolean;
+
+  // UI layout state
+  isInspectorCollapsed: boolean;
+  isDrawerExpanded: boolean;
+  activeToolbarFlyout: string | null; // 'generate' | 'batch' | 'analyze' | 'axes' | null
+  flyToImageId: number | null;
 }
 
 export interface VisualSettings {

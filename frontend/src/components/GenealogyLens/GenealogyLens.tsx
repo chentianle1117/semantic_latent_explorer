@@ -68,7 +68,8 @@ export const GenealogyLens: React.FC<GenealogyLensProps> = ({ selectedImageIds }
           }
         }
       }
-      if (img.children && level < 1) {
+      // Only expand children from selected node (level 0), not from parents (level -1) — avoids batch siblings
+      if (img.children && level === 0) {
         for (const childId of img.children) {
           const node = nodeMap.get(imgId);
           if (node && !node.childIds.includes(childId)) node.childIds.push(childId);

@@ -304,7 +304,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Render images
     const imageSize = visualSettings.imageSize;
     const strokeHover = Math.max(1, Math.min(4, Math.round(imageSize * 0.04)));
-    const strokeSelection = Math.max(2, Math.min(6, Math.round(imageSize * 0.05)));
     const coordScale = visualSettings.coordinateScale || 1.0; // Get coordinate scale multiplier
     const coordOffset = visualSettings.coordinateOffset || [0, 0, 0]; // Get coordinate offset
     const imageNodes = imagesGroup
@@ -450,34 +449,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("opacity", 0)
       .style("pointer-events", "none");
 
-    // Selection border
-    imageNodes
-      .append("rect")
-      .attr("class", "selection-border")
-      .attr("x", -imageSize / 2 - pad - 1)
-      .attr("y", -imageSize / 2 - pad - 1)
-      .attr("width", imageSize + (pad + 1) * 2)
-      .attr("height", imageSize + (pad + 1) * 2)
-      .attr("rx", 8)
-      .attr("fill", "none")
-      .attr("stroke", "#ff0000")
-      .attr("stroke-width", strokeSelection)
-      .attr("opacity", 0)
-      .style("pointer-events", "none");
-
-    // Parent/child highlighting border
-    imageNodes
-      .append("rect")
-      .attr("class", "image-border")
-      .attr("x", -imageSize / 2 - pad)
-      .attr("y", -imageSize / 2 - pad)
-      .attr("width", imageSize + pad * 2)
-      .attr("height", imageSize + pad * 2)
-      .attr("rx", 8)
-      .attr("fill", "none")
-      .attr("stroke-width", strokeHover)
-      .attr("opacity", 0)
-      .style("pointer-events", "none");
+    // Selection and parent/child highlighting uses contour filters
+    // applied directly to <image> elements — follows shoe silhouette, not bounding box
 
     // Render pending/background images with faded opacity
     if (pendingImages.length > 0) {
@@ -851,14 +824,13 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       linesGroup.selectAll("*").remove();
     }
 
-    // Reset all borders and filters
-    imagesGroup.selectAll(".image-border").attr("opacity", 0);
-    imagesGroup.selectAll(".selection-border").attr("opacity", 0).attr("stroke", "#58a6ff");
+    // Reset all filters on images
+    imagesGroup.selectAll(".image-node image").attr("filter", null).attr("clip-path", null);
     imagesGroup.selectAll(".image-node").attr("filter", null);
 
-    // Selection: box border (persistent)
+    // Selection: box highlight via group-level drop-shadow (rectangular)
     selectedImageIds.forEach((id) => {
-      imagesGroup.select(`#image-${id} .selection-border`).attr("opacity", 0.7);
+      imagesGroup.select(`#image-${id}`).attr("filter", "url(#selection-drop-shadow)");
     });
 
     // Highlight images in hovered group
@@ -875,19 +847,14 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       imagesGroup.select(`#image-${hoveredImageId} .hover-border`).attr("opacity", 0.35);
     }
 
-    // Show genealogy only for selected images (click), not on hover
-    const idsToShowGenealogy = selectedImageIds;
-
-    if (idsToShowGenealogy.length > 0) {
-      idsToShowGenealogy.forEach((selectedId) => {
+    // Genealogy lines on canvas (toggle-able, default OFF to reduce clutter)
+    if (visualSettings.showGenealogyOnCanvas && selectedImageIds.length > 0) {
+      selectedImageIds.forEach((selectedId) => {
         const selectedImg = images.find((img) => img.id === selectedId);
         if (selectedImg) {
-          // Use same bounds as main render for consistency
           const width = svgRef.current!.clientWidth;
           const height = svgRef.current!.clientHeight;
           const currentBounds = useAppStore.getState().canvasBounds;
-
-          // Get coordinate transformation settings
           const coordScale = visualSettings.coordinateScale || 1.0;
           const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
 
@@ -895,7 +862,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           if (currentBounds) {
             ({ xMin: xMin2, xMax: xMax2, yMin: yMin2, yMax: yMax2 } = currentBounds);
           } else {
-            // Fallback to data extent if bounds not set - use TRANSFORMED coordinates
             const xExtent = d3.extent(images, (d) => (d.coordinates[0] + coordOffset[0]) * coordScale) as [number, number];
             const yExtent = d3.extent(images, (d) => (d.coordinates[1] + coordOffset[1]) * coordScale) as [number, number];
             const xPadding = Math.max((xExtent[1] - xExtent[0]) * 0.1, 0.1);
@@ -905,81 +871,47 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             yMin2 = yExtent[0] - yPadding;
             yMax2 = yExtent[1] + yPadding;
           }
-          const xScale = d3
-            .scaleLinear()
-            .domain([xMin2, xMax2])
-            .range([50, width - 50]);
-          const yScale = d3
-            .scaleLinear()
-            .domain([yMin2, yMax2])
-            .range([height - 50, 50]);
+          const xScale = d3.scaleLinear().domain([xMin2, xMax2]).range([50, width - 50]);
+          const yScale = d3.scaleLinear().domain([yMin2, yMax2]).range([height - 50, 50]);
 
           const currentX = xScale((selectedImg.coordinates[0] + coordOffset[0]) * coordScale);
           const currentY = yScale((selectedImg.coordinates[1] + coordOffset[1]) * coordScale);
 
-          // Draw parent lines
+          // Draw parent lines + apply parent contour filter
           selectedImg.parents.forEach((parentId) => {
             const parent = images.find((img) => img.id === parentId);
             if (!parent) return;
-
             const parentX = xScale((parent.coordinates[0] + coordOffset[0]) * coordScale);
             const parentY = yScale((parent.coordinates[1] + coordOffset[1]) * coordScale);
             const midX = (parentX + currentX) / 2;
             const midY = (parentY + currentY) / 2;
             const dx = currentX - parentX;
             const dy = currentY - parentY;
-            const controlX = midX - dy * 0.2;
-            const controlY = midY + dx * 0.2;
-            const pathData = `M ${parentX} ${parentY} Q ${controlX} ${controlY} ${currentX} ${currentY}`;
-
-            linesGroup
-              .append("path")
-              .attr("d", pathData)
-              .attr("stroke", "#3fb950")
-              .attr("stroke-width", 2)
-              .attr("stroke-dasharray", "8,4")
-              .attr("fill", "none")
-              .attr("opacity", 0.5);
-
+            linesGroup.append("path")
+              .attr("d", `M ${parentX} ${parentY} Q ${midX - dy * 0.2} ${midY + dx * 0.2} ${currentX} ${currentY}`)
+              .attr("stroke", "#3fb950").attr("stroke-width", 2)
+              .attr("stroke-dasharray", "8,4").attr("fill", "none").attr("opacity", 0.5);
             if (!selectedImageIds.includes(parentId)) {
-              imagesGroup
-                .select(`#image-${parentId} .image-border`)
-                .attr("stroke", "#3fb950")
-                .attr("stroke-width", 1.5)
-                .attr("opacity", 0.6);
+              imagesGroup.select(`#image-${parentId}`).attr("filter", "url(#parent-drop-shadow)");
             }
           });
 
-          // Draw child lines
+          // Draw child lines + apply child contour filter
           selectedImg.children.forEach((childId) => {
             const child = images.find((img) => img.id === childId);
             if (!child) return;
-
             const childX = xScale((child.coordinates[0] + coordOffset[0]) * coordScale);
             const childY = yScale((child.coordinates[1] + coordOffset[1]) * coordScale);
             const midX = (currentX + childX) / 2;
             const midY = (currentY + childY) / 2;
             const dx = childX - currentX;
             const dy = childY - currentY;
-            const controlX = midX - dy * 0.2;
-            const controlY = midY + dx * 0.2;
-            const pathData = `M ${currentX} ${currentY} Q ${controlX} ${controlY} ${childX} ${childY}`;
-
-            linesGroup
-              .append("path")
-              .attr("d", pathData)
-              .attr("stroke", "#d29922")
-              .attr("stroke-width", 2)
-              .attr("stroke-dasharray", "8,4")
-              .attr("fill", "none")
-              .attr("opacity", 0.5);
-
+            linesGroup.append("path")
+              .attr("d", `M ${currentX} ${currentY} Q ${midX - dy * 0.2} ${midY + dx * 0.2} ${childX} ${childY}`)
+              .attr("stroke", "#d29922").attr("stroke-width", 2)
+              .attr("stroke-dasharray", "8,4").attr("fill", "none").attr("opacity", 0.5);
             if (!selectedImageIds.includes(childId)) {
-              imagesGroup
-                .select(`#image-${childId} .image-border`)
-                .attr("stroke", "#d29922")
-                .attr("stroke-width", 1.5)
-                .attr("opacity", 0.6);
+              imagesGroup.select(`#image-${childId}`).attr("filter", "url(#child-drop-shadow)");
             }
           });
         }
@@ -1117,7 +1049,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         }}
         style={{
           position: "absolute",
-          left: 20,
+          left: -12,
           top: "50%",
           transform: "translateY(-50%) rotate(-90deg)",
           transformOrigin: "center",

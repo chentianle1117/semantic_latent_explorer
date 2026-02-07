@@ -26,7 +26,8 @@
       "Bash(cd:*)",
       "Bash(wc:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx vite build)"
+      "Bash(npx vite build)",
+      "Bash(find \"w:\\\\CMU_Academics\\\\2025 Fall\\\\Thesis Demo\\\\Zappos50K_semantic_explorer\\\\backend\"\" -type f -name \"*.py \")"
     ],
     "deny": [],
     "ask": []

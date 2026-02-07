@@ -19,6 +19,7 @@ interface SettingsModalProps {
   onToggleGrid?: () => void;
   onToggleClusters?: () => void;
   onBackgroundColorChange?: (color: string) => void;
+  onExportZip?: (ids?: number[]) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -36,9 +37,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onToggleGrid = () => {},
   onToggleClusters = () => {},
   onBackgroundColorChange = () => {},
+  onExportZip,
 }) => {
   const removeBackground = useAppStore((s) => s.removeBackground);
   const setRemoveBackground = useAppStore((s) => s.setRemoveBackground);
+  const selectedImageIds = useAppStore((s) => s.selectedImageIds);
   const visualSettings = useAppStore((s) => s.visualSettings);
   const updateVisualSettings = useAppStore((s) => s.updateVisualSettings);
   const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
@@ -216,8 +219,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 />
                 Clusters
               </label>
+              <label className="toggle-row">
+                <input
+                  type="checkbox"
+                  checked={visualSettings.showGenealogyOnCanvas ?? false}
+                  onChange={(e) =>
+                    updateVisualSettings({ showGenealogyOnCanvas: e.target.checked })
+                  }
+                />
+                Genealogy on canvas
+              </label>
             </div>
             <div className="setting-actions">
+              {onExportZip && (
+                <button
+                  onClick={() =>
+                    onExportZip(
+                      selectedImageIds.length > 0 ? selectedImageIds : undefined
+                    )
+                  }
+                >
+                  {selectedImageIds.length > 0
+                    ? `Export ${selectedImageIds.length} selected`
+                    : "Export all as ZIP"}
+                </button>
+              )}
               <button onClick={() => resetCanvasBounds()}>Recenter</button>
               <button
                 onClick={async () => {

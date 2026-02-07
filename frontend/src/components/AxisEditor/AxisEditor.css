@@ -1,86 +1,127 @@
-.axis-label {
-  background: rgba(88, 166, 255, 0.1);
-  border: 1px solid #58a6ff;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  user-select: none;
-}
+/* ── Axis Inline Editor ── */
 
-.axis-label:hover {
-  background: rgba(88, 166, 255, 0.2);
-  border-color: #79c0ff;
-}
-
-.axis-editor {
-  background: rgba(22, 27, 34, 0.95);
-  border: 1px solid #58a6ff;
-  padding: 12px;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-}
-
-.axis-editor-inputs {
+.axis-inline {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  pointer-events: auto;
 }
 
-.axis-input {
-  flex: 1;
-  background: #0d1117;
-  border: 1px solid #30363d;
-  color: #c9d1d9;
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.2s ease;
-}
+/* ── Clickable Word Labels ── */
 
-.axis-input:focus {
-  border-color: #58a6ff;
-}
-
-.axis-separator {
-  color: #8b949e;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.axis-editor-buttons {
-  display: flex;
-  gap: 6px;
-}
-
-.axis-btn {
-  flex: 1;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  border: none;
+.axis-word {
+  font-size: clamp(14px, 1.2vw, 20px);
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  padding: 4px 12px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s;
+  user-select: none;
+  white-space: nowrap;
 }
 
-.axis-btn-update {
+.axis-word.axis-x {
+  color: #58a6ff;
+}
+
+.axis-word.axis-y {
+  color: #bc8cff;
+}
+
+.axis-word:hover {
+  background: rgba(88, 166, 255, 0.15);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.axis-word.axis-y:hover {
+  background: rgba(188, 140, 255, 0.15);
+}
+
+/* ── Arrow Between Words ── */
+
+.axis-arrow {
+  font-size: clamp(10px, 0.8vw, 14px);
+  opacity: 0.3;
+  letter-spacing: -2px;
+  user-select: none;
+  flex-shrink: 1;
+  overflow: hidden;
+}
+
+.axis-arrow.axis-x {
+  color: #58a6ff;
+}
+
+.axis-arrow.axis-y {
+  color: #bc8cff;
+}
+
+/* ── Edit Mode ── */
+
+.axis-edit-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.axis-word-input {
+  font-size: clamp(14px, 1.2vw, 20px);
+  font-weight: 700;
+  width: 120px;
+  background: rgba(13, 17, 23, 0.95);
+  border: 2px solid #58a6ff;
+  color: #58a6ff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  outline: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.axis-word-input.axis-y {
+  border-color: #bc8cff;
+  color: #bc8cff;
+}
+
+.axis-word-input:focus {
+  box-shadow: 0 0 8px rgba(88, 166, 255, 0.3);
+}
+
+.axis-word-input.axis-y:focus {
+  box-shadow: 0 0 8px rgba(188, 140, 255, 0.3);
+}
+
+.axis-apply-btn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: none;
   background: #238636;
   color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-.axis-btn-update:hover {
+.axis-apply-btn:hover {
   background: #2ea043;
 }
 
-.axis-btn-cancel {
+.axis-cancel-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
   background: #30363d;
-  color: #c9d1d9;
+  color: #8b949e;
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
 }
 
-.axis-btn-cancel:hover {
+.axis-cancel-btn:hover {
   background: #484f58;
+  color: #e6edf3;
 }

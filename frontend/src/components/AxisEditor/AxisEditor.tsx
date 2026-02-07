@@ -1,12 +1,14 @@
 /**
  * Inline Axis Editor Component
+ * Shows two prominent words at opposite ends of the axis.
+ * Click a word to edit it inline, with an Apply button.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./AxisEditor.css";
 
 interface AxisEditorProps {
-  axis: "x" | "y" | "z";  // Support z-axis for 3D mode
+  axis: "x" | "y" | "z";
   negativeLabel: string;
   positiveLabel: string;
   onUpdate: (negative: string, positive: string) => void;
@@ -14,73 +16,102 @@ interface AxisEditorProps {
 }
 
 export const AxisEditor: React.FC<AxisEditorProps> = ({
-  axis: _axis,
+  axis,
   negativeLabel,
   positiveLabel,
   onUpdate,
   style,
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [editingEnd, setEditingEnd] = useState<"negative" | "positive" | null>(null);
   const [negative, setNegative] = useState(negativeLabel);
   const [positive, setPositive] = useState(positiveLabel);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync local state with props whenever they change
   useEffect(() => {
     setNegative(negativeLabel);
     setPositive(positiveLabel);
   }, [negativeLabel, positiveLabel]);
 
-  const handleUpdate = () => {
+  useEffect(() => {
+    if (editingEnd && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingEnd]);
+
+  const handleApply = () => {
     if (negative.trim() && positive.trim()) {
       onUpdate(negative.trim(), positive.trim());
-      setIsEditing(false);
-    } else {
-      alert("Both labels are required");
+      setEditingEnd(null);
     }
   };
 
   const handleCancel = () => {
     setNegative(negativeLabel);
     setPositive(positiveLabel);
-    setIsEditing(false);
+    setEditingEnd(null);
   };
 
-  if (!isEditing) {
-    return (
-      <div className="axis-label" style={style} onClick={() => setIsEditing(true)}>
-        ← {negativeLabel} ... {positiveLabel} →
-      </div>
-    );
-  }
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") handleApply();
+    if (e.key === "Escape") handleCancel();
+  };
+
+  const isX = axis === "x";
+  const colorClass = isX ? "axis-x" : "axis-y";
 
   return (
-    <div className="axis-editor" style={style}>
-      <div className="axis-editor-inputs">
-        <input
-          type="text"
-          className="axis-input"
-          value={negative}
-          onChange={(e) => setNegative(e.target.value)}
-          placeholder="Negative"
-          autoFocus
-        />
-        <span className="axis-separator">...</span>
-        <input
-          type="text"
-          className="axis-input"
-          value={positive}
-          onChange={(e) => setPositive(e.target.value)}
-          placeholder="Positive"
-        />
-      </div>
-      <div className="axis-editor-buttons">
-        <button className="axis-btn axis-btn-update" onClick={handleUpdate}>
-          Update
-        </button>
-        <button className="axis-btn axis-btn-cancel" onClick={handleCancel}>
-          Cancel
-        </button>
-      </div>
+    <div className={`axis-inline ${colorClass}`} style={style}>
+      {/* Negative end */}
+      {editingEnd === "negative" ? (
+        <span className="axis-edit-group">
+          <input
+            ref={inputRef}
+            className={`axis-word-input ${colorClass}`}
+            value={negative}
+            onChange={(e) => setNegative(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <button className="axis-apply-btn" onClick={handleApply}>Apply</button>
+          <button className="axis-cancel-btn" onClick={handleCancel}>×</button>
+        </span>
+      ) : (
+        <span
+          className={`axis-word ${colorClass}`}
+          onClick={() => setEditingEnd("negative")}
+          title="Click to edit"
+        >
+          {negativeLabel}
+        </span>
+      )}
+
+      {/* Arrow line */}
+      <span className={`axis-arrow ${colorClass}`}>
+        {isX ? "◄──────────────────►" : "◄────────►"}
+      </span>
+
+      {/* Positive end */}
+      {editingEnd === "positive" ? (
+        <span className="axis-edit-group">
+          <input
+            ref={editingEnd === "positive" ? inputRef : undefined}
+            className={`axis-word-input ${colorClass}`}
+            value={positive}
+            onChange={(e) => setPositive(e.target.value)}
+            onKeyDown={handleKeyDown}
+          />
+          <button className="axis-apply-btn" onClick={handleApply}>Apply</button>
+          <button className="axis-cancel-btn" onClick={handleCancel}>×</button>
+        </span>
+      ) : (
+        <span
+          className={`axis-word ${colorClass}`}
+          onClick={() => setEditingEnd("positive")}
+          title="Click to edit"
+        >
+          {positiveLabel}
+        </span>
+      )}
     </div>
   );
 };

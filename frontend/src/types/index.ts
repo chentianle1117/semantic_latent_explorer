@@ -72,6 +72,7 @@ export interface VisualSettings {
   coordinateScale: number; // Scale multiplier for coordinates (affects spacing between items)
   coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
   contourStrength: number; // 1–10, controls contour highlight thickness/visibility
+  showGenealogyOnCanvas: boolean; // Show parent/child lines on canvas (default: false)
 }
 
 export interface AxisUpdateRequest {

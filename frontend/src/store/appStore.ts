@@ -67,6 +67,7 @@ const initialState: AppState = {
     coordinateScale: 1.0, // Scale multiplier for coordinates (affects spacing)
     coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
     contourStrength: 6, // 1–10, contour highlight thickness (higher = more visible)
+    showGenealogyOnCanvas: false, // Show parent/child lines on canvas (default off to reduce clutter)
   },
   canvasBounds: null, // Will auto-calculate on first render
   removeBackground: true,

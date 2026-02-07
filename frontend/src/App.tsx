@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
 import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
-import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingActionPanel";
+// FloatingActionPanel removed — actions moved to RightInspector
 import { ProgressModal } from "./components/ProgressModal/ProgressModal";
 import { HeaderBar } from "./components/HeaderBar/HeaderBar";
 import { RightInspector } from "./components/RightInspector/RightInspector";
@@ -16,6 +16,7 @@ import { AxisSuggestionModal } from "./components/AxisSuggestionModal/AxisSugges
 import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPromptDialog";
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
+import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
@@ -27,11 +28,7 @@ import type {
 import "./styles/app.css";
 
 export const App: React.FC = () => {
-  const [floatingPanelPos, setFloatingPanelPos] = useState<{
-    x: number;
-    y: number;
-    count: number;
-  } | null>(null);
+  // floatingPanelPos removed — actions now in RightInspector
   const [showTextToImageDialog, setShowTextToImageDialog] = useState(false);
   const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [promptDialogImageId, setPromptDialogImageId] = useState<number | null>(
@@ -72,6 +69,7 @@ export const App: React.FC = () => {
   const [backgroundColor, setBackgroundColor] = useState("#0d1117");
   const [showRadialDial, setShowRadialDial] = useState(false);
   const [radialDialPos, setRadialDialPos] = useState({ x: 0, y: 0 });
+  const [showExplorationTreeModal, setShowExplorationTreeModal] = useState(false);
   const lastMousePosRef = useRef({
     x: typeof window !== "undefined" ? window.innerWidth / 2 : 400,
     y: typeof window !== "undefined" ? window.innerHeight / 2 : 300,
@@ -293,15 +291,16 @@ export const App: React.FC = () => {
       setImages(state.images);
       setHistoryGroups(state.history_groups);
       clearSelection();
-      setFloatingPanelPos(null);
+      // floatingPanelPos removed
     } catch (error) {
       console.error("Clear failed:", error);
       alert("Failed to clear canvas. Check console for details.");
     }
   };
 
-  const handleExportZip = async () => {
-    if (images.length === 0) {
+  const handleExportZip = async (exportIds?: number[]) => {
+    const toExport = exportIds ?? images.map((img) => img.id);
+    if (toExport.length === 0) {
       alert("No images to export. Generate some images first!");
       return;
     }
@@ -311,17 +310,20 @@ export const App: React.FC = () => {
     setGenerationProgress(50);
 
     try {
+      const idsParam = exportIds ? `?ids=${exportIds.join(",")}` : "";
       console.log(
-        `📦 Exporting ${images.length} images and metadata as ZIP...`
+        `📦 Exporting ${toExport.length} image(s) as ZIP${exportIds ? " (selected only)" : ""}`
       );
-      console.log("Fetching from: http://localhost:8000/api/export-zip");
 
-      const response = await fetch("http://localhost:8000/api/export-zip", {
-        method: "GET",
-        headers: {
-          Accept: "application/zip",
-        },
-      });
+      const response = await fetch(
+        `http://localhost:8000/api/export-zip${idsParam}`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/zip",
+          },
+        }
+      );
 
       console.log("Response status:", response.status, response.statusText);
 
@@ -354,9 +356,9 @@ export const App: React.FC = () => {
       window.URL.revokeObjectURL(url);
 
       console.log(
-        `✅ Successfully exported ${images.length} images with metadata!`
+        `✅ Successfully exported ${toExport.length} image(s) with metadata!`
       );
-      alert(`✅ Successfully exported ${images.length} images with metadata!`);
+      alert(`✅ Successfully exported ${toExport.length} image(s) with metadata!`);
     } catch (error) {
       console.error("❌ Export ZIP failed:", error);
       alert(
@@ -650,7 +652,6 @@ export const App: React.FC = () => {
     setPromptDialogImageId(null);
     setShowPromptDialog(false);
     setIsGenerating(true);
-    setFloatingPanelPos(null);
     useProgressStore
       .getState()
       .showProgress(
@@ -1330,23 +1331,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // Click outside to close floating panel
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-
-      if (
-        floatingPanelPos &&
-        !target.closest(".floating-action-panel") &&
-        !target.closest(".image-node")
-      ) {
-        setFloatingPanelPos(null);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [floatingPanelPos]);
+  // FloatingActionPanel click-outside handler removed (panel replaced by inspector actions)
 
   // Close menus on Escape key
   useEffect(() => {
@@ -1354,7 +1339,7 @@ export const App: React.FC = () => {
       if (e.key === "Escape") {
         setPromptDialogImageId(null);
         setShowPromptDialog(false);
-        setFloatingPanelPos(null);
+        // floatingPanelPos removed
         setShowRadialDial(false);
         clearSelection(); // Also clear selection to close dialogs
       }
@@ -1396,7 +1381,7 @@ export const App: React.FC = () => {
   // Update floating panel position when selection changes
   useEffect(() => {
     if (selectedImageIds.length === 0) {
-      setFloatingPanelPos(null);
+      // floatingPanelPos removed
       setShowPromptDialog(false);
     }
   }, [selectedImageIds]);
@@ -1453,44 +1438,16 @@ export const App: React.FC = () => {
             {/* Conditionally render 2D or 3D canvas */}
             {is3DMode ? (
               <SemanticCanvas3D
-                onSelectionChange={React.useCallback((x, y, count) => {
-                  console.log("🎯 App received 3D onSelectionChange:", {
-                    x,
-                    y,
-                    count,
-                  });
-                  if (count > 0) {
-                    if (x === -1 && y === -1) {
-                      setFloatingPanelPos((prev) =>
-                        prev ? { ...prev, count } : { x: 0, y: 0, count }
-                      );
-                    } else {
-                      setFloatingPanelPos({ x, y, count });
-                    }
-                  } else {
-                    setFloatingPanelPos(null);
-                  }
+                onSelectionChange={React.useCallback((_x: number, _y: number, _count: number) => {
+                  // Selection tracking handled by store (selectedImageIds)
+                  // FloatingActionPanel removed — actions now in RightInspector
                 }, [])}
               />
             ) : (
               <SemanticCanvas
-                onSelectionChange={React.useCallback((x, y, count) => {
-                  console.log("🎯 App received 2D onSelectionChange:", {
-                    x,
-                    y,
-                    count,
-                  });
-                  if (count > 0) {
-                    if (x === -1 && y === -1) {
-                      setFloatingPanelPos((prev) =>
-                        prev ? { ...prev, count } : { x: 0, y: 0, count }
-                      );
-                    } else {
-                      setFloatingPanelPos({ x, y, count });
-                    }
-                  } else {
-                    setFloatingPanelPos(null);
-                  }
+                onSelectionChange={React.useCallback((_x: number, _y: number, _count: number) => {
+                  // Selection tracking handled by store (selectedImageIds)
+                  // FloatingActionPanel removed — actions now in RightInspector
                 }, [])}
                 regionHighlights={regionHighlights}
                 onGenerateFromRegion={(prompt, region) =>
@@ -1503,43 +1460,7 @@ export const App: React.FC = () => {
               />
             )}
 
-            {/* Floating Action Panel (primary interaction) */}
-            {floatingPanelPos && floatingPanelPos.count > 0 && (
-              <FloatingActionPanel
-                x={floatingPanelPos.x}
-                y={floatingPanelPos.y}
-                selectedCount={floatingPanelPos.count}
-                onGenerateFromReference={() => {
-                  // Open dialog with all selected images
-                  handleGenerateFromReferenceClick();
-                  setFloatingPanelPos(null);
-                }}
-                onViewDetails={() => {
-                  // Show details of selected images
-                  const selectedImages = images.filter((img) =>
-                    selectedImageIds.includes(img.id)
-                  );
-                  const details = selectedImages
-                    .map(
-                      (img) =>
-                        `ID: ${img.id}\nMethod: ${img.generation_method}\nPrompt: ${img.prompt}`
-                    )
-                    .join("\n\n---\n\n");
-                  alert(`Selected Images:\n\n${details}`);
-                }}
-                onRemove={() => {
-                  selectedImageIds.forEach((id) => {
-                    useAppStore.getState().removeImage(id);
-                  });
-                  clearSelection();
-                  setFloatingPanelPos(null);
-                }}
-                onClearSelection={() => {
-                  clearSelection();
-                  setFloatingPanelPos(null);
-                }}
-              />
-            )}
+            {/* FloatingActionPanel removed — actions now in RightInspector */}
 
             {/* Prompt Dialog */}
             {showPromptDialog && promptDialogImages.length > 0 && (
@@ -1663,6 +1584,15 @@ export const App: React.FC = () => {
           onToggleGrid={() => setShowGrid(!showGrid)}
           onToggleClusters={() => setShowClusters(!showClusters)}
           onBackgroundColorChange={setBackgroundColor}
+          onGenerateFromReference={() => {
+            handleGenerateFromReferenceClick();
+          }}
+          onRemoveSelected={() => {
+            selectedImageIds.forEach((id) => {
+              useAppStore.getState().removeImage(id);
+            });
+            clearSelection();
+          }}
         />
 
         {/* Bottom Drawer */}
@@ -1685,6 +1615,12 @@ export const App: React.FC = () => {
         onToggleGrid={() => setShowGrid(!showGrid)}
         onToggleClusters={() => setShowClusters(!showClusters)}
         onBackgroundColorChange={setBackgroundColor}
+        onExportZip={handleExportZip}
+      />
+
+      <ExplorationTreeModal
+        isOpen={showExplorationTreeModal}
+        onClose={() => setShowExplorationTreeModal(false)}
       />
 
       {/* Radial Dial (global actions: Space or middle-click) */}
@@ -1698,9 +1634,15 @@ export const App: React.FC = () => {
             id: "generate",
             icon: "✨",
             label: "Generate",
-            description: "Generate images from text",
+            description:
+              selectedImageIds.length > 0
+                ? `Generate from ${selectedImageIds.length} selected reference(s)`
+                : "Generate images from text",
             category: "image",
-            onClick: () => setShowTextToImageDialog(true),
+            onClick: () =>
+              selectedImageIds.length > 0
+                ? handleGenerateFromReferenceClick()
+                : setShowTextToImageDialog(true),
           },
           {
             id: "load",
@@ -1735,22 +1677,40 @@ export const App: React.FC = () => {
             onClick: handlePromptSuggestion,
           },
           {
-            id: "save",
-            icon: "📦",
-            label: "Save",
-            description: "Export as ZIP",
+            id: "exploration-tree",
+            icon: "🌳",
+            label: "Exploration Tree",
+            description: "Full genealogy graph of all images",
             category: "global",
-            onClick: handleExportZip,
+            onClick: () => setShowExplorationTreeModal(true),
           },
           {
             id: "delete",
             icon: "🗑️",
             label: "Delete",
-            description: "Clear all images",
+            description:
+              selectedImageIds.length > 0
+                ? `Remove ${selectedImageIds.length} selected image(s)`
+                : "Clear all images from canvas",
             category: "global",
             onClick: () => {
-              if (window.confirm("Clear all images from the canvas?")) {
-                handleClearCanvas();
+              if (selectedImageIds.length > 0) {
+                if (
+                  window.confirm(
+                    `Remove ${selectedImageIds.length} selected image(s) from the canvas?`
+                  )
+                ) {
+                  selectedImageIds.forEach((id) => {
+                    useAppStore.getState().removeImage(id);
+                  });
+                  clearSelection();
+                }
+              } else {
+                if (
+                  window.confirm("Clear all images from the canvas?")
+                ) {
+                  handleClearCanvas();
+                }
               }
             },
           },

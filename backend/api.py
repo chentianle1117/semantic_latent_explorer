@@ -189,43 +189,77 @@ def project_embeddings_to_coordinates(embeddings: np.ndarray, use_3d: bool = Non
             f"shoe that is {state.axis_labels['z'][0]}"   # negative
         )
         z_coords = embeddings @ z_axis.direction
-        return np.column_stack([x_coords, y_coords, z_coords])
+        coords = np.column_stack([x_coords, y_coords, z_coords])
+    else:
+        coords = np.column_stack([x_coords, y_coords])
 
-    return np.column_stack([x_coords, y_coords])
+    # Center projections at origin (ensures canvas auto-centering after axis updates)
+    coords -= coords.mean(axis=0)
+    return coords
 
 
 # Unified unit: minimum coord distance to avoid overlap (~120px shoe at 600px range → 0.2)
-MIN_COORD_DISTANCE = 0.2
+# Increased to 0.35 for more aggressive spacing; sqrt(n) division reduced spacing as n grew
+MIN_COORD_DISTANCE = 0.35
 
 
-def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.45) -> np.ndarray:
+def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.4,
+                        max_iterations: int = 80) -> np.ndarray:
     """
-    Ensure minimum spacing between points to prevent overlap on canvas.
-    Uses unified unit system: target_min = max(extent * ratio, MIN_COORD_DISTANCE)
-    so dense clusters always get spread enough for ~120px shoe images.
+    Force-directed repulsion to prevent overlap while preserving relative positions.
+    Iteratively pushes overlapping nodes apart, then re-centers to origin.
     """
     if len(coords) < 2:
         return coords
+
     n = len(coords)
-    min_dist = float("inf")
-    for i in range(n):
-        for j in range(i + 1, n):
-            d = np.linalg.norm(coords[i] - coords[j])
-            if d < min_dist:
-                min_dist = d
-    if min_dist <= 1e-10:
-        rng = np.random.default_rng(42)
-        jitter = rng.uniform(-0.02, 0.02, coords.shape)
-        return coords + jitter
-    extent_range = float(np.ptp(coords))
-    if extent_range <= 1e-10:
-        extent_range = 1.0
-    target_min = max(extent_range * min_spacing_ratio, MIN_COORD_DISTANCE)
-    if min_dist >= target_min:
-        return coords
-    scale = target_min / min_dist
-    center = np.mean(coords, axis=0)
-    return (coords - center) * scale + center
+    result = coords.copy().astype(float)
+    rng = np.random.default_rng(42)
+
+    # Handle degenerate case: all points identical
+    dists_check = np.linalg.norm(result - result[0], axis=-1)
+    if np.max(dists_check) < 1e-10:
+        jitter = rng.uniform(-0.05, 0.05, result.shape)
+        result += jitter
+
+    # Calculate minimum allowed distance in coordinate space
+    extent = np.ptp(result, axis=0)
+    max_extent = max(float(np.max(extent)), 1e-6)
+    min_dist = max(max_extent * min_spacing_ratio, MIN_COORD_DISTANCE)
+
+    for iteration in range(max_iterations):
+        forces = np.zeros_like(result)
+        max_overlap = 0.0
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                delta = result[i] - result[j]
+                dist = float(np.linalg.norm(delta))
+
+                if dist < 1e-10:
+                    # Identical points: add random jitter direction
+                    delta = rng.uniform(-0.01, 0.01, delta.shape)
+                    dist = float(np.linalg.norm(delta)) + 1e-10
+
+                if dist < min_dist:
+                    overlap = min_dist - dist
+                    max_overlap = max(max_overlap, overlap)
+                    # Repulsion force proportional to overlap
+                    direction = delta / dist
+                    force_magnitude = overlap * 0.5  # Move each node half the overlap
+                    forces[i] += direction * force_magnitude
+                    forces[j] -= direction * force_magnitude
+
+        if max_overlap < min_dist * 0.05:  # Converged: <5% overlap remaining
+            break
+
+        result += forces
+
+    # Re-center to origin (ensures canvas auto-centering works)
+    center = np.mean(result, axis=0)
+    result -= center
+
+    return result
 
 
 def image_metadata_to_response(img: ImageMetadata) -> ImageResponse:
@@ -1372,13 +1406,18 @@ Return JSON ONLY (no markdown):
 
 
 @app.get("/api/export-zip")
-async def export_zip():
-    """Export all images and metadata as a ZIP file."""
+async def export_zip(ids: Optional[str] = None):
+    """Export images and metadata as ZIP. If ids query param provided (comma-separated),
+    export only those image IDs; otherwise export all visible images."""
     try:
         print(f"\n=== Export ZIP Request ===")
         print(f"Total images in state: {len(state.images_metadata)}")
 
         visible_images = [img for img in state.images_metadata if img.visible]
+        if ids:
+            id_set = {int(x.strip()) for x in ids.split(",") if x.strip()}
+            visible_images = [img for img in visible_images if img.id in id_set]
+            print(f"Exporting selected only: {len(visible_images)} images (ids={id_set})")
         print(f"Visible images to export: {len(visible_images)}")
 
         if len(visible_images) == 0:

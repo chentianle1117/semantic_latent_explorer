@@ -7,8 +7,8 @@
   padding: 8px 0;
   gap: 4px;
   background: #161b22;
-  border-right: 1px solid #30363d;
-  width: 48px;
+  border-right: 1px solid var(--border);
+  width: var(--toolbar-width, 52px);
   z-index: 50;
 }
 
@@ -16,14 +16,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: calc(var(--toolbar-width, 52px) - 12px);
+  height: calc(var(--toolbar-width, 52px) - 12px);
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
   cursor: pointer;
   transition: all 0.15s;
-  font-size: 18px;
+  font-size: var(--icon-lg, 24px);
   position: relative;
 }
 
@@ -39,4 +39,168 @@
 
 .toolbar-icon {
   line-height: 1;
+}
+
+/* ── Flyout Panel ── */
+
+.toolbar-flyout {
+  position: absolute;
+  top: 0;
+  left: var(--toolbar-width, 52px);
+  width: clamp(280px, 22vw, 340px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 0 8px 8px 0;
+  box-shadow: 4px 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.flyout-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+.flyout-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e6edf3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.flyout-close {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.flyout-close:hover {
+  color: #e6edf3;
+  background: #21262d;
+}
+
+.flyout-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* ── Flyout Action Buttons ── */
+
+.flyout-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #e6edf3;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.flyout-action-btn:hover:not(:disabled) {
+  background: #30363d;
+  border-color: #484f58;
+}
+
+.flyout-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.flyout-action-btn.primary {
+  background: rgba(88, 166, 255, 0.15);
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
+.flyout-action-btn.primary:hover:not(:disabled) {
+  background: rgba(88, 166, 255, 0.25);
+}
+
+.flyout-action-btn.danger {
+  color: #f85149;
+  border-color: rgba(248, 81, 73, 0.3);
+}
+
+.flyout-action-btn.danger:hover:not(:disabled) {
+  background: rgba(248, 81, 73, 0.15);
+  border-color: #f85149;
+}
+
+/* ── Flyout Utilities ── */
+
+.flyout-divider {
+  height: 1px;
+  background: #30363d;
+  margin: 4px 0;
+}
+
+.flyout-hint {
+  font-size: 11px;
+  color: #8b949e;
+  margin: 2px 0;
+  line-height: 1.4;
+}
+
+.flyout-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flyout-slider-row label {
+  font-size: 12px;
+  color: #8b949e;
+  white-space: nowrap;
+  min-width: 90px;
+}
+
+.flyout-slider-row input[type="range"] {
+  flex: 1;
+  accent-color: #58a6ff;
+  height: 4px;
+}
+
+.flyout-slider-value {
+  font-size: 12px;
+  color: #e6edf3;
+  min-width: 18px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Axes Flyout ── */
+
+.flyout-axis-section {
+  margin-bottom: 8px;
+}
+
+.flyout-axis-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
 }

@@ -1,0 +1,48 @@
+.genealogy-lens {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 160px;
+  overflow: hidden;
+}
+
+.genealogy-lens svg {
+  display: block;
+  width: 100%;
+  flex: 1;
+  min-height: 140px;
+}
+
+.genealogy-legend {
+  display: flex;
+  gap: 12px;
+  font-size: 10px;
+  color: var(--text-secondary, #8b949e);
+  margin-bottom: 6px;
+}
+
+.legend-item.parent { color: #3fb950; }
+.legend-item.child { color: #d29922; }
+
+/* Link colors & arrows set inline (green=parent, yellow=child) */
+
+.genealogy-node:hover image {
+  opacity: 0.9;
+}
+
+.node-label {
+  font-size: 8px;
+  fill: #8b949e;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.genealogy-empty {
+  font-size: 11px;
+  color: #8b949e;
+  text-align: center;
+  padding: 8px 0;
+  font-style: italic;
+}
+

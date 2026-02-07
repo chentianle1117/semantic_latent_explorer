@@ -4,11 +4,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  height: 40px;
+  padding: 0 var(--fs-lg, 16px);
+  height: var(--header-height, 40px);
   background: rgba(22, 27, 34, 0.85);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid #30363d;
+  border-bottom: 1px solid var(--border);
   z-index: 100;
   position: relative;
 }
@@ -20,9 +20,9 @@
 }
 
 .header-logo {
-  font-size: 14px;
+  font-size: var(--fs-lg, 14px);
   font-weight: 600;
-  color: #58a6ff;
+  color: var(--primary-blue);
   letter-spacing: 0.3px;
 }
 
@@ -32,14 +32,14 @@
   gap: 6px;
   padding: 3px 10px;
   border-radius: 12px;
-  font-size: 11px;
-  color: #8b949e;
+  font-size: var(--fs-sm, 11px);
+  color: var(--text-secondary);
   background: #21262d;
-  border: 1px solid #30363d;
+  border: 1px solid var(--border);
 }
 
 .agent-status-pill.active {
-  color: #58a6ff;
+  color: var(--primary-blue);
   border-color: #58a6ff40;
   background: rgba(88, 166, 255, 0.1);
 }
@@ -49,7 +49,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #58a6ff;
+  background: var(--primary-blue);
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
 
@@ -62,12 +62,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
-  color: #8b949e;
+  font-size: var(--fs-sm, 11px);
+  color: var(--text-secondary);
 }
 
 .header-stat-sep {
-  color: #30363d;
+  color: var(--border);
 }
 
 .header-right {
@@ -80,25 +80,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: calc(var(--header-height, 40px) - 10px);
+  height: calc(var(--header-height, 40px) - 10px);
   border-radius: 6px;
-  border: 1px solid #30363d;
+  border: 1px solid var(--border);
   background: #21262d;
-  color: #c9d1d9;
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: var(--fs-base, 14px);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .header-icon-btn:hover {
   background: #30363d;
-  border-color: #58a6ff;
-  color: #58a6ff;
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
 }
 
 .mode-toggle {
-  font-size: 11px;
+  font-size: var(--fs-sm, 11px);
   font-weight: 600;
   width: auto;
   padding: 0 8px;
@@ -106,6 +106,6 @@
 
 .mode-toggle.active {
   background: rgba(88, 166, 255, 0.15);
-  border-color: #58a6ff;
-  color: #58a6ff;
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
 }

@@ -1,0 +1,141 @@
+.visual-settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visual-settings-modal {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  min-width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.visual-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #30363d;
+}
+
+.visual-settings-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.visual-settings-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: #8b949e;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.visual-settings-close:hover {
+  background: #30363d;
+  color: #e6edf3;
+}
+
+.visual-settings-content {
+  padding: 18px;
+}
+
+.visual-settings-content .setting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.visual-settings-content .setting-row label {
+  font-size: 12px;
+  color: #8b949e;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.visual-settings-content .setting-row input[type="range"] {
+  flex: 1;
+  height: 6px;
+  accent-color: #58a6ff;
+}
+
+.visual-settings-content .setting-row input[type="color"] {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 2px;
+  background: #21262d;
+  cursor: pointer;
+}
+
+.visual-settings-content .setting-value {
+  font-size: 11px;
+  color: #8b949e;
+  min-width: 42px;
+  text-align: right;
+}
+
+.visual-settings-content .setting-hint {
+  font-size: 10px;
+  color: #6e7681;
+  margin: -6px 0 10px 0;
+  padding: 0;
+}
+
+.visual-settings-content .setting-toggles {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.visual-settings-content .toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #c9d1d9;
+  cursor: pointer;
+}
+
+.visual-settings-content .toggle-row input[type="checkbox"] {
+  accent-color: #58a6ff;
+}
+
+.visual-settings-content .setting-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.visual-settings-content .setting-actions button {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #c9d1d9;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.visual-settings-content .setting-actions button:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+  color: #e6edf3;
+}

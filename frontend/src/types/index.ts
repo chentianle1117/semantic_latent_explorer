@@ -71,6 +71,7 @@ export interface VisualSettings {
   layoutPadding: number; // Padding factor for canvas bounds (0.05 = 5%, 0.2 = 20%)
   coordinateScale: number; // Scale multiplier for coordinates (affects spacing between items)
   coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
+  contourStrength: number; // 1–10, controls contour highlight thickness/visibility
 }
 
 export interface AxisUpdateRequest {

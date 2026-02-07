@@ -54,6 +54,12 @@ class APIClient {
     return response.data;
   }
 
+  // Reapply layout spread to fix overlap
+  async reapplyLayout(): Promise<{ status: string; message?: string }> {
+    const response = await axios.post(`${API_BASE}/reapply-layout`);
+    return response.data;
+  }
+
   // Add external images (e.g., from fal.ai)
   async addExternalImages(request: {
     images: { url: string }[];
@@ -147,6 +153,12 @@ class APIClient {
       current_x_axis: currentXAxis,
       current_y_axis: currentYAxis
     });
+    return response.data;
+  }
+
+  // Generate initial prompts from design brief
+  async getInitialPrompts(brief: string): Promise<{ prompts: Array<{ prompt: string; reasoning: string }> }> {
+    const response = await axios.post(`${API_BASE}/agent/initial-prompts`, { brief });
     return response.data;
   }
 

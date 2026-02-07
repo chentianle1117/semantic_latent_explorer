@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useAppStore } from "../../store/appStore";
+import { GenealogyLens } from "../GenealogyLens/GenealogyLens";
 import "./RightInspector.css";
 
 interface RightInspectorProps {
@@ -13,22 +14,26 @@ interface RightInspectorProps {
   onBackgroundColorChange: (color: string) => void;
 }
 
-export const RightInspector: React.FC<RightInspectorProps> = ({
-  showLabels,
-  showGrid,
-  showClusters,
-  backgroundColor,
-  onToggleLabels,
-  onToggleGrid,
-  onToggleClusters,
-  onBackgroundColorChange,
-}) => {
+export const RightInspector: React.FC<RightInspectorProps> = () => {
   const isCollapsed = useAppStore((s) => s.isInspectorCollapsed);
   const setIsCollapsed = useAppStore((s) => s.setIsInspectorCollapsed);
-  const visualSettings = useAppStore((s) => s.visualSettings);
-  const updateVisualSettings = useAppStore((s) => s.updateVisualSettings);
-  const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
   const selectedImageIds = useAppStore((s) => s.selectedImageIds);
+  const setSelectedImageIds = useAppStore((s) => s.setSelectedImageIds);
+  const setFlyToImageId = useAppStore((s) => s.setFlyToImageId);
+  const images = useAppStore((s) => s.images);
+
+  // Accordion open state per section (visual removed - now in dial popup)
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    selection: true,
+  });
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const selectedImage =
+    selectedImageIds.length === 1
+      ? images.find((img) => img.id === selectedImageIds[0])
+      : null;
 
   if (isCollapsed) {
     return (
@@ -36,7 +41,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
         <button
           className="inspector-expand-tab"
           onClick={() => setIsCollapsed(false)}
-          title="Open Inspector"
+          title="Open Inspector (click to expand)"
         >
           &#9664;
         </button>
@@ -57,110 +62,71 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
         </button>
       </div>
 
-      {/* Selection section - only when image selected */}
+      {/* Selection section - only when image(s) selected */}
       {selectedImageIds.length > 0 && (
         <div className="inspector-section">
-          <div className="section-header">
-            <span>Selection ({selectedImageIds.length})</span>
+          <div
+            className="section-header"
+            onClick={() => toggleSection("selection")}
+          >
+            <span>
+              Selection ({selectedImageIds.length})
+            </span>
+            <span className={`section-chevron ${openSections.selection ? "open" : ""}`}>
+              &#9660;
+            </span>
           </div>
-          <div className="section-content">
-            <p className="section-placeholder">Genealogy Lens (Phase 4)</p>
-          </div>
+          {openSections.selection && (
+            <div className="section-content">
+              {selectedImageIds.length > 1 ? (
+                <div className="selection-multi-detail">
+                  <div className="selection-genealogy selection-genealogy-enlarged">
+                    <GenealogyLens selectedImageIds={selectedImageIds} />
+                  </div>
+                </div>
+              ) : selectedImage ? (
+                <div className="selection-detail">
+                  <div className="selection-thumb">
+                    <img
+                      src={`data:image/png;base64,${selectedImage.base64_image}`}
+                      alt={selectedImage.prompt || "Selected"}
+                    />
+                  </div>
+                  {selectedImage.prompt && (
+                    <p className="selection-prompt">{selectedImage.prompt}</p>
+                  )}
+                  <div className="selection-meta">
+                    <span>ID: {selectedImage.id}</span>
+                    <span>
+                      Pos: ({selectedImage.coordinates[0].toFixed(2)},{" "}
+                      {selectedImage.coordinates[1].toFixed(2)})
+                    </span>
+                  </div>
+                  {selectedImage.parents && selectedImage.parents.length > 0 && (
+                    <div className="selection-lineage">
+                      <span className="lineage-label">Parents:</span>
+                      <span className="lineage-ids">
+                        {selectedImage.parents.map((p) => `#${p}`).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  {selectedImage.children && selectedImage.children.length > 0 && (
+                    <div className="selection-lineage">
+                      <span className="lineage-label">Children:</span>
+                      <span className="lineage-ids">
+                        {selectedImage.children.map((c) => `#${c}`).join(", ")}
+                      </span>
+                    </div>
+                  )}
+                  <GenealogyLens selectedImageIds={[selectedImage.id]} />
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Visual Settings - always visible */}
-      <div className="inspector-section">
-        <div className="section-header">
-          <span>Visual Settings</span>
-        </div>
-        <div className="section-content">
-          <div className="setting-row">
-            <label>Image Size</label>
-            <input
-              type="range"
-              min="30"
-              max="400"
-              value={visualSettings.imageSize}
-              onChange={(e) => updateVisualSettings({ imageSize: parseInt(e.target.value) })}
-            />
-            <span className="setting-value">{visualSettings.imageSize}px</span>
-          </div>
-
-          <div className="setting-row">
-            <label>Opacity</label>
-            <input
-              type="range"
-              min="0.3"
-              max="1"
-              step="0.05"
-              value={visualSettings.imageOpacity}
-              onChange={(e) => updateVisualSettings({ imageOpacity: parseFloat(e.target.value) })}
-            />
-            <span className="setting-value">{Math.round(visualSettings.imageOpacity * 100)}%</span>
-          </div>
-
-          <div className="setting-row">
-            <label>Padding</label>
-            <input
-              type="range"
-              min="0.05"
-              max="0.3"
-              step="0.01"
-              value={visualSettings.layoutPadding}
-              onChange={(e) => updateVisualSettings({ layoutPadding: parseFloat(e.target.value) })}
-            />
-            <span className="setting-value">{Math.round(visualSettings.layoutPadding * 100)}%</span>
-          </div>
-
-          <div className="setting-row">
-            <label>Scale</label>
-            <input
-              type="range"
-              min="0.1"
-              max="5"
-              step="0.1"
-              value={visualSettings.coordinateScale}
-              onChange={(e) => updateVisualSettings({ coordinateScale: parseFloat(e.target.value) })}
-            />
-            <span className="setting-value">{visualSettings.coordinateScale.toFixed(1)}x</span>
-          </div>
-
-          <div className="setting-toggles">
-            <label className="toggle-row">
-              <input type="checkbox" checked={showLabels} onChange={onToggleLabels} />
-              Labels
-            </label>
-            <label className="toggle-row">
-              <input type="checkbox" checked={showGrid} onChange={onToggleGrid} />
-              Grid
-            </label>
-            <label className="toggle-row">
-              <input type="checkbox" checked={showClusters} onChange={onToggleClusters} />
-              Clusters
-            </label>
-          </div>
-
-          <div className="setting-row">
-            <label>Background</label>
-            <input
-              type="color"
-              value={backgroundColor}
-              onChange={(e) => onBackgroundColorChange(e.target.value)}
-            />
-          </div>
-
-          <div className="setting-actions">
-            <button onClick={() => resetCanvasBounds()}>Recenter</button>
-            <button onClick={() => {
-              resetCanvasBounds();
-              updateVisualSettings({ coordinateScale: 1.0, coordinateOffset: [0, 0, 0] });
-            }}>
-              Rescale
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* Visual Settings moved to dial popup */}
     </div>
   );
 };

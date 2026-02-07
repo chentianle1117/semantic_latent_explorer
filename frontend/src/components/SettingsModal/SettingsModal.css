@@ -1,0 +1,153 @@
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.settings-modal {
+  width: 440px;
+  max-height: 80vh;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid #30363d;
+}
+
+.settings-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.settings-close {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.settings-close:hover {
+  color: #e6edf3;
+  background: #21262d;
+}
+
+.settings-body {
+  padding: 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9d1d9;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.settings-hint {
+  font-size: 11px;
+  color: #8b949e;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.settings-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.settings-textarea:focus {
+  outline: none;
+  border-color: #58a6ff;
+}
+
+.settings-save-btn {
+  align-self: flex-end;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #58a6ff;
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-save-btn:hover:not(:disabled) {
+  background: rgba(88, 166, 255, 0.25);
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #c9d1d9;
+  cursor: pointer;
+}
+
+.settings-toggle input[type="checkbox"] {
+  accent-color: #58a6ff;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.settings-row label {
+  font-size: 12px;
+  color: #8b949e;
+  min-width: 140px;
+}
+
+.settings-row input[type="range"] {
+  flex: 1;
+  accent-color: #58a6ff;
+}
+
+.settings-row span {
+  font-size: 12px;
+  color: #8b949e;
+  min-width: 20px;
+}

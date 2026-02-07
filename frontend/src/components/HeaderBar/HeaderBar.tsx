@@ -47,6 +47,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
         </span>
       </div>
       <div className="header-right">
+        <button className="header-icon-btn" onClick={onOpenSettings} title="Project Brief">
+          📄
+        </button>
         <button className="header-icon-btn" onClick={onOpenSettings} title="Settings">
           &#9881;
         </button>

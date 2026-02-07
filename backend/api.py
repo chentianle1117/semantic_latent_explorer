@@ -194,6 +194,40 @@ def project_embeddings_to_coordinates(embeddings: np.ndarray, use_3d: bool = Non
     return np.column_stack([x_coords, y_coords])
 
 
+# Unified unit: minimum coord distance to avoid overlap (~120px shoe at 600px range → 0.2)
+MIN_COORD_DISTANCE = 0.2
+
+
+def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.45) -> np.ndarray:
+    """
+    Ensure minimum spacing between points to prevent overlap on canvas.
+    Uses unified unit system: target_min = max(extent * ratio, MIN_COORD_DISTANCE)
+    so dense clusters always get spread enough for ~120px shoe images.
+    """
+    if len(coords) < 2:
+        return coords
+    n = len(coords)
+    min_dist = float("inf")
+    for i in range(n):
+        for j in range(i + 1, n):
+            d = np.linalg.norm(coords[i] - coords[j])
+            if d < min_dist:
+                min_dist = d
+    if min_dist <= 1e-10:
+        rng = np.random.default_rng(42)
+        jitter = rng.uniform(-0.02, 0.02, coords.shape)
+        return coords + jitter
+    extent_range = float(np.ptp(coords))
+    if extent_range <= 1e-10:
+        extent_range = 1.0
+    target_min = max(extent_range * min_spacing_ratio, MIN_COORD_DISTANCE)
+    if min_dist >= target_min:
+        return coords
+    scale = target_min / min_dist
+    center = np.mean(coords, axis=0)
+    return (coords - center) * scale + center
+
+
 def image_metadata_to_response(img: ImageMetadata) -> ImageResponse:
     """Convert ImageMetadata to API response."""
     return ImageResponse(
@@ -330,6 +364,7 @@ async def update_semantic_axes(request: AxisUpdateRequest):
             print(f"Recalculating positions for {len(state.images_metadata)} images...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings)
+            new_coords = apply_layout_spread(new_coords)
 
             for i, img_meta in enumerate(state.images_metadata):
                 # Store coordinates as tuple (2D or 3D)
@@ -366,6 +401,7 @@ async def set_3d_mode(use_3d: bool):
             print(f"Recalculating positions for {len(state.images_metadata)} images in {'3D' if use_3d else '2D'} mode...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=use_3d)
+            new_coords = apply_layout_spread(new_coords)
 
             for i, img_meta in enumerate(state.images_metadata):
                 # Store coordinates as tuple (2D or 3D)
@@ -430,6 +466,33 @@ async def clear_canvas():
     await broadcast_state_update()
 
     return {"status": "success"}
+
+
+@app.post("/api/reapply-layout")
+async def reapply_layout():
+    """Re-apply layout spread to all images to fix overlap. Call after loading or when shoes overlap."""
+    try:
+        if state.axis_builder is None or state.embedder is None:
+            raise HTTPException(status_code=400, detail="Models not initialized")
+        if len(state.images_metadata) < 2:
+            return {"status": "success", "message": "Nothing to spread"}
+
+        print("Reapplying layout spread to fix overlap...")
+        all_embeddings = np.array([img.embedding for img in state.images_metadata])
+        new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=state.is_3d_mode)
+        new_coords = apply_layout_spread(new_coords)
+        for i, img_meta in enumerate(state.images_metadata):
+            img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+        print("OK: Layout reapplied")
+        await broadcast_state_update()
+        return {"status": "success", "message": "Layout reapplied"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in reapply_layout: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/add-external-images")
@@ -533,7 +596,7 @@ async def add_external_images(request: AddExternalImagesRequest):
         embeddings = state.embedder.extract_image_embeddings_from_pil(pil_images)
         print("OK: Embeddings extracted")
 
-        # Project embeddings onto semantic axes
+        # Project embeddings onto semantic axes (for new images only, then reproject all for layout)
         print("Projecting onto semantic axes...")
         coords = project_embeddings_to_coordinates(embeddings)
         print(f"OK: Coordinates calculated: {coords.shape}")
@@ -561,6 +624,16 @@ async def add_external_images(request: AddExternalImagesRequest):
             state.next_id += 1
 
         state.images_metadata.extend(new_metadata)
+
+        # Reproject ALL images with layout spread to prevent overlap
+        if len(state.images_metadata) > 1:
+            print("Applying layout spread to prevent overlap...")
+            all_embeddings = np.array([img.embedding for img in state.images_metadata])
+            all_coords = project_embeddings_to_coordinates(all_embeddings)
+            all_coords = apply_layout_spread(all_coords)
+            for i, img_meta in enumerate(state.images_metadata):
+                img_meta.coordinates = tuple(float(c) for c in all_coords[i])
+            print("OK: Layout spread applied")
 
         # Update parent images' children lists
         if request.parent_ids:

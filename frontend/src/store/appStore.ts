@@ -63,9 +63,10 @@ const initialState: AppState = {
     imageSize: 120,
     imageOpacity: 0.9,
     removeBackground: true,
-    layoutPadding: 0.1, // 10% padding by default
+    layoutPadding: 0.2, // 20% padding by default (reduces clutter)
     coordinateScale: 1.0, // Scale multiplier for coordinates (affects spacing)
     coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
+    contourStrength: 6, // 1–10, contour highlight thickness (higher = more visible)
   },
   canvasBounds: null, // Will auto-calculate on first render
   removeBackground: true,

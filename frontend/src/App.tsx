@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
 import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
 import { FloatingActionPanel } from "./components/FloatingActionPanel/FloatingActionPanel";
 import { ProgressModal } from "./components/ProgressModal/ProgressModal";
 import { HeaderBar } from "./components/HeaderBar/HeaderBar";
-import { LeftToolbar } from "./components/LeftToolbar/LeftToolbar";
 import { RightInspector } from "./components/RightInspector/RightInspector";
 import { BottomDrawer } from "./components/BottomDrawer/BottomDrawer";
+import { SettingsModal } from "./components/SettingsModal/SettingsModal";
 import { useProgressStore } from "./store/progressStore";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
@@ -15,6 +15,7 @@ import { StarterPromptsModal } from "./components/StarterPromptsModal/StarterPro
 import { AxisSuggestionModal } from "./components/AxisSuggestionModal/AxisSuggestionModal";
 import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPromptDialog";
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
+import { RadialDial } from "./components/RadialDial/RadialDial";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
@@ -69,6 +70,12 @@ export const App: React.FC = () => {
   const [showGrid, setShowGrid] = useState(false);
   const [showClusters, setShowClusters] = useState(false);
   const [backgroundColor, setBackgroundColor] = useState("#0d1117");
+  const [showRadialDial, setShowRadialDial] = useState(false);
+  const [radialDialPos, setRadialDialPos] = useState({ x: 0, y: 0 });
+  const lastMousePosRef = useRef({
+    x: typeof window !== "undefined" ? window.innerWidth / 2 : 400,
+    y: typeof window !== "undefined" ? window.innerHeight / 2 : 300,
+  });
 
   const images = useAppStore((state) =>
     state.images.filter((img) => img.visible)
@@ -82,6 +89,7 @@ export const App: React.FC = () => {
   const setImages = useAppStore((state) => state.setImages);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
   const setIsInitialized = useAppStore((state) => state.setIsInitialized);
+  const resetCanvasBounds = useAppStore((state) => state.resetCanvasBounds);
   const setIsGenerating = useAppStore((state) => state.setIsGenerating);
   const setGenerationProgress = useAppStore(
     (state) => state.setGenerationProgress
@@ -957,6 +965,25 @@ export const App: React.FC = () => {
     setSuggestedPrompts([]);
   };
 
+  const handlePromptSuggestion = async () => {
+    const brief = currentBrief || "Explore shoe design variations";
+    try {
+      useProgressStore
+        .getState()
+        .showProgress("analyzing", "Generating prompt ideas...", true);
+      const result = await apiClient.getInitialPrompts(brief);
+      setSuggestedPrompts(result.prompts || []);
+      useProgressStore.getState().hideProgress();
+      if (!result.prompts?.length) {
+        alert("Could not generate prompts. Try adding a design brief in Settings.");
+      }
+    } catch (error) {
+      console.error("Failed to get prompt suggestions:", error);
+      useProgressStore.getState().hideProgress();
+      alert("Failed to generate prompt ideas. Ensure Gemini API is configured.");
+    }
+  };
+
   const analyzeCanvas = async () => {
     if (images.length < 5) {
       console.log("Skipping analysis: too few images (need at least 5)");
@@ -1185,6 +1212,30 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleRefreshLayout = async () => {
+    const axisLabels = useAppStore.getState().axisLabels;
+    try {
+      useProgressStore
+        .getState()
+        .showProgress("reprojecting", "Refreshing layout...", false);
+      await apiClient.updateAxes({
+        x_negative: axisLabels.x[0],
+        x_positive: axisLabels.x[1],
+        y_negative: axisLabels.y[0],
+        y_positive: axisLabels.y[1],
+      });
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
+      resetCanvasBounds();
+      useProgressStore.getState().hideProgress();
+    } catch (error) {
+      console.error("Failed to refresh layout:", error);
+      useProgressStore.getState().hideProgress();
+      alert("Failed to refresh layout");
+    }
+  };
+
   const handleSuggestAxes = async () => {
     // Prevent overlapping requests
     if (isLoadingAxes || showAxisSuggestionModal) {
@@ -1304,6 +1355,7 @@ export const App: React.FC = () => {
         setPromptDialogImageId(null);
         setShowPromptDialog(false);
         setFloatingPanelPos(null);
+        setShowRadialDial(false);
         clearSelection(); // Also clear selection to close dialogs
       }
     };
@@ -1311,6 +1363,35 @@ export const App: React.FC = () => {
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
   }, [clearSelection]);
+  // Radial dial: Space key = toggle (stays open until Space again or Escape or click outside)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === " " && !e.repeat) {
+        const target = e.target as HTMLElement;
+        if (target.closest("input") || target.closest("textarea")) return;
+        e.preventDefault();
+        setShowRadialDial((prev) => {
+          if (prev) return false;
+          setRadialDialPos({
+            x: lastMousePosRef.current.x,
+            y: lastMousePosRef.current.y,
+          });
+          return true;
+        });
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Track mouse for Space-triggered dial
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+    };
+    document.addEventListener("mousemove", handleMouseMove);
+    return () => document.removeEventListener("mousemove", handleMouseMove);
+  }, []);
 
   // Update floating panel position when selection changes
   useEffect(() => {
@@ -1346,19 +1427,7 @@ export const App: React.FC = () => {
           onOpenSettings={() => setShowSettingsModal(true)}
         />
 
-        {/* Left Toolbar */}
-        <LeftToolbar
-          onGenerate={() => setShowTextToImageDialog(true)}
-          onBatchGenerate={() => setShowBatchPromptDialog(true)}
-          onLoadImages={() => setShowExternalImageLoader(true)}
-          onExport={handleExportZip}
-          onClearAll={handleClearCanvas}
-          onAnalyzeCanvas={analyzeCanvas}
-          onSuggestAxes={handleSuggestAxes}
-          isGenerating={isGenerating}
-          isAnalyzing={isAnalyzing}
-          isLoadingAxes={isLoadingAxes}
-        />
+        {/* Left Toolbar removed - all actions in Radial Dial (Space or middle-click) */}
 
         {/* Center Canvas */}
         <div className="center-canvas">
@@ -1371,7 +1440,16 @@ export const App: React.FC = () => {
             />
           )}
 
-          <div className="canvas-container">
+          <div
+            className="canvas-container"
+            onMouseDown={(e) => {
+              if (e.button === 1) {
+                e.preventDefault();
+                setRadialDialPos({ x: e.clientX, y: e.clientY });
+                setShowRadialDial(true);
+              }
+            }}
+          >
             {/* Conditionally render 2D or 3D canvas */}
             {is3DMode ? (
               <SemanticCanvas3D
@@ -1590,6 +1668,102 @@ export const App: React.FC = () => {
         {/* Bottom Drawer */}
         <BottomDrawer />
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        currentBrief={currentBrief}
+        onBriefChange={setCurrentBrief}
+        unexpectedImagesCount={unexpectedImagesCount}
+        onUnexpectedImagesCountChange={setUnexpectedImagesCount}
+        showLabels={showLabels}
+        showGrid={showGrid}
+        showClusters={showClusters}
+        backgroundColor={backgroundColor}
+        onToggleLabels={() => setShowLabels(!showLabels)}
+        onToggleGrid={() => setShowGrid(!showGrid)}
+        onToggleClusters={() => setShowClusters(!showClusters)}
+        onBackgroundColorChange={setBackgroundColor}
+      />
+
+      {/* Radial Dial (global actions: Space or middle-click) */}
+      <RadialDial
+        x={radialDialPos.x}
+        y={radialDialPos.y}
+        isOpen={showRadialDial}
+        onClose={() => setShowRadialDial(false)}
+        actions={[
+          {
+            id: "generate",
+            icon: "✨",
+            label: "Generate",
+            description: "Generate images from text",
+            category: "image",
+            onClick: () => setShowTextToImageDialog(true),
+          },
+          {
+            id: "load",
+            icon: "📁",
+            label: "Load Files",
+            description: "Load images from disk",
+            category: "system",
+            onClick: () => setShowExternalImageLoader(true),
+          },
+          {
+            id: "analyze",
+            icon: "🔍",
+            label: "Analyze",
+            description: "Analyze canvas with AI",
+            category: "agentic",
+            onClick: analyzeCanvas,
+          },
+          {
+            id: "analyze-axis",
+            icon: "📐",
+            label: "Suggest Axes",
+            description: "Suggest alternative axis labels",
+            category: "agentic",
+            onClick: handleSuggestAxes,
+          },
+          {
+            id: "prompt-suggestion",
+            icon: "💡",
+            label: "Prompt Ideas",
+            description: "AI-generated starter prompts from brief",
+            category: "agentic",
+            onClick: handlePromptSuggestion,
+          },
+          {
+            id: "save",
+            icon: "📦",
+            label: "Save",
+            description: "Export as ZIP",
+            category: "global",
+            onClick: handleExportZip,
+          },
+          {
+            id: "delete",
+            icon: "🗑️",
+            label: "Delete",
+            description: "Clear all images",
+            category: "global",
+            onClick: () => {
+              if (window.confirm("Clear all images from the canvas?")) {
+                handleClearCanvas();
+              }
+            },
+          },
+          {
+            id: "settings",
+            icon: "🔧",
+            label: "Settings",
+            description: "App & visual preferences",
+            category: "global",
+            onClick: () => setShowSettingsModal(true),
+          },
+        ]}
+      />
     </>
   );
 };

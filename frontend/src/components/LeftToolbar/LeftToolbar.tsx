@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { useAppStore } from "../../store/appStore";
 import { ToolbarFlyout } from "./ToolbarFlyout";
 import { AxisEditor } from "../AxisEditor/AxisEditor";

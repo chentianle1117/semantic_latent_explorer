@@ -8,7 +8,7 @@ import * as d3 from "d3";
 import { useAppStore } from "../../store/appStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
 import { apiClient } from "../../api/client";
-import type { ImageData, RegionHighlight, PendingImage } from "../../types";
+import type { RegionHighlight, PendingImage } from "../../types";
 
 interface SemanticCanvasProps {
   onSelectionChange: (x: number, y: number, count: number) => void;
@@ -31,6 +31,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomTransformRef = useRef<d3.ZoomTransform | null>(null);
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const xScaleRef = useRef<d3.ScaleLinear<number, number> | null>(null);
+  const yScaleRef = useRef<d3.ScaleLinear<number, number> | null>(null);
 
   // Subscribe only to the specific state we need
   const allImages = useAppStore((state) => state.images);
@@ -166,6 +169,57 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("d", "M 5 10 L 0 0 L 10 0 Z")
       .attr("fill", "#bc8cff");
 
+    // Contour filters: selection (blue), parent (green), child (yellow) — all follow shoe shape
+    const contourRadius = Math.max(4, (visualSettings.contourStrength ?? 6));
+
+    const addContourFilter = (
+      id: string,
+      contourRgb: string,
+      glowRgb: string
+    ) => {
+      const f = defs.append("filter").attr("id", id)
+        .attr("x", "-50%").attr("y", "-50%")
+        .attr("width", "200%").attr("height", "200%");
+      f.append("feMorphology").attr("in", "SourceAlpha").attr("operator", "dilate")
+        .attr("radius", contourRadius).attr("result", "dilated");
+      f.append("feComposite").attr("in", "dilated").attr("in2", "SourceAlpha")
+        .attr("operator", "out").attr("result", "outline");
+      f.append("feColorMatrix").attr("in", "outline").attr("type", "matrix")
+        .attr("values", contourRgb).attr("result", "contour");
+      f.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", 10).attr("result", "blur");
+      f.append("feColorMatrix").attr("in", "blur").attr("type", "matrix")
+        .attr("values", glowRgb).attr("result", "glow");
+      const m = f.append("feMerge");
+      m.append("feMergeNode").attr("in", "glow");
+      m.append("feMergeNode").attr("in", "contour");
+      m.append("feMergeNode").attr("in", "SourceGraphic");
+    };
+    // Blue selection — strong glow for opaque images, contour for transparent
+    addContourFilter("selection-glow",
+      "0 0 0 0 0.6  0 0 0 0 0.8  0 0 0 0 1  0 0 0 0 1",
+      "0 0 0 0 0.5  0 0 0 0 0.7  0 0 0 0 1  0 0 0 0.9 0");
+    // feDropShadow: guaranteed visible glow (works on opaque and transparent images)
+    const dropShadowFilter = defs.append("filter").attr("id", "selection-drop-shadow")
+      .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
+    dropShadowFilter.append("feDropShadow")
+      .attr("dx", 0).attr("dy", 0).attr("stdDeviation", 14)
+      .attr("flood-color", "#58a6ff").attr("flood-opacity", 0.95);
+    addContourFilter("selection-glow-parent",
+      "0 0 0 0 0.25  0 0 0 0 0.73  0 0 0 0 0.31  0 0 0 0 1",
+      "0 0 0 0 0.2  0 0 0 0 0.65  0 0 0 0 0.35  0 0 0 0.9 0");
+    addContourFilter("selection-glow-child",
+      "0 0 0 0 0.82  0 0 0 0 0.6  0 0 0 0 0.13  0 0 0 0 1",
+      "0 0 0 0 0.75  0 0 0 0 0.6  0 0 0 0 0.2  0 0 0 0.9 0");
+    // Drop-shadow for parent (green) and child (yellow)
+    defs.append("filter").attr("id", "parent-drop-shadow")
+      .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%")
+      .append("feDropShadow").attr("dx", 0).attr("dy", 0).attr("stdDeviation", 10)
+      .attr("flood-color", "#3fb950").attr("flood-opacity", 0.9);
+    defs.append("filter").attr("id", "child-drop-shadow")
+      .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%")
+      .append("feDropShadow").attr("dx", 0).attr("dy", 0).attr("stdDeviation", 10)
+      .attr("flood-color", "#d29922").attr("flood-opacity", 0.9);
+
     // Create main group for zoom/pan
     const g = svg.append("g").attr("class", "main-group");
 
@@ -179,6 +233,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       });
 
     svg.call(zoom as any);
+    zoomRef.current = zoom;
 
     // Restore previous zoom/pan state
     if (zoomTransformRef.current) {
@@ -229,144 +284,27 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .domain([yMin, yMax])
       .range([height - 50, 50]);
 
-    // Group for grid lines (behind everything)
-    const gridGroup = g.append("g").attr("class", "grid-lines");
+    xScaleRef.current = xScale;
+    yScaleRef.current = yScale;
 
-    // Draw grid lines using adaptive spacing based on bounds
-    const dataRangeX = xMax - xMin;
-    const dataRangeY = yMax - yMin;
-
-    // Aim for ~12 grid lines across the visible range
-    const targetLineCount = 12;
-    const gridSpacingX = dataRangeX / targetLineCount;
-    const gridSpacingY = dataRangeY / targetLineCount;
-
-    const gridColor = "#30363d";
-    const gridOpacity = 0.25;
-
-    // Calculate grid bounds with extra padding
-    const gridXMin = Math.floor(xMin / gridSpacingX) * gridSpacingX - gridSpacingX * 2;
-    const gridXMax = Math.ceil(xMax / gridSpacingX) * gridSpacingX + gridSpacingX * 2;
-    const gridYMin = Math.floor(yMin / gridSpacingY) * gridSpacingY - gridSpacingY * 2;
-    const gridYMax = Math.ceil(yMax / gridSpacingY) * gridSpacingY + gridSpacingY * 2;
-
-    // Vertical grid lines
-    for (let x = gridXMin; x <= gridXMax; x += gridSpacingX) {
-      gridGroup
-        .append("line")
-        .attr("x1", xScale(x))
-        .attr("y1", yScale(gridYMin))
-        .attr("x2", xScale(x))
-        .attr("y2", yScale(gridYMax))
-        .attr("stroke", gridColor)
-        .attr("stroke-width", 1)
-        .attr("opacity", gridOpacity);
-    }
-
-    // Horizontal grid lines
-    for (let y = gridYMin; y <= gridYMax; y += gridSpacingY) {
-      gridGroup
-        .append("line")
-        .attr("x1", xScale(gridXMin))
-        .attr("y1", yScale(y))
-        .attr("x2", xScale(gridXMax))
-        .attr("y2", yScale(y))
-        .attr("stroke", gridColor)
-        .attr("stroke-width", 1)
-        .attr("opacity", gridOpacity);
-    }
+    // Grid removed per user request — no overlay
 
     // Group for region highlights (behind images)
     const regionHighlightsGroup = g.append("g").attr("class", "region-highlights");
 
-    // Group for genealogy lines
-    const linesGroup = g.append("g").attr("class", "genealogy-lines");
+    // Group for genealogy lines (drawn in selection effect)
+    g.append("g").attr("class", "genealogy-lines");
 
     // Group for images
     const imagesGroup = g.append("g").attr("class", "images");
 
     // Removed axis line rendering; labels remain via AxisEditor components
-
-    // Function to draw genealogy lines
-    const drawGenealogy = (imgData: ImageData) => {
-      linesGroup.selectAll("*").remove();
-
-      const coordScale = visualSettings.coordinateScale || 1.0;
-      const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
-      const currentX = xScale((imgData.coordinates[0] + coordOffset[0]) * coordScale);
-      const currentY = yScale((imgData.coordinates[1] + coordOffset[1]) * coordScale);
-
-      // Draw parent lines (green)
-      imgData.parents.forEach((parentId) => {
-        const parent = images.find((img) => img.id === parentId);
-        if (!parent) return;
-
-        const parentX = xScale((parent.coordinates[0] + coordOffset[0]) * coordScale);
-        const parentY = yScale((parent.coordinates[1] + coordOffset[1]) * coordScale);
-        const midX = (parentX + currentX) / 2;
-        const midY = (parentY + currentY) / 2;
-        const dx = currentX - parentX;
-        const dy = currentY - parentY;
-        const controlX = midX - dy * 0.2;
-        const controlY = midY + dx * 0.2;
-        const pathData = `M ${parentX} ${parentY} Q ${controlX} ${controlY} ${currentX} ${currentY}`;
-
-        linesGroup
-          .append("path")
-          .attr("d", pathData)
-          .attr("stroke", "#3fb950")
-          .attr("stroke-width", 3)
-          .attr("stroke-dasharray", "8,4")
-          .attr("fill", "none")
-          .attr("opacity", 0.8);
-
-        imagesGroup
-          .select(`#image-${parentId} .image-border`)
-          .attr("stroke", "#3fb950")
-          .attr("stroke-width", 3)
-          .attr("opacity", 1);
-      });
-
-      // Draw child lines (orange)
-      imgData.children.forEach((childId) => {
-        const child = images.find((img) => img.id === childId);
-        if (!child) return;
-
-        const childX = xScale((child.coordinates[0] + coordOffset[0]) * coordScale);
-        const childY = yScale((child.coordinates[1] + coordOffset[1]) * coordScale);
-        const midX = (currentX + childX) / 2;
-        const midY = (currentY + childY) / 2;
-        const dx = childX - currentX;
-        const dy = childY - currentY;
-        const controlX = midX - dy * 0.2;
-        const controlY = midY + dx * 0.2;
-        const pathData = `M ${currentX} ${currentY} Q ${controlX} ${controlY} ${childX} ${childY}`;
-
-        linesGroup
-          .append("path")
-          .attr("d", pathData)
-          .attr("stroke", "#d29922")
-          .attr("stroke-width", 2.5)
-          .attr("stroke-dasharray", "8,4")
-          .attr("fill", "none")
-          .attr("opacity", 0.8);
-
-        imagesGroup
-          .select(`#image-${childId} .image-border`)
-          .attr("stroke", "#d29922")
-          .attr("stroke-width", 3)
-          .attr("opacity", 1);
-      });
-    };
-
-    // Clear genealogy
-    const clearGenealogy = () => {
-      linesGroup.selectAll("*").remove();
-      imagesGroup.selectAll(".image-border").attr("opacity", 0);
-    };
+    // Genealogy is drawn only on selection (in separate effect), not on hover
 
     // Render images
     const imageSize = visualSettings.imageSize;
+    const strokeHover = Math.max(1, Math.min(4, Math.round(imageSize * 0.04)));
+    const strokeSelection = Math.max(2, Math.min(6, Math.round(imageSize * 0.05)));
     const coordScale = visualSettings.coordinateScale || 1.0; // Get coordinate scale multiplier
     const coordOffset = visualSettings.coordinateOffset || [0, 0, 0]; // Get coordinate offset
     const imageNodes = imagesGroup
@@ -470,42 +408,18 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         }, 0);
       })
       .on("mouseenter", function (_event, d) {
-        console.log("👆 Mouse enter image:", d.id, "parents:", d.parents, "children:", d.children);
         d3.select(this.parentNode as SVGGElement)
           .select(".hover-border")
           .attr("stroke", "#58a6ff")
-          .attr("stroke-width", 3)
-          .attr("opacity", 1);
-
-        // Update hoveredImageId for bi-directional highlighting with tree modal
+          .attr("stroke-width", strokeHover)
+          .attr("opacity", 0.4);
         useAppStore.getState().setHoveredImageId(d.id);
-
-        // Only show hover genealogy if no images are selected
-        const currentSelection = useAppStore.getState().selectedImageIds;
-        if (currentSelection.length === 0) {
-          console.log("Drawing genealogy for hover on image", d.id);
-          drawGenealogy(d);
-          console.log("Genealogy lines drawn:", linesGroup.selectAll("path").size());
-        } else {
-          console.log("Selection exists, skipping hover genealogy");
-        }
       })
       .on("mouseleave", function () {
-        console.log("👋 Mouse leave");
         d3.select(this.parentNode as SVGGElement)
           .select(".hover-border")
           .attr("opacity", 0);
-
-        // Clear hoveredImageId
         useAppStore.getState().setHoveredImageId(null);
-
-        // Only clear if no selection
-        const currentSelection = useAppStore.getState().selectedImageIds;
-        if (currentSelection.length === 0) {
-          console.log("Clearing hover genealogy");
-          clearGenealogy();
-        }
-        // Don't update store - it causes re-renders
       });
 
     // Add image
@@ -520,18 +434,19 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("clip-path", `inset(0 round 8px)`)
       .style("pointer-events", "none");
 
+    const pad = Math.max(2, Math.round(imageSize * 0.04));
     // Hover border
     imageNodes
       .append("rect")
       .attr("class", "hover-border")
-      .attr("x", -imageSize / 2 - 2)
-      .attr("y", -imageSize / 2 - 2)
-      .attr("width", imageSize + 4)
-      .attr("height", imageSize + 4)
+      .attr("x", -imageSize / 2 - pad)
+      .attr("y", -imageSize / 2 - pad)
+      .attr("width", imageSize + pad * 2)
+      .attr("height", imageSize + pad * 2)
       .attr("rx", 8)
       .attr("fill", "none")
       .attr("stroke", "#58a6ff")
-      .attr("stroke-width", 3)
+      .attr("stroke-width", strokeHover)
       .attr("opacity", 0)
       .style("pointer-events", "none");
 
@@ -539,14 +454,14 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     imageNodes
       .append("rect")
       .attr("class", "selection-border")
-      .attr("x", -imageSize / 2 - 3)
-      .attr("y", -imageSize / 2 - 3)
-      .attr("width", imageSize + 6)
-      .attr("height", imageSize + 6)
+      .attr("x", -imageSize / 2 - pad - 1)
+      .attr("y", -imageSize / 2 - pad - 1)
+      .attr("width", imageSize + (pad + 1) * 2)
+      .attr("height", imageSize + (pad + 1) * 2)
       .attr("rx", 8)
       .attr("fill", "none")
       .attr("stroke", "#ff0000")
-      .attr("stroke-width", 5)
+      .attr("stroke-width", strokeSelection)
       .attr("opacity", 0)
       .style("pointer-events", "none");
 
@@ -554,13 +469,13 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     imageNodes
       .append("rect")
       .attr("class", "image-border")
-      .attr("x", -imageSize / 2 - 2)
-      .attr("y", -imageSize / 2 - 2)
-      .attr("width", imageSize + 4)
-      .attr("height", imageSize + 4)
+      .attr("x", -imageSize / 2 - pad)
+      .attr("y", -imageSize / 2 - pad)
+      .attr("width", imageSize + pad * 2)
+      .attr("height", imageSize + pad * 2)
       .attr("rx", 8)
       .attr("fill", "none")
-      .attr("stroke-width", 3)
+      .attr("stroke-width", strokeHover)
       .attr("opacity", 0)
       .style("pointer-events", "none");
 
@@ -706,7 +621,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     // Render region highlights (AI agent exploration suggestions)
     if (regionHighlights.length > 0) {
-      regionHighlights.forEach((region, index) => {
+      regionHighlights.forEach((region) => {
         const [normX, normY] = region.center;
         // Convert normalized coordinates (0-1) to data coordinates
         const dataX = xMin + normX * (xMax - xMin);
@@ -936,43 +851,32 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       linesGroup.selectAll("*").remove();
     }
 
-    // Reset all borders
+    // Reset all borders and filters
     imagesGroup.selectAll(".image-border").attr("opacity", 0);
-    imagesGroup
-      .selectAll(".selection-border")
-      .attr("stroke", "#ff0000")
-      .attr("opacity", 0)
-      .style("filter", "none");
+    imagesGroup.selectAll(".selection-border").attr("opacity", 0).attr("stroke", "#58a6ff");
+    imagesGroup.selectAll(".image-node").attr("filter", null);
 
-    // Update selection borders
+    // Selection: box border (persistent)
     selectedImageIds.forEach((id) => {
-      imagesGroup.select(`#image-${id} .selection-border`).attr("opacity", 1);
+      imagesGroup.select(`#image-${id} .selection-border`).attr("opacity", 0.7);
     });
 
     // Highlight images in hovered group
     if (hoveredGroupId) {
       imagesGroup.selectAll(".image-node").each(function (d: any) {
         if (d.group_id === hoveredGroupId) {
-          d3.select(this)
-            .select(".selection-border")
-            .attr("stroke", "#ff0000")
-            .attr("opacity", 0.8)
-            .style("filter", "drop-shadow(0 0 12px rgba(255, 0, 0, 0.6))");
+          d3.select(this).select(".hover-border").attr("opacity", 0.35);
         }
       });
     }
 
     // Highlight hovered image from tree modal
     if (hoveredImageId) {
-      imagesGroup
-        .select(`#image-${hoveredImageId} .selection-border`)
-        .attr("stroke", "#58a6ff")
-        .attr("opacity", 1)
-        .style("filter", "drop-shadow(0 0 16px rgba(88, 166, 255, 0.8))");
+      imagesGroup.select(`#image-${hoveredImageId} .hover-border`).attr("opacity", 0.35);
     }
 
-    // Show genealogy for selected images or hovered image from tree
-    const idsToShowGenealogy = selectedImageIds.length > 0 ? selectedImageIds : (hoveredImageId ? [hoveredImageId] : []);
+    // Show genealogy only for selected images (click), not on hover
+    const idsToShowGenealogy = selectedImageIds;
 
     if (idsToShowGenealogy.length > 0) {
       idsToShowGenealogy.forEach((selectedId) => {
@@ -1032,16 +936,18 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               .append("path")
               .attr("d", pathData)
               .attr("stroke", "#3fb950")
-              .attr("stroke-width", 3)
+              .attr("stroke-width", 2)
               .attr("stroke-dasharray", "8,4")
               .attr("fill", "none")
-              .attr("opacity", 0.8);
+              .attr("opacity", 0.5);
 
-            imagesGroup
-              .select(`#image-${parentId} .image-border`)
-              .attr("stroke", "#3fb950")
-              .attr("stroke-width", 3)
-              .attr("opacity", 1);
+            if (!selectedImageIds.includes(parentId)) {
+              imagesGroup
+                .select(`#image-${parentId} .image-border`)
+                .attr("stroke", "#3fb950")
+                .attr("stroke-width", 1.5)
+                .attr("opacity", 0.6);
+            }
           });
 
           // Draw child lines
@@ -1063,21 +969,68 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               .append("path")
               .attr("d", pathData)
               .attr("stroke", "#d29922")
-              .attr("stroke-width", 2.5)
+              .attr("stroke-width", 2)
               .attr("stroke-dasharray", "8,4")
               .attr("fill", "none")
-              .attr("opacity", 0.8);
+              .attr("opacity", 0.5);
 
-            imagesGroup
-              .select(`#image-${childId} .image-border`)
-              .attr("stroke", "#d29922")
-              .attr("stroke-width", 3)
-              .attr("opacity", 1);
+            if (!selectedImageIds.includes(childId)) {
+              imagesGroup
+                .select(`#image-${childId} .image-border`)
+                .attr("stroke", "#d29922")
+                .attr("stroke-width", 1.5)
+                .attr("opacity", 0.6);
+            }
           });
         }
       });
     }
   }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, visualSettings]);
+
+  // FlyTo effect: smoothly pan/zoom to a specific image
+  const flyToImageId = useAppStore((state) => state.flyToImageId);
+  useEffect(() => {
+    if (
+      !flyToImageId ||
+      !svgRef.current ||
+      !zoomRef.current ||
+      !xScaleRef.current ||
+      !yScaleRef.current
+    )
+      return;
+
+    const img = images.find((i) => i.id === flyToImageId);
+    if (!img) return;
+
+    const coordScale = visualSettings.coordinateScale || 1.0;
+    const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+    const px = xScaleRef.current(
+      (img.coordinates[0] + coordOffset[0]) * coordScale
+    );
+    const py = yScaleRef.current(
+      (img.coordinates[1] + coordOffset[1]) * coordScale
+    );
+
+    const svg = d3.select(svgRef.current);
+    const width = svgRef.current.clientWidth;
+    const height = svgRef.current.clientHeight;
+
+    // Zoom to scale 2, centered on the image
+    const targetScale = 2;
+    const tx = width / 2 - px * targetScale;
+    const ty = height / 2 - py * targetScale;
+    const targetTransform = d3.zoomIdentity
+      .translate(tx, ty)
+      .scale(targetScale);
+
+    svg
+      .transition()
+      .duration(600)
+      .call(zoomRef.current.transform as any, targetTransform);
+
+    // Clear the flyTo request
+    useAppStore.getState().setFlyToImageId(null);
+  }, [flyToImageId, images, visualSettings]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>

@@ -52,13 +52,13 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
               </>
             ) : (
               <>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <div className="reference-grid">
                   {referenceImages.map((img) => (
                     <img
                       key={img.id}
                       src={`data:image/png;base64,${img.base64_image}`}
                       alt={`Reference ${img.id}`}
-                      style={{ width: '80px', height: '80px', borderRadius: '4px', objectFit: 'cover' }}
+                      className="reference-thumb"
                     />
                   ))}
                 </div>

@@ -17,6 +17,8 @@
   --warning-orange: #d29922;
   --selection-orange: #ffa657;
   --danger-red: #f85149;
+  --glow-cyan: #00d2ff;
+  --glow-silver: #c0d0e0;
 
   /* Layout */
   --header-height: clamp(44px, 3.5vh, 56px);
@@ -486,21 +488,24 @@ body {
   }
 }
 
-/* New Layout Structure */
+/* Ethereal Layout Structure - Expert Workspace */
 .app-layout {
   display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: var(--header-height) 1fr auto;
+  /* Left Toolbar (4rem) | Canvas (flex) | Right Inspector (responsive elastic) */
+  grid-template-columns: 4rem 1fr min(28vw, 380px);
+  /* Canvas Area (full height) | Bottom Timeline Strip (auto) */
+  grid-template-rows: 1fr auto;
   height: 100vh;
   width: 100vw;
   gap: 0;
   overflow: hidden;
+  background: #0d0d0d;
 }
 
-/* Canvas spans under header */
+/* Canvas area with integrated header */
 .center-canvas {
-  grid-row: 1 / 3;
-  grid-column: 1;
+  grid-row: 1;
+  grid-column: 2;
   display: flex;
   flex-direction: column;
   background: #0d1117;
@@ -732,4 +737,44 @@ body {
 .right-panel.collapsed .collapse-btn {
   left: 10px;
   right: auto;
+}
+
+/* ===== Ethereal Energy Node Glow Effects ===== */
+
+.image-node.selected-glow {
+  filter: drop-shadow(0 0 2px #fff)
+          drop-shadow(0 0 15px #00FFFF);
+  opacity: 1.0;
+}
+
+/* ===== Terrain Toggle ===== */
+
+.terrain-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgba(22, 27, 34, 0.8);
+  backdrop-filter: blur(8px);
+  border-radius: 8px;
+  padding: 3px;
+  border: 1px solid var(--border);
+}
+
+.terrain-toggle button {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.terrain-toggle button:hover {
+  color: var(--text-muted);
+}
+
+.terrain-toggle button.active {
+  background: rgba(88, 166, 255, 0.2);
+  color: var(--primary-blue);
 }

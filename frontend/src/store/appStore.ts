@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus } from '../types';
 
 interface AppStore extends AppState {
   // Actions
@@ -45,6 +45,13 @@ interface AppStore extends AppState {
   setActiveToolbarFlyout: (flyout: string | null) => void;
   setFlyToImageId: (id: number | null) => void;
 
+  // Agent passive observer
+  agentStatus: AgentStatus;
+  agentInsight: AgentInsight | null;
+  setAgentStatus: (status: AgentStatus) => void;
+  setAgentInsight: (insight: AgentInsight | null) => void;
+  dismissInsight: () => void;
+
   clearAll: () => void;
 }
 
@@ -83,6 +90,10 @@ const initialState: AppState = {
   isDrawerExpanded: false,
   activeToolbarFlyout: null,
   flyToImageId: null,
+
+  // Agent defaults
+  agentStatus: 'idle' as AgentStatus,
+  agentInsight: null as AgentInsight | null,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -190,6 +201,16 @@ export const useAppStore = create<AppStore>((set) => ({
     activeToolbarFlyout: state.activeToolbarFlyout === flyout ? null : flyout,
   })),
   setFlyToImageId: (id) => set({ flyToImageId: id }),
+
+  // Agent passive observer
+  agentStatus: 'idle',
+  agentInsight: null,
+  setAgentStatus: (status) => set({ agentStatus: status }),
+  setAgentInsight: (insight) => set({
+    agentInsight: insight,
+    agentStatus: insight ? 'insight-ready' : 'idle',
+  }),
+  dismissInsight: () => set({ agentInsight: null, agentStatus: 'idle' }),
 
   // Clear all
   clearAll: () =>

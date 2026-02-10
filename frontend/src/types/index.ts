@@ -162,3 +162,17 @@ export interface PendingImage {
   variation: PromptVariation;
   isPending: true;
 }
+
+// Agent Passive Observer types
+export type AgentInsightType = 'gap' | 'axis' | 'prompt' | 'variation';
+
+export interface AgentInsight {
+  id: string;
+  type: AgentInsightType;
+  message: string;
+  data: any;
+  isRead: boolean;
+  timestamp: number;
+}
+
+export type AgentStatus = 'idle' | 'thinking' | 'insight-ready';

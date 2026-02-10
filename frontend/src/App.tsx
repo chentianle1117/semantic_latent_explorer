@@ -17,6 +17,8 @@ import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPrompt
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
+import { AgentToast } from "./components/AgentToast/AgentToast";
+import { useAgentObserver } from "./hooks/useAgentObserver";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
@@ -83,6 +85,9 @@ export const App: React.FC = () => {
   const isGenerating = useAppStore((state) => state.isGenerating);
   const removeBackground = useAppStore((state) => state.removeBackground);
   const is3DMode = useAppStore((state) => state.is3DMode);
+
+  // Mount passive observer agent
+  useAgentObserver({ brief: currentBrief });
 
   const setImages = useAppStore((state) => state.setImages);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
@@ -1172,10 +1177,6 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleDismissRegions = () => {
-    setRegionHighlights([]);
-  };
-
   const handleAcceptPending = async (pendingId: string) => {
     console.log("Accepting pending image:", pendingId);
 
@@ -1400,6 +1401,13 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* Agent Toast - floating notification */}
+      <AgentToast
+        onShowGap={(regions) => {
+          setRegionHighlights(regions);
+        }}
+      />
+
       <div className="app-layout">
         {/* Header Bar */}
         <HeaderBar
@@ -1410,6 +1418,14 @@ export const App: React.FC = () => {
           is3DMode={is3DMode}
           onToggle3D={() => useAppStore.getState().setIs3DMode(!is3DMode)}
           onOpenSettings={() => setShowSettingsModal(true)}
+          onInsightClick={() => {
+            // When clicking the insight pill, show the regions on canvas
+            const insight = useAppStore.getState().agentInsight;
+            if (insight?.data?.allRegions) {
+              setRegionHighlights(insight.data.allRegions);
+            }
+            useAppStore.getState().dismissInsight();
+          }}
         />
 
         {/* Left Toolbar removed - all actions in Radial Dial (Space or middle-click) */}
@@ -1453,7 +1469,6 @@ export const App: React.FC = () => {
                 onGenerateFromRegion={(prompt, region) =>
                   handleRegionPromptClick(prompt, region)
                 }
-                onDismissRegions={handleDismissRegions}
                 pendingImages={pendingImages}
                 onAcceptPending={handleAcceptPending}
                 onDiscardPending={handleDiscardPending}

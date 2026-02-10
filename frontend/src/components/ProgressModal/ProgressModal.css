@@ -224,8 +224,5 @@
   font-weight: 700;
 }
 
-/* Add gradient for circle progress */
-svg defs {
-  display: none;
-}
+/* Gradient for circle progress is defined inline in SVG defs */
 

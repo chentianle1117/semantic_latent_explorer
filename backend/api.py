@@ -198,13 +198,12 @@ def project_embeddings_to_coordinates(embeddings: np.ndarray, use_3d: bool = Non
     return coords
 
 
-# Unified unit: minimum coord distance to avoid overlap (~120px shoe at 600px range → 0.2)
-# Increased to 0.35 for more aggressive spacing; sqrt(n) division reduced spacing as n grew
-MIN_COORD_DISTANCE = 0.35
+# Minimum coord distance to avoid overlap — increased for stronger separation
+MIN_COORD_DISTANCE = 0.5
 
 
-def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.4,
-                        max_iterations: int = 80) -> np.ndarray:
+def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.5,
+                        max_iterations: int = 150) -> np.ndarray:
     """
     Force-directed repulsion to prevent overlap while preserving relative positions.
     Iteratively pushes overlapping nodes apart, then re-centers to origin.
@@ -215,6 +214,14 @@ def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.4,
     n = len(coords)
     result = coords.copy().astype(float)
     rng = np.random.default_rng(42)
+
+    # Pre-spread: scale coordinates so extent fills at least 2.0 units
+    extent_pre = np.ptp(result, axis=0)
+    max_extent_pre = float(np.max(extent_pre))
+    if max_extent_pre > 1e-6 and max_extent_pre < 2.0:
+        scale_factor = 2.0 / max_extent_pre
+        center_pre = np.mean(result, axis=0)
+        result = (result - center_pre) * scale_factor + center_pre
 
     # Handle degenerate case: all points identical
     dists_check = np.linalg.norm(result - result[0], axis=-1)
@@ -246,11 +253,11 @@ def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.4,
                     max_overlap = max(max_overlap, overlap)
                     # Repulsion force proportional to overlap
                     direction = delta / dist
-                    force_magnitude = overlap * 0.5  # Move each node half the overlap
+                    force_magnitude = overlap * 0.8  # Stronger repulsion
                     forces[i] += direction * force_magnitude
                     forces[j] -= direction * force_magnitude
 
-        if max_overlap < min_dist * 0.05:  # Converged: <5% overlap remaining
+        if max_overlap < min_dist * 0.02:  # Converged: <2% overlap remaining
             break
 
         result += forces
@@ -761,18 +768,66 @@ async def get_canvas_digest():
                 (actual_center[1] - bounds["y"][0]) / (bounds["y"][1] - bounds["y"][0]) if bounds["y"][1] != bounds["y"][0] else 0.5
             ]
 
-            clusters.append({
+            cluster_entry = {
                 "id": f"cluster_{i}",
-                "center": actual_center.tolist(),  # Keep actual coordinates for reference
-                "normalized_center": normalized_center,  # Add normalized [0-1] coordinates
+                "center": actual_center.tolist(),
+                "normalized_center": normalized_center,
                 "size": int(mask.sum()),
                 "sample_prompts": [img.prompt for img in cluster_imgs[:3]],
                 "generation_methods": list(set(img.generation_method for img in cluster_imgs))
-            })
+            }
+
+            # Compute bounding ellipse from covariance matrix (2σ)
+            pts = coords[mask]
+            if len(pts) >= 3:
+                cov = np.cov(pts.T)
+                eigenvalues, eigenvectors = np.linalg.eigh(cov)
+                eigenvalues = np.maximum(eigenvalues, 1e-6)  # Avoid zero
+                angle = float(np.degrees(np.arctan2(eigenvectors[1, 1], eigenvectors[0, 1])))
+                rx, ry = 2.0 * np.sqrt(eigenvalues)
+                # Normalize rx/ry to [0-1] space
+                x_range = bounds["x"][1] - bounds["x"][0] if bounds["x"][1] != bounds["x"][0] else 1.0
+                y_range = bounds["y"][1] - bounds["y"][0] if bounds["y"][1] != bounds["y"][0] else 1.0
+                cluster_entry["ellipse"] = {
+                    "rx": float(rx / x_range),
+                    "ry": float(ry / y_range),
+                    "angle": angle
+                }
+
+            clusters.append(cluster_entry)
+
+        # Algorithmic gap detection via density grid
+        x_range = bounds["x"][1] - bounds["x"][0] if bounds["x"][1] != bounds["x"][0] else 1.0
+        y_range = bounds["y"][1] - bounds["y"][0] if bounds["y"][1] != bounds["y"][0] else 1.0
+        grid_size = 10
+        grid = np.zeros((grid_size, grid_size))
+        for c in coords:
+            gx = min(grid_size - 1, int(((c[0] - bounds["x"][0]) / x_range) * grid_size))
+            gy = min(grid_size - 1, int(((c[1] - bounds["y"][0]) / y_range) * grid_size))
+            grid[gx][gy] += 1
+
+        # Find empty cells adjacent to occupied cells
+        gaps = []
+        for x in range(grid_size):
+            for y in range(grid_size):
+                if grid[x][y] == 0:
+                    # Count occupied neighbors
+                    x_lo, x_hi = max(0, x - 1), min(grid_size, x + 2)
+                    y_lo, y_hi = max(0, y - 1), min(grid_size, y + 2)
+                    neighbor_count = int(np.sum(grid[x_lo:x_hi, y_lo:y_hi] > 0))
+                    if neighbor_count >= 2:
+                        gaps.append({
+                            "center": [(x + 0.5) / grid_size, (y + 0.5) / grid_size],
+                            "neighbor_density": neighbor_count,
+                            "ellipse": {"rx": 0.08, "ry": 0.06, "angle": 0}
+                        })
+        gaps.sort(key=lambda g: g["neighbor_density"], reverse=True)
+        gaps = gaps[:3]  # Top 3 gaps
 
         return {
             "count": len(visible),
             "clusters": clusters,
+            "gaps": gaps,
             "axis_labels": state.axis_labels,
             "bounds": bounds
         }
@@ -864,87 +919,115 @@ async def analyze_canvas(request: AnalyzeCanvasRequest):
 
         print(f"Canvas has {digest['count']} images in {len(digest['clusters'])} clusters")
 
-        # Format cluster info for AI with normalized centers
-        cluster_info = []
+        # Build pre-computed regions from algorithmic detection
+        # Clusters: use exact centers and ellipses from digest
+        # Gaps: use algorithmically detected empty areas from digest
+        precomputed_regions = []
+
+        db = digest.get('bounds', {"x": [0, 1], "y": [0, 1]})
+        dx_range = db["x"][1] - db["x"][0] if db["x"][1] != db["x"][0] else 1.0
+        dy_range = db["y"][1] - db["y"][0] if db["y"][1] != db["y"][0] else 1.0
+
         for c in digest['clusters']:
-            cluster_info.append({
-                "normalized_center": c['normalized_center'],
+            precomputed_regions.append({
+                "data_center": c['center'],  # actual data coords for frontend positioning
+                "normalized_center": c['normalized_center'],  # for Gemini semantic context
+                "type": "cluster",
                 "size": c['size'],
-                "sample_prompts": c['sample_prompts'][:2]  # Just 2 examples
+                "sample_prompts": c['sample_prompts'][:2],
+                "ellipse": c.get('ellipse', {"rx": 0.1, "ry": 0.08, "angle": 0})
             })
 
-        prompt = f"""You are a design exploration assistant analyzing a shoe design canvas.
+        for g in digest.get('gaps', []):
+            # Convert gap normalized center to actual data coordinates
+            gap_data_x = db["x"][0] + g['center'][0] * dx_range
+            gap_data_y = db["y"][0] + g['center'][1] * dy_range
+            precomputed_regions.append({
+                "data_center": [gap_data_x, gap_data_y],  # actual data coords
+                "normalized_center": g['center'],  # for Gemini semantic context
+                "type": "gap",
+                "neighbor_density": g['neighbor_density'],
+                "ellipse": g.get('ellipse', {"rx": 0.08, "ry": 0.06, "angle": 0})
+            })
+
+        # Build Gemini-facing summary (uses normalized coords for semantic interpretation)
+        gemini_regions = []
+        for r in precomputed_regions:
+            gr = {"normalized_center": r["normalized_center"], "type": r["type"]}
+            if "size" in r: gr["size"] = r["size"]
+            if "sample_prompts" in r: gr["sample_prompts"] = r["sample_prompts"]
+            gemini_regions.append(gr)
+
+        # Format for Gemini — ask it only to NAME and DESCRIBE, not guess coordinates
+        prompt = f"""You are a design exploration assistant. Name and describe pre-computed regions on a shoe design canvas.
 
 DESIGN BRIEF:
 {request.brief}
 
-CURRENT CANVAS STATE:
-- {digest['count']} shoes displayed
-- X-Axis: {digest['axis_labels']['x'][0]} (left/0.0) ↔ {digest['axis_labels']['x'][1]} (right/1.0)
-- Y-Axis: {digest['axis_labels']['y'][0]} (bottom/0.0) ↔ {digest['axis_labels']['y'][1]} (top/1.0)
-- {len(digest['clusters'])} clusters detected
+AXES:
+- X-Axis: {digest['axis_labels']['x'][0]} (left/0.0) to {digest['axis_labels']['x'][1]} (right/1.0)
+- Y-Axis: {digest['axis_labels']['y'][0]} (bottom/0.0) to {digest['axis_labels']['y'][1]} (top/1.0)
 
-EXISTING CLUSTERS (normalized positions [x, y] in 0-1 range):
-{json.dumps(cluster_info, indent=2)}
-
-CRITICAL RULES:
-1. For "cluster" type regions: Use the EXACT normalized_center from an existing cluster above
-2. For "gap" type regions: Choose coordinates that are:
-   - BETWEEN existing clusters (not on top of them)
-   - Within reasonable distance (0.2-0.3 units) from nearest cluster
-   - NOT in corners or edges unless clusters are there
-3. Coordinates interpretation:
-   - [0.0, 0.0] = bottom-left: {digest['axis_labels']['x'][0]}, {digest['axis_labels']['y'][0]}
-   - [1.0, 1.0] = top-right: {digest['axis_labels']['x'][1]}, {digest['axis_labels']['y'][1]}
-   - [x, y] where x is position on X-axis, y is position on Y-axis
-4. Prompts MUST match the coordinates semantically (use axis labels as guide)
+PRE-COMPUTED REGIONS (coordinates are algorithmically determined — do NOT change them):
+{json.dumps(gemini_regions, indent=2)}
 
 TASK:
-Suggest 2-3 specific regions to explore. For each region:
-1. Type: "cluster" (expand existing) OR "gap" (fill empty space between clusters)
-2. Center: For clusters, copy exact normalized_center from above. For gaps, calculate position between clusters
-3. Create HIGHLY SPECIFIC prompts that match the coordinate position based on axis meanings
+For each region above (in order), provide a short title, 1-sentence description, and 1-2 specific shoe prompts.
+Use the axis labels to interpret what each [x, y] coordinate means semantically.
+Keep titles under 5 words. Keep descriptions under 15 words.
 
 Return JSON ONLY (no markdown):
 {{
   "regions": [
     {{
-      "center": [0.45, 0.62],
-      "title": "Gap: Mid-range Exploration",
-      "description": "Empty space between clusters - good for diversity",
-      "suggested_prompts": [
-        "Detailed prompt matching x=0.45, y=0.62 based on axis meanings",
-        "Another detailed prompt for same position"
-      ],
-      "type": "gap"
-    }},
-    {{
-      "center": [0.78, 0.23],
-      "title": "Cluster Expansion",
-      "description": "Expand existing cluster with more variations",
-      "suggested_prompts": [
-        "Variation of cluster's existing style",
-        "Another variation similar to cluster"
-      ],
-      "type": "cluster"
+      "index": 0,
+      "title": "Short Title",
+      "description": "Brief description",
+      "suggested_prompts": ["specific shoe prompt"]
     }}
   ]
 }}"""
 
-        # Using gemini-2.5-flash-lite (fast, low-cost, high-performance)
-        # Note: gemini-1.5-flash was retired in April 2025
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
         response = model.generate_content(prompt)
 
-        # Parse JSON
+        # Parse JSON and merge Gemini names with precomputed geometry
         json_match = re.search(r'\{[\s\S]*\}', response.text)
+        final_regions = []
         if json_match:
-            result = json.loads(json_match.group(0))
-            print(f"Generated {len(result.get('regions', []))} region suggestions")
-            return result
+            try:
+                result = json.loads(json_match.group(0))
+                gemini_output = result.get('regions', [])
+                for i, precomp in enumerate(precomputed_regions):
+                    # Find matching Gemini output by index
+                    gemini_r = next((g for g in gemini_output if g.get('index') == i), None)
+                    if not gemini_r and i < len(gemini_output):
+                        gemini_r = gemini_output[i]
+                    final_regions.append({
+                        "center": precomp["data_center"],  # actual data coords
+                        "type": precomp["type"],
+                        "title": gemini_r.get("title", f"Region {i+1}") if gemini_r else f"Region {i+1}",
+                        "description": gemini_r.get("description", "") if gemini_r else "",
+                        "suggested_prompts": gemini_r.get("suggested_prompts", precomp.get("sample_prompts", ["shoe design"])) if gemini_r else precomp.get("sample_prompts", ["shoe design"]),
+                        "ellipse": precomp["ellipse"]
+                    })
+            except (json.JSONDecodeError, KeyError):
+                pass
 
-        # Fallback
-        return {"regions": []}
+        # Fallback if Gemini parsing failed
+        if not final_regions:
+            for i, r in enumerate(precomputed_regions):
+                final_regions.append({
+                    "center": r["data_center"],
+                    "type": r["type"],
+                    "title": f"{'Cluster' if r['type'] == 'cluster' else 'Gap'} {i+1}",
+                    "description": f"{'Existing group' if r['type'] == 'cluster' else 'Unexplored area'}",
+                    "suggested_prompts": r.get("sample_prompts", ["shoe design variation"]),
+                    "ellipse": r.get("ellipse", {"rx": 0.08, "ry": 0.06, "angle": 0})
+                })
+
+        print(f"Generated {len(final_regions)} region suggestions")
+        return {"regions": final_regions}
 
     except Exception as e:
         print(f"ERROR in analyze-canvas: {e}")

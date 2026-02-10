@@ -3,7 +3,7 @@
  * Optimized to prevent canvas shifting on selection changes
  */
 
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, useState } from "react";
 import * as d3 from "d3";
 import { useAppStore } from "../../store/appStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
@@ -14,7 +14,6 @@ interface SemanticCanvasProps {
   onSelectionChange: (x: number, y: number, count: number) => void;
   regionHighlights?: RegionHighlight[];
   onGenerateFromRegion?: (prompt: string, region: RegionHighlight) => void;
-  onDismissRegions?: () => void;
   pendingImages?: PendingImage[];
   onAcceptPending?: (pendingId: string) => void;
   onDiscardPending?: (pendingId: string) => void;
@@ -24,7 +23,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   onSelectionChange,
   regionHighlights = [],
   onGenerateFromRegion,
-  onDismissRegions,
   pendingImages = [],
   onAcceptPending,
   onDiscardPending,
@@ -43,6 +41,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const hoveredImageId = useAppStore((state) => state.hoveredImageId);
   const axisLabels = useAppStore((state) => state.axisLabels);
   const canvasBounds = useAppStore((state) => state.canvasBounds);
+
+  // Terrain mode: show clusters, gaps, or nothing
+  const [terrainMode, setTerrainMode] = useState<'clusters' | 'gaps' | 'off'>('off');
 
   // Memoize filtered images to prevent new array on every render
   const images = useMemo(
@@ -169,56 +170,47 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("d", "M 5 10 L 0 0 L 10 0 Z")
       .attr("fill", "#bc8cff");
 
-    // Contour filters: selection (blue), parent (green), child (yellow) — all follow shoe shape
-    const contourRadius = Math.max(4, (visualSettings.contourStrength ?? 6));
+    // Genealogy arrow markers — tiny, subtle, directional colors
+    defs.append("marker")
+      .attr("id", "arrow-cyan")
+      .attr("markerWidth", 6).attr("markerHeight", 6)
+      .attr("refX", 5).attr("refY", 3)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M 0 0 L 6 3 L 0 6 Z")
+      .attr("fill", "#00E5FF").attr("opacity", 0.7);
 
-    const addContourFilter = (
-      id: string,
-      contourRgb: string,
-      glowRgb: string
-    ) => {
-      const f = defs.append("filter").attr("id", id)
-        .attr("x", "-50%").attr("y", "-50%")
-        .attr("width", "200%").attr("height", "200%");
-      f.append("feMorphology").attr("in", "SourceAlpha").attr("operator", "dilate")
-        .attr("radius", contourRadius).attr("result", "dilated");
-      f.append("feComposite").attr("in", "dilated").attr("in2", "SourceAlpha")
-        .attr("operator", "out").attr("result", "outline");
-      f.append("feColorMatrix").attr("in", "outline").attr("type", "matrix")
-        .attr("values", contourRgb).attr("result", "contour");
-      f.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", 10).attr("result", "blur");
-      f.append("feColorMatrix").attr("in", "blur").attr("type", "matrix")
-        .attr("values", glowRgb).attr("result", "glow");
-      const m = f.append("feMerge");
-      m.append("feMergeNode").attr("in", "glow");
-      m.append("feMergeNode").attr("in", "contour");
-      m.append("feMergeNode").attr("in", "SourceGraphic");
-    };
-    // Blue selection — strong glow for opaque images, contour for transparent
-    addContourFilter("selection-glow",
-      "0 0 0 0 0.6  0 0 0 0 0.8  0 0 0 0 1  0 0 0 0 1",
-      "0 0 0 0 0.5  0 0 0 0 0.7  0 0 0 0 1  0 0 0 0.9 0");
-    // feDropShadow: guaranteed visible glow (works on opaque and transparent images)
-    const dropShadowFilter = defs.append("filter").attr("id", "selection-drop-shadow")
-      .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
-    dropShadowFilter.append("feDropShadow")
-      .attr("dx", 0).attr("dy", 0).attr("stdDeviation", 14)
-      .attr("flood-color", "#58a6ff").attr("flood-opacity", 0.95);
-    addContourFilter("selection-glow-parent",
-      "0 0 0 0 0.25  0 0 0 0 0.73  0 0 0 0 0.31  0 0 0 0 1",
-      "0 0 0 0 0.2  0 0 0 0 0.65  0 0 0 0 0.35  0 0 0 0.9 0");
-    addContourFilter("selection-glow-child",
-      "0 0 0 0 0.82  0 0 0 0 0.6  0 0 0 0 0.13  0 0 0 0 1",
-      "0 0 0 0 0.75  0 0 0 0 0.6  0 0 0 0 0.2  0 0 0 0.9 0");
-    // Drop-shadow for parent (green) and child (yellow)
-    defs.append("filter").attr("id", "parent-drop-shadow")
-      .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%")
-      .append("feDropShadow").attr("dx", 0).attr("dy", 0).attr("stdDeviation", 10)
-      .attr("flood-color", "#3fb950").attr("flood-opacity", 0.9);
-    defs.append("filter").attr("id", "child-drop-shadow")
-      .attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%")
-      .append("feDropShadow").attr("dx", 0).attr("dy", 0).attr("stdDeviation", 10)
-      .attr("flood-color", "#d29922").attr("flood-opacity", 0.9);
+    defs.append("marker")
+      .attr("id", "arrow-amber")
+      .attr("markerWidth", 6).attr("markerHeight", 6)
+      .attr("refX", 5).attr("refY", 3)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M 0 0 L 6 3 L 0 6 Z")
+      .attr("fill", "#FFAA00").attr("opacity", 0.7);
+
+    // Hover glow: silvery-white, subtle emission
+    const hoverFilter = defs.append("filter").attr("id", "hover-glow")
+      .attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
+    hoverFilter.append("feDropShadow")
+      .attr("dx", 0).attr("dy", 0).attr("stdDeviation", 8)
+      .attr("flood-color", "#c0d0e0").attr("flood-opacity", 0.5);
+
+    // Terrain nebula gradients
+    const clusterGrad = defs.append("radialGradient").attr("id", "cluster-nebula");
+    clusterGrad.append("stop").attr("offset", "0%").attr("stop-color", "#58a6ff").attr("stop-opacity", 0.25);
+    clusterGrad.append("stop").attr("offset", "40%").attr("stop-color", "#58a6ff").attr("stop-opacity", 0.1);
+    clusterGrad.append("stop").attr("offset", "100%").attr("stop-color", "#58a6ff").attr("stop-opacity", 0);
+
+    const gapGrad = defs.append("radialGradient").attr("id", "gap-nebula");
+    gapGrad.append("stop").attr("offset", "0%").attr("stop-color", "#ffa658").attr("stop-opacity", 0.2);
+    gapGrad.append("stop").attr("offset", "35%").attr("stop-color", "#ffa658").attr("stop-opacity", 0.08);
+    gapGrad.append("stop").attr("offset", "100%").attr("stop-color", "#ffa658").attr("stop-opacity", 0);
+
+    // Blur filter for terrain blobs
+    const terrainBlur = defs.append("filter").attr("id", "terrain-blur")
+      .attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
+    terrainBlur.append("feGaussianBlur").attr("stdDeviation", 6);
 
     // Create main group for zoom/pan
     const g = svg.append("g").attr("class", "main-group");
@@ -292,18 +284,14 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Group for region highlights (behind images)
     const regionHighlightsGroup = g.append("g").attr("class", "region-highlights");
 
-    // Group for genealogy lines (drawn in selection effect)
+    // Group for genealogy lines (drawn in selection effect only for selected images)
     g.append("g").attr("class", "genealogy-lines");
 
     // Group for images
     const imagesGroup = g.append("g").attr("class", "images");
 
-    // Removed axis line rendering; labels remain via AxisEditor components
-    // Genealogy is drawn only on selection (in separate effect), not on hover
-
     // Render images
     const imageSize = visualSettings.imageSize;
-    const strokeHover = Math.max(1, Math.min(4, Math.round(imageSize * 0.04)));
     const coordScale = visualSettings.coordinateScale || 1.0; // Get coordinate scale multiplier
     const coordOffset = visualSettings.coordinateOffset || [0, 0, 0]; // Get coordinate offset
     const imageNodes = imagesGroup
@@ -406,19 +394,21 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           }
         }, 0);
       })
-      .on("mouseenter", function (_event, d) {
-        d3.select(this.parentNode as SVGGElement)
-          .select(".hover-border")
-          .attr("stroke", "#58a6ff")
-          .attr("stroke-width", strokeHover)
-          .attr("opacity", 0.4);
-        useAppStore.getState().setHoveredImageId(d.id);
+      .on("mouseenter", function () {
+        const g = d3.select(this.parentNode as SVGGElement);
+        const id = (g.datum() as any).id;
+        // Only apply hover glow if not already selected (selection glow takes priority)
+        if (!useAppStore.getState().selectedImageIds.includes(id)) {
+          g.attr("filter", "url(#hover-glow)");
+        }
       })
       .on("mouseleave", function () {
-        d3.select(this.parentNode as SVGGElement)
-          .select(".hover-border")
-          .attr("opacity", 0);
-        useAppStore.getState().setHoveredImageId(null);
+        const g = d3.select(this.parentNode as SVGGElement);
+        const id = (g.datum() as any).id;
+        // Only clear filter if not selected
+        if (!useAppStore.getState().selectedImageIds.includes(id)) {
+          g.attr("filter", null);
+        }
       });
 
     // Add image
@@ -430,27 +420,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("width", imageSize)
       .attr("height", imageSize)
       .attr("opacity", visualSettings.imageOpacity)
-      .attr("clip-path", `inset(0 round 8px)`)
       .style("pointer-events", "none");
 
-    const pad = Math.max(2, Math.round(imageSize * 0.04));
-    // Hover border
-    imageNodes
-      .append("rect")
-      .attr("class", "hover-border")
-      .attr("x", -imageSize / 2 - pad)
-      .attr("y", -imageSize / 2 - pad)
-      .attr("width", imageSize + pad * 2)
-      .attr("height", imageSize + pad * 2)
-      .attr("rx", 8)
-      .attr("fill", "none")
-      .attr("stroke", "#58a6ff")
-      .attr("stroke-width", strokeHover)
-      .attr("opacity", 0)
-      .style("pointer-events", "none");
-
-    // Selection and parent/child highlighting uses contour filters
-    // applied directly to <image> elements — follows shoe silhouette, not bounding box
+    // Selection and parent/child highlighting uses CSS drop-shadow classes
+    // applied to <g> groups — pulsing cyan glow for selection
 
     // Render pending/background images with faded opacity
     if (pendingImages.length > 0) {
@@ -592,183 +565,116 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       });
     }
 
-    // Render region highlights (AI agent exploration suggestions)
-    if (regionHighlights.length > 0) {
-      regionHighlights.forEach((region) => {
-        const [normX, normY] = region.center;
-        // Convert normalized coordinates (0-1) to data coordinates
-        const dataX = xMin + normX * (xMax - xMin);
-        const dataY = yMin + normY * (yMax - yMin);
-        // Convert to pixel coordinates using scales
+    // Render region highlights as nebula blobs (behind shoes)
+    // Filter by terrain mode: clusters, gaps, or off
+    const filteredRegions = terrainMode === 'off'
+      ? []
+      : regionHighlights.filter(r => terrainMode === 'clusters' ? r.type === 'cluster' : r.type === 'gap');
+
+    if (filteredRegions.length > 0) {
+      const canvasPixelW = xScale(xMax) - xScale(xMin);
+      const canvasPixelH = yScale(yMin) - yScale(yMax); // Note: yScale is inverted
+
+      filteredRegions.forEach((region) => {
+        // Region centers are in actual data coordinates from the backend
+        const [dataX, dataY] = region.center;
         const pixelX = xScale(dataX);
         const pixelY = yScale(dataY);
 
-        // Visual distinction: cluster (blue solid) vs gap (orange dashed)
         const isCluster = region.type === 'cluster';
-        const fillColor = isCluster ? "rgba(88, 166, 255, 0.15)" : "rgba(255, 166, 88, 0.15)";
-        const strokeColor = isCluster ? "#58a6ff" : "#ffa658";
-        const strokeDasharray = isCluster ? "none" : "5,5";
+        const gradId = isCluster ? "url(#cluster-nebula)" : "url(#gap-nebula)";
 
-        // Pulsing circle
+        // Use ellipse data from backend if available, or defaults
+        const ellipse = (region as any).ellipse || { rx: 0.1, ry: 0.08, angle: 0 };
+        const rxPx = Math.max(60, ellipse.rx * canvasPixelW * 0.5);
+        const ryPx = Math.max(50, ellipse.ry * canvasPixelH * 0.5);
+        const angle = ellipse.angle || 0;
+
+        // Main soft blob
         regionHighlightsGroup
-          .append("circle")
+          .append("ellipse")
           .attr("cx", pixelX)
           .attr("cy", pixelY)
-          .attr("r", 60)
-          .attr("fill", fillColor)
-          .attr("stroke", strokeColor)
-          .attr("stroke-width", 2)
-          .attr("stroke-dasharray", strokeDasharray)
-          .attr("opacity", 0.6);
+          .attr("rx", rxPx)
+          .attr("ry", ryPx)
+          .attr("fill", gradId)
+          .attr("transform", `rotate(${angle}, ${pixelX}, ${pixelY})`)
+          .attr("filter", "url(#terrain-blur)")
+          .style("pointer-events", "all")
+          .style("cursor", "pointer")
+          .on("click", function (event) {
+            event.stopPropagation();
+            // Remove any existing tooltip
+            regionHighlightsGroup.selectAll(".terrain-tooltip").remove();
 
-        // Inner dot
+            // Show minimal tooltip
+            const tooltipFO = regionHighlightsGroup
+              .append("foreignObject")
+              .attr("class", "terrain-tooltip")
+              .attr("x", pixelX + 20)
+              .attr("y", pixelY - 40)
+              .attr("width", 220)
+              .attr("height", 100)
+              .style("pointer-events", "all");
+
+            const tooltipDiv = tooltipFO
+              .append("xhtml:div")
+              .style("background", "rgba(13, 17, 23, 0.9)")
+              .style("backdrop-filter", "blur(8px)")
+              .style("border", `1px solid ${isCluster ? '#58a6ff40' : '#ffa65840'}`)
+              .style("border-radius", "8px")
+              .style("padding", "10px 14px")
+              .style("color", "#c9d1d9")
+              .style("font-size", "12px")
+              .style("font-family", "system-ui, -apple-system, sans-serif")
+              .style("box-shadow", "0 4px 16px rgba(0, 0, 0, 0.5)");
+
+            tooltipDiv.append("xhtml:div")
+              .style("font-weight", "600")
+              .style("color", isCluster ? "#58a6ff" : "#ffa658")
+              .style("margin-bottom", "6px")
+              .text(region.title);
+
+            if (region.description) {
+              tooltipDiv.append("xhtml:div")
+                .style("font-size", "11px")
+                .style("opacity", "0.7")
+                .style("margin-bottom", "8px")
+                .text(region.description);
+            }
+
+            if (region.suggested_prompts.length > 0) {
+              tooltipDiv.append("xhtml:button")
+                .style("background", "rgba(88, 166, 255, 0.2)")
+                .style("border", "1px solid #58a6ff60")
+                .style("border-radius", "4px")
+                .style("padding", "4px 10px")
+                .style("color", "#58a6ff")
+                .style("font-size", "11px")
+                .style("cursor", "pointer")
+                .style("pointer-events", "all")
+                .text("Explore")
+                .on("click", (e: any) => {
+                  e.stopPropagation();
+                  if (onGenerateFromRegion) {
+                    onGenerateFromRegion(region.suggested_prompts[0], region);
+                  }
+                });
+            }
+          });
+
+        // Second smaller overlapping blob for density center emphasis
         regionHighlightsGroup
-          .append("circle")
+          .append("ellipse")
           .attr("cx", pixelX)
           .attr("cy", pixelY)
-          .attr("r", 6)
-          .attr("fill", strokeColor)
-          .attr("opacity", 0.8);
-
-        // Add interactive foreign object for the card
-        const cardWidth = 280;
-        const cardHeight = 120;
-        const cardX = pixelX + 70;
-        const cardY = pixelY - 60;
-
-        const foreignObject = regionHighlightsGroup
-          .append("foreignObject")
-          .attr("x", cardX)
-          .attr("y", cardY)
-          .attr("width", cardWidth)
-          .attr("height", cardHeight)
-          .style("overflow", "visible");
-
-        const cardDiv = foreignObject
-          .append("xhtml:div")
-          .style("background", "rgba(22, 27, 34, 0.95)")
-          .style("border", `1px solid ${strokeColor}`)
-          .style("border-radius", "8px")
-          .style("padding", "12px")
-          .style("color", "#c9d1d9")
-          .style("font-size", "13px")
-          .style("font-family", "system-ui, -apple-system, sans-serif")
-          .style("box-shadow", "0 8px 24px rgba(0, 0, 0, 0.6)")
-          .style("cursor", "default")
-          .style("pointer-events", "all");
-
-        // Card title with type badge
-        const titleDiv = cardDiv
-          .append("xhtml:div")
-          .style("display", "flex")
-          .style("align-items", "center")
-          .style("gap", "8px")
-          .style("margin-bottom", "6px");
-
-        titleDiv
-          .append("xhtml:div")
-          .style("font-weight", "600")
-          .style("color", strokeColor)
-          .text(region.title);
-
-        // Type badge
-        titleDiv
-          .append("xhtml:span")
-          .style("background", `${strokeColor}33`)
-          .style("color", strokeColor)
-          .style("padding", "2px 6px")
-          .style("border-radius", "4px")
-          .style("font-size", "9px")
-          .style("font-weight", "600")
-          .style("text-transform", "uppercase")
-          .text(region.type);
-
-        // Confidence badge for clusters
-        if (isCluster && region.confidence !== undefined) {
-          titleDiv
-            .append("xhtml:span")
-            .style("color", "#7d8590")
-            .style("font-size", "10px")
-            .text(`${Math.round(region.confidence * 100)}%`);
-        }
-
-        // Card description
-        cardDiv
-          .append("xhtml:div")
-          .style("font-size", "12px")
-          .style("margin-bottom", "8px")
-          .style("opacity", "0.8")
-          .text(region.description);
-
-        // Prompts
-        const promptsDiv = cardDiv
-          .append("xhtml:div")
-          .style("display", "flex")
-          .style("flex-wrap", "wrap")
-          .style("gap", "6px");
-
-        region.suggested_prompts.slice(0, 2).forEach((prompt) => {
-          promptsDiv
-            .append("xhtml:button")
-            .style("background", "#1f6feb")
-            .style("border", "none")
-            .style("border-radius", "4px")
-            .style("padding", "4px 8px")
-            .style("color", "white")
-            .style("font-size", "11px")
-            .style("cursor", "pointer")
-            .style("pointer-events", "all")
-            .style("white-space", "nowrap")
-            .style("overflow", "hidden")
-            .style("text-overflow", "ellipsis")
-            .style("max-width", "120px")
-            .text(prompt.substring(0, 25) + (prompt.length > 25 ? "..." : ""))
-            .on("click", () => {
-              if (onGenerateFromRegion) {
-                onGenerateFromRegion(prompt, region);
-              }
-            })
-            .on("mouseover", function () {
-              d3.select(this).style("background", "#2f81f7");
-            })
-            .on("mouseout", function () {
-              d3.select(this).style("background", "#1f6feb");
-            });
-        });
+          .attr("rx", rxPx * 0.5)
+          .attr("ry", ryPx * 0.5)
+          .attr("fill", gradId)
+          .attr("opacity", 0.6)
+          .attr("transform", `rotate(${angle + 15}, ${pixelX}, ${pixelY})`)
+          .style("pointer-events", "none");
       });
-
-      // Add dismiss button (positioned at bottom right of canvas bounds)
-      const dismissButton = regionHighlightsGroup
-        .append("foreignObject")
-        .attr("x", xScale(xMax) - 200)
-        .attr("y", yScale(yMax) + 20)
-        .attr("width", 180)
-        .attr("height", 40)
-        .style("pointer-events", "all");
-
-      dismissButton
-        .append("xhtml:button")
-        .style("background", "rgba(88, 166, 255, 0.2)")
-        .style("border", "1px solid #58a6ff")
-        .style("border-radius", "6px")
-        .style("padding", "8px 16px")
-        .style("color", "#58a6ff")
-        .style("font-size", "13px")
-        .style("cursor", "pointer")
-        .style("pointer-events", "all")
-        .style("width", "100%")
-        .text("✕ Dismiss Highlights")
-        .on("click", () => {
-          if (onDismissRegions) {
-            onDismissRegions();
-          }
-        })
-        .on("mouseover", function () {
-          d3.select(this).style("background", "rgba(88, 166, 255, 0.3)");
-        })
-        .on("mouseout", function () {
-          d3.select(this).style("background", "rgba(88, 166, 255, 0.2)");
-        });
     }
 
     // Click on canvas background to deselect
@@ -797,6 +703,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     axisLabels,
     canvasBounds,
     regionHighlights,
+    terrainMode,
     pendingImages,
     // Note: Excluded selectedImageIds and hoveredGroupId to prevent full redraws on selection/hover changes
     // These are handled in a separate effect below
@@ -808,113 +715,90 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     const svg = d3.select(svgRef.current);
     const imagesGroup = svg.select(".images");
-    const linesGroup = svg.select(".genealogy-lines");
 
     if (imagesGroup.empty()) return;
 
-    console.log("🎯 Selection/hover update (no redraw):", {
-      selectedCount: selectedImageIds.length,
-      hoveredGroupId,
-      hoveredImageId,
-    });
+    // Reset selection glow and hover filter on all <g> groups
+    imagesGroup.selectAll(".image-node")
+      .classed("selected-glow", false)
+      .attr("filter", null);
 
-    // Only clear genealogy lines if we have a selection, hovered group, or hovered image
-    // This allows hover genealogy to persist when there's no selection
-    if (selectedImageIds.length > 0 || hoveredGroupId || hoveredImageId) {
-      linesGroup.selectAll("*").remove();
-    }
-
-    // Reset all filters on images
-    imagesGroup.selectAll(".image-node image").attr("filter", null).attr("clip-path", null);
-    imagesGroup.selectAll(".image-node").attr("filter", null);
-
-    // Selection: box highlight via group-level drop-shadow (rectangular)
+    // Apply pulsing selection glow via CSS class (targets <g> group)
     selectedImageIds.forEach((id) => {
-      imagesGroup.select(`#image-${id}`).attr("filter", "url(#selection-drop-shadow)");
+      imagesGroup.select(`#image-${id}`).classed("selected-glow", true);
     });
 
-    // Highlight images in hovered group
+    // Highlight images in hovered group (silver glow filter)
     if (hoveredGroupId) {
       imagesGroup.selectAll(".image-node").each(function (d: any) {
-        if (d.group_id === hoveredGroupId) {
-          d3.select(this).select(".hover-border").attr("opacity", 0.35);
+        if (d.group_id === hoveredGroupId && !selectedImageIds.includes(d.id)) {
+          d3.select(this).attr("filter", "url(#hover-glow)");
         }
       });
     }
 
-    // Highlight hovered image from tree modal
-    if (hoveredImageId) {
-      imagesGroup.select(`#image-${hoveredImageId} .hover-border`).attr("opacity", 0.35);
+    // Highlight hovered image from tree modal (silver glow filter)
+    if (hoveredImageId && !selectedImageIds.includes(hoveredImageId)) {
+      imagesGroup.select(`#image-${hoveredImageId}`).attr("filter", "url(#hover-glow)");
     }
 
-    // Genealogy lines on canvas (toggle-able, default OFF to reduce clutter)
-    if (visualSettings.showGenealogyOnCanvas && selectedImageIds.length > 0) {
+    // Draw directional genealogy lines ONLY for selected images
+    const genealogyLines = svg.select(".genealogy-lines");
+    genealogyLines.selectAll("*").remove(); // Clear previous
+
+    const coordScaleSel = visualSettings.coordinateScale || 1.0;
+    const coordOffsetSel = visualSettings.coordinateOffset || [0, 0, 0];
+
+    if (selectedImageIds.length > 0) {
+      const drawnLinks = new Set<string>();
+
       selectedImageIds.forEach((selectedId) => {
         const selectedImg = images.find((img) => img.id === selectedId);
-        if (selectedImg) {
-          const width = svgRef.current!.clientWidth;
-          const height = svgRef.current!.clientHeight;
-          const currentBounds = useAppStore.getState().canvasBounds;
-          const coordScale = visualSettings.coordinateScale || 1.0;
-          const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+        if (!selectedImg) return;
+        const sx = xScaleRef.current!((selectedImg.coordinates[0] + coordOffsetSel[0]) * coordScaleSel);
+        const sy = yScaleRef.current!((selectedImg.coordinates[1] + coordOffsetSel[1]) * coordScaleSel);
 
-          let xMin2, xMax2, yMin2, yMax2;
-          if (currentBounds) {
-            ({ xMin: xMin2, xMax: xMax2, yMin: yMin2, yMax: yMax2 } = currentBounds);
-          } else {
-            const xExtent = d3.extent(images, (d) => (d.coordinates[0] + coordOffset[0]) * coordScale) as [number, number];
-            const yExtent = d3.extent(images, (d) => (d.coordinates[1] + coordOffset[1]) * coordScale) as [number, number];
-            const xPadding = Math.max((xExtent[1] - xExtent[0]) * 0.1, 0.1);
-            const yPadding = Math.max((yExtent[1] - yExtent[0]) * 0.1, 0.1);
-            xMin2 = xExtent[0] - xPadding;
-            xMax2 = xExtent[1] + xPadding;
-            yMin2 = yExtent[0] - yPadding;
-            yMax2 = yExtent[1] + yPadding;
-          }
-          const xScale = d3.scaleLinear().domain([xMin2, xMax2]).range([50, width - 50]);
-          const yScale = d3.scaleLinear().domain([yMin2, yMax2]).range([height - 50, 50]);
+        // Parent → Selection: Cyan (#00E5FF) — input flow
+        selectedImg.parents.forEach((parentId) => {
+          const key = `${parentId}->${selectedId}`;
+          if (drawnLinks.has(key)) return;
+          drawnLinks.add(key);
+          const parent = images.find((p) => p.id === parentId);
+          if (!parent) return;
+          const px = xScaleRef.current!((parent.coordinates[0] + coordOffsetSel[0]) * coordScaleSel);
+          const py = yScaleRef.current!((parent.coordinates[1] + coordOffsetSel[1]) * coordScaleSel);
+          // Cubic bezier: vertical bias control points
+          const cp1x = px;
+          const cp1y = py + (sy - py) * 0.4;
+          const cp2x = sx;
+          const cp2y = sy - (sy - py) * 0.4;
+          genealogyLines.append("path")
+            .attr("d", `M ${px} ${py} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${sx} ${sy}`)
+            .attr("stroke", "#00E5FF").attr("stroke-width", 2)
+            .attr("fill", "none").attr("opacity", 0.8)
+            .attr("marker-end", "url(#arrow-cyan)");
+        });
 
-          const currentX = xScale((selectedImg.coordinates[0] + coordOffset[0]) * coordScale);
-          const currentY = yScale((selectedImg.coordinates[1] + coordOffset[1]) * coordScale);
-
-          // Draw parent lines + apply parent contour filter
-          selectedImg.parents.forEach((parentId) => {
-            const parent = images.find((img) => img.id === parentId);
-            if (!parent) return;
-            const parentX = xScale((parent.coordinates[0] + coordOffset[0]) * coordScale);
-            const parentY = yScale((parent.coordinates[1] + coordOffset[1]) * coordScale);
-            const midX = (parentX + currentX) / 2;
-            const midY = (parentY + currentY) / 2;
-            const dx = currentX - parentX;
-            const dy = currentY - parentY;
-            linesGroup.append("path")
-              .attr("d", `M ${parentX} ${parentY} Q ${midX - dy * 0.2} ${midY + dx * 0.2} ${currentX} ${currentY}`)
-              .attr("stroke", "#3fb950").attr("stroke-width", 2)
-              .attr("stroke-dasharray", "8,4").attr("fill", "none").attr("opacity", 0.5);
-            if (!selectedImageIds.includes(parentId)) {
-              imagesGroup.select(`#image-${parentId}`).attr("filter", "url(#parent-drop-shadow)");
-            }
-          });
-
-          // Draw child lines + apply child contour filter
-          selectedImg.children.forEach((childId) => {
-            const child = images.find((img) => img.id === childId);
-            if (!child) return;
-            const childX = xScale((child.coordinates[0] + coordOffset[0]) * coordScale);
-            const childY = yScale((child.coordinates[1] + coordOffset[1]) * coordScale);
-            const midX = (currentX + childX) / 2;
-            const midY = (currentY + childY) / 2;
-            const dx = childX - currentX;
-            const dy = childY - currentY;
-            linesGroup.append("path")
-              .attr("d", `M ${currentX} ${currentY} Q ${midX - dy * 0.2} ${midY + dx * 0.2} ${childX} ${childY}`)
-              .attr("stroke", "#d29922").attr("stroke-width", 2)
-              .attr("stroke-dasharray", "8,4").attr("fill", "none").attr("opacity", 0.5);
-            if (!selectedImageIds.includes(childId)) {
-              imagesGroup.select(`#image-${childId}`).attr("filter", "url(#child-drop-shadow)");
-            }
-          });
-        }
+        // Selection → Child: Amber (#FFAA00) — output flow
+        selectedImg.children.forEach((childId) => {
+          const key = `${selectedId}->${childId}`;
+          if (drawnLinks.has(key)) return;
+          drawnLinks.add(key);
+          const child = images.find((c) => c.id === childId);
+          if (!child) return;
+          const cx = xScaleRef.current!((child.coordinates[0] + coordOffsetSel[0]) * coordScaleSel);
+          const cy = yScaleRef.current!((child.coordinates[1] + coordOffsetSel[1]) * coordScaleSel);
+          // Cubic bezier: vertical bias control points
+          const cp1x = sx;
+          const cp1y = sy + (cy - sy) * 0.4;
+          const cp2x = cx;
+          const cp2y = cy - (cy - sy) * 0.4;
+          genealogyLines.append("path")
+            .attr("d", `M ${sx} ${sy} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${cx} ${cy}`)
+            .attr("stroke", "#FFAA00").attr("stroke-width", 2)
+            .attr("fill", "none").attr("opacity", 0.8)
+            .attr("marker-end", "url(#arrow-amber)");
+        });
       });
     }
   }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, visualSettings]);
@@ -1049,13 +933,31 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         }}
         style={{
           position: "absolute",
-          left: -12,
+          left: 16,
           top: "50%",
           transform: "translateY(-50%) rotate(-90deg)",
           transformOrigin: "center",
           whiteSpace: "nowrap",
         }}
       />
+
+      {/* Terrain toggle: Clusters vs Gaps */}
+      {regionHighlights.length > 0 && (
+        <div className="terrain-toggle" style={{ position: "absolute", bottom: 60, right: 16 }}>
+          <button
+            className={terrainMode === 'clusters' ? 'active' : ''}
+            onClick={() => setTerrainMode(m => m === 'clusters' ? 'off' : 'clusters')}
+          >
+            Clusters
+          </button>
+          <button
+            className={terrainMode === 'gaps' ? 'active' : ''}
+            onClick={() => setTerrainMode(m => m === 'gaps' ? 'off' : 'gaps')}
+          >
+            Gaps
+          </button>
+        </div>
+      )}
     </div>
   );
 };

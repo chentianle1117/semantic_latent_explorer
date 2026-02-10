@@ -44,6 +44,25 @@
   background: rgba(88, 166, 255, 0.1);
 }
 
+.agent-status-pill.insight {
+  color: #d2a83c;
+  border-color: rgba(210, 168, 60, 0.4);
+  background: rgba(210, 168, 60, 0.1);
+}
+
+.agent-status-pill.insight:hover {
+  background: rgba(210, 168, 60, 0.2);
+  border-color: rgba(210, 168, 60, 0.6);
+}
+
+.agent-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+}
+
 .agent-pulse {
   display: inline-block;
   width: 6px;
@@ -53,9 +72,23 @@
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
 
+.agent-sparkle {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d2a83c;
+  animation: sparkle-glow 1.5s ease-in-out infinite;
+}
+
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+@keyframes sparkle-glow {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 4px rgba(210, 168, 60, 0.6); }
+  50% { opacity: 0.7; transform: scale(1.2); box-shadow: 0 0 8px rgba(210, 168, 60, 0.9); }
 }
 
 .header-center {

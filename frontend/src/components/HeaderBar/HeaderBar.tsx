@@ -1,4 +1,5 @@
 import React from "react";
+import { useAppStore } from "../../store/appStore";
 import "./HeaderBar.css";
 
 interface HeaderBarProps {
@@ -9,6 +10,7 @@ interface HeaderBarProps {
   is3DMode: boolean;
   onToggle3D: () => void;
   onOpenSettings: () => void;
+  onInsightClick?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -19,22 +21,46 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   is3DMode,
   onToggle3D,
   onOpenSettings,
+  onInsightClick,
 }) => {
-  const agentStatus = isAnalyzing
-    ? "Analyzing..."
-    : isLoadingAxes
-    ? "Loading Axes..."
+  const agentStoreStatus = useAppStore((s) => s.agentStatus);
+  const agentInsight = useAppStore((s) => s.agentInsight);
+
+  // Merge manual analysis states with passive observer status
+  const isManualActive = isAnalyzing || isLoadingAxes;
+  const displayStatus = isManualActive
+    ? isAnalyzing ? "Analyzing..." : "Loading Axes..."
+    : agentStoreStatus === "thinking"
+    ? "Observing..."
+    : agentStoreStatus === "insight-ready"
+    ? "Insight Ready"
     : "Idle";
 
-  const isAgentActive = isAnalyzing || isLoadingAxes;
+  const pillClass = isManualActive || agentStoreStatus === "thinking"
+    ? "active"
+    : agentStoreStatus === "insight-ready"
+    ? "insight"
+    : "";
+
+  const pillIcon = agentStoreStatus === "insight-ready" && !isManualActive
+    ? "sparkle"
+    : isManualActive || agentStoreStatus === "thinking"
+    ? "pulse"
+    : "dot";
 
   return (
     <div className="header-bar">
       <div className="header-left">
         <span className="header-logo">Semantic Explorer</span>
-        <span className={`agent-status-pill ${isAgentActive ? "active" : ""}`}>
-          {isAgentActive && <span className="agent-pulse" />}
-          {agentStatus}
+        <span
+          className={`agent-status-pill ${pillClass}`}
+          onClick={agentInsight ? onInsightClick : undefined}
+          style={agentInsight ? { cursor: "pointer" } : undefined}
+        >
+          {pillIcon === "pulse" && <span className="agent-pulse" />}
+          {pillIcon === "sparkle" && <span className="agent-sparkle" />}
+          {pillIcon === "dot" && <span className="agent-dot" />}
+          {displayStatus}
         </span>
       </div>
       <div className="header-center">

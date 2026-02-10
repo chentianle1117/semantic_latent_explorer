@@ -1,7 +1,153 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useAppStore } from "../../store/appStore";
-import { GenealogyLens } from "../GenealogyLens/GenealogyLens";
+import type { ImageData } from "../../types";
 import "./RightInspector.css";
+
+type LineSegment = { from: { x: number; y: number }; to: { x: number; y: number }; type: "ancestor" | "child" };
+type LineageLevel = { level: number; nodes: ImageData[]; parentIds: Map<number, number[]> };
+
+interface FullLineageViewProps {
+  levels: LineageLevel[];
+  inspectedImageId: number | null;
+  selectedImageIds: number[];
+  onNodeClick: (id: number) => void;
+  onAddToSelection: (id: number) => void;
+}
+
+const FullLineageView: React.FC<FullLineageViewProps> = ({
+  levels,
+  inspectedImageId,
+  selectedImageIds,
+  onNodeClick,
+  onAddToSelection,
+}) => {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [lineSegments, setLineSegments] = useState<LineSegment[]>([]);
+
+  useLayoutEffect(() => {
+    const el = contentRef.current;
+    if (!el || levels.length === 0) {
+      setLineSegments([]);
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      setLineSegments([]);
+      return;
+    }
+    const toPct = (clientX: number, clientY: number) => ({
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 100,
+    });
+    const segments: LineSegment[] = [];
+    for (let i = 0; i < levels.length - 1; i++) {
+      const curr = levels[i];
+      const next = levels[i + 1];
+      const currWrappers = el.querySelectorAll(`[data-level="${curr.level}"] .full-lineage-thumb`);
+      const nextWrappers = el.querySelectorAll(`[data-level="${next.level}"] .full-lineage-thumb`);
+      curr.nodes.forEach((node, ni) => {
+        const childIds = new Set(node.children || []);
+        next.nodes.forEach((child, ci) => {
+          if (childIds.has(child.id)) {
+            const fromEl = currWrappers[ni] as HTMLElement | undefined;
+            const toEl = nextWrappers[ci] as HTMLElement | undefined;
+            if (fromEl && toEl) {
+              const fr = fromEl.getBoundingClientRect();
+              const tr = toEl.getBoundingClientRect();
+              segments.push({
+                from: toPct(fr.left + fr.width / 2, fr.bottom),
+                to: toPct(tr.left + tr.width / 2, tr.top),
+                type: curr.level < 0 ? "ancestor" : "child",
+              });
+            }
+          }
+        });
+      });
+    }
+    setLineSegments(segments);
+  }, [levels]);
+
+  return (
+    <div className="full-lineage-container">
+      <div className="full-lineage-content" ref={contentRef}>
+        {lineSegments.length > 0 && (
+          <div className="river-lines-overlay full-lineage-lines" aria-hidden>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="river-lines-svg">
+              <defs>
+                <linearGradient id="river-line-ancestor-full" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(0, 229, 255, 0.35)" />
+                  <stop offset="100%" stopColor="rgba(0, 229, 255, 0)" />
+                </linearGradient>
+                <linearGradient id="river-line-child-full" x1="0%" y1="100%" x2="0%" y2="0%">
+                  <stop offset="0%" stopColor="rgba(255, 170, 0, 0.35)" />
+                  <stop offset="100%" stopColor="rgba(255, 170, 0, 0)" />
+                </linearGradient>
+              </defs>
+              {lineSegments.map((seg, i) => (
+                <line
+                  key={i}
+                  x1={seg.from.x}
+                  y1={seg.from.y}
+                  x2={seg.to.x}
+                  y2={seg.to.y}
+                  stroke={seg.type === "ancestor" ? "url(#river-line-ancestor-full)" : "url(#river-line-child-full)"}
+                  strokeWidth={0.35}
+                  strokeDasharray="2 1.5"
+                  strokeLinecap="butt"
+                />
+              ))}
+            </svg>
+          </div>
+        )}
+        {levels.map((lv) => (
+          <div
+            key={lv.level}
+            className="full-lineage-row"
+            data-level={lv.level}
+          >
+            {lv.nodes.map((node) => {
+              const isHero = node.id === inspectedImageId;
+              const isInSelection = selectedImageIds.includes(node.id);
+              return (
+                <div key={node.id} className="full-lineage-node-wrapper">
+                  <div
+                    className={`full-lineage-thumb ${isHero ? "hero" : ""} ${isInSelection ? "in-selection" : ""}`}
+                    onClick={() => onNodeClick(node.id)}
+                    title={`#${node.id} ${node.generation_method}`}
+                  >
+                    <img src={`data:image/png;base64,${node.base64_image}`} alt={`#${node.id}`} />
+                  </div>
+                  {!isInSelection && (
+                    <button
+                      className="river-add-btn full-lineage-add"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddToSelection(node.id);
+                      }}
+                      title="Add to selection"
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// #region agent log
+const DEBUG_LOG = (data: Record<string, unknown>) => {
+  fetch("http://127.0.0.1:7242/ingest/448d361a-26b6-4fac-b400-a422df87618f", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ location: "RightInspector.tsx", message: "river-lines", data: { ...data }, timestamp: Date.now() }),
+  }).catch(() => {});
+};
+// #endregion
 
 interface RightInspectorProps {
   showLabels: boolean;
@@ -24,43 +170,236 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   const setIsCollapsed = useAppStore((s) => s.setIsInspectorCollapsed);
   const selectedImageIds = useAppStore((s) => s.selectedImageIds);
   const clearSelection = useAppStore((s) => s.clearSelection);
+  const toggleImageSelection = useAppStore((s) => s.toggleImageSelection);
   const setFlyToImageId = useAppStore((s) => s.setFlyToImageId);
   const images = useAppStore((s) => s.images);
 
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    selection: true,
-    actions: true,
-    genealogy: true,
-  });
-  const toggleSection = (key: string) => {
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  // Split-state: inspectedImageId can diverge from selectedImageIds
+  const [inspectedImageId, setInspectedImageId] = useState<number | null>(null);
+  const [heroHoverAdd, setHeroHoverAdd] = useState(false);
+  const [isFullLineageView, setIsFullLineageView] = useState(false);
 
-  // For multi-select: track which tile is focused for genealogy
-  const [focusedId, setFocusedId] = useState<number | null>(null);
-
-  // Auto-expand inspector when selection is made (so selection preview is always visible)
   useEffect(() => {
     if (selectedImageIds.length > 0 && isCollapsed) {
       setIsCollapsed(false);
     }
   }, [selectedImageIds.length, isCollapsed, setIsCollapsed]);
 
-  // Auto-focus first selected when selection changes
   useEffect(() => {
     if (selectedImageIds.length > 0) {
-      if (!focusedId || !selectedImageIds.includes(focusedId)) {
-        setFocusedId(selectedImageIds[0]);
+      // Always navigate to the LAST shoe added to selection
+      const lastSelected = selectedImageIds[selectedImageIds.length - 1];
+      if (!inspectedImageId || !selectedImageIds.includes(inspectedImageId)) {
+        setInspectedImageId(lastSelected);
+      } else {
+        // If a new shoe was just added, switch to it
+        setInspectedImageId(lastSelected);
       }
     } else {
-      setFocusedId(null);
+      setInspectedImageId(null);
     }
-  }, [selectedImageIds, focusedId]);
+  }, [selectedImageIds]);
 
+  const imageMap = useMemo(() => {
+    const m = new Map<number, ImageData>();
+    images.forEach((img) => m.set(img.id, img));
+    return m;
+  }, [images]);
+
+  const inspectedImage = inspectedImageId != null ? imageMap.get(inspectedImageId) : null;
   const selectedImages = images.filter((img) => selectedImageIds.includes(img.id));
-  const selectedImage = selectedImageIds.length === 1
-    ? images.find((img) => img.id === selectedImageIds[0])
-    : null;
+
+  const ancestors = useMemo(() => {
+    if (!inspectedImage) return [];
+    return (inspectedImage.parents || [])
+      .map((id) => imageMap.get(id))
+      .filter(Boolean) as ImageData[];
+  }, [inspectedImage, imageMap]);
+
+  const children = useMemo(() => {
+    if (!inspectedImage) return [];
+    return (inspectedImage.children || [])
+      .map((id) => imageMap.get(id))
+      .filter(Boolean) as ImageData[];
+  }, [inspectedImage, imageMap]);
+
+  const fullLineageLevels = useMemo((): LineageLevel[] => {
+    if (selectedImageIds.length === 0 || !imageMap.size) return [];
+    const allIds = new Set<number>();
+
+    for (const sid of selectedImageIds) {
+      allIds.add(sid);
+      let frontier: number[] = [sid];
+      const seen = new Set<number>([sid]);
+      while (frontier.length > 0) {
+        const next: number[] = [];
+        for (const id of frontier) {
+          const node = imageMap.get(id);
+          if (!node) continue;
+          for (const pid of node.parents || []) {
+            if (!seen.has(pid)) {
+              seen.add(pid);
+              allIds.add(pid);
+              next.push(pid);
+            }
+          }
+        }
+        frontier = next;
+      }
+    }
+
+    for (const sid of selectedImageIds) {
+      const node = imageMap.get(sid);
+      if (!node) continue;
+      let frontier: number[] = (node.children || []).slice();
+      const seen = new Set<number>([sid]);
+      while (frontier.length > 0) {
+        const next: number[] = [];
+        for (const id of frontier) {
+          if (!seen.has(id)) {
+            seen.add(id);
+            allIds.add(id);
+          }
+          const n = imageMap.get(id);
+          if (!n) continue;
+          for (const cid of n.children || []) {
+            if (!seen.has(cid)) {
+              seen.add(cid);
+              allIds.add(cid);
+              next.push(cid);
+            }
+          }
+        }
+        frontier = next;
+      }
+    }
+
+    const roots = Array.from(allIds).filter((id) => {
+      const node = imageMap.get(id);
+      if (!node?.parents?.length) return true;
+      return node.parents.every((p) => !allIds.has(p));
+    });
+
+    const levelMap = new Map<number, number>();
+    roots.forEach((r) => levelMap.set(r, 0));
+
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const id of allIds) {
+        if (levelMap.has(id)) continue;
+        const node = imageMap.get(id);
+        if (!node?.parents?.length) {
+          levelMap.set(id, 0);
+          changed = true;
+          continue;
+        }
+        const parentsInSet = node.parents.filter((p) => allIds.has(p));
+        const parentLevels = parentsInSet.map((p) => levelMap.get(p)).filter((l): l is number => l !== undefined);
+        if (parentLevels.length === parentsInSet.length) {
+          levelMap.set(id, parentLevels.length > 0 ? 1 + Math.max(...parentLevels) : 0);
+          changed = true;
+        }
+      }
+    }
+
+    const byLevel = new Map<number, ImageData[]>();
+    for (const id of allIds) {
+      const node = imageMap.get(id);
+      if (!node) continue;
+      const lvl = levelMap.get(id) ?? 0;
+      const arr = byLevel.get(lvl) || [];
+      arr.push(node);
+      byLevel.set(lvl, arr);
+    }
+
+    const sortedLevels = Array.from(byLevel.keys()).sort((a, b) => a - b);
+    return sortedLevels.map((lvl) => ({
+      level: lvl,
+      nodes: byLevel.get(lvl) || [],
+      parentIds: new Map(),
+    }));
+  }, [selectedImageIds, imageMap]);
+
+  const riverRef = useRef<HTMLDivElement>(null);
+  const [lineSegments, setLineSegments] = useState<LineSegment[]>([]);
+
+  useLayoutEffect(() => {
+    if (isFullLineageView) return;
+    const el = riverRef.current;
+    if (!el || (ancestors.length === 0 && children.length === 0)) {
+      setLineSegments([]);
+      return;
+    }
+    const riverRect = el.getBoundingClientRect();
+    if (riverRect.width === 0 || riverRect.height === 0) {
+      setLineSegments([]);
+      return;
+    }
+    const toPct = (clientX: number, clientY: number) => ({
+      x: ((clientX - riverRect.left) / riverRect.width) * 100,
+      y: ((clientY - riverRect.top) / riverRect.height) * 100,
+    });
+    const heroEl = el.querySelector(".hero-image-wrapper") as HTMLElement | null;
+    const heroRect = heroEl?.getBoundingClientRect();
+    const heroCenter = heroRect
+      ? toPct(heroRect.left + heroRect.width / 2, heroRect.top + heroRect.height / 2)
+      : null;
+
+    const segments: LineSegment[] = [];
+    if (heroCenter) {
+      const ancestorWrappers = el.querySelectorAll(".river-ancestors .river-node-wrapper");
+      ancestorWrappers.forEach((w) => {
+        const r = (w as HTMLElement).getBoundingClientRect();
+        const from = toPct(r.left + r.width / 2, r.bottom);
+        segments.push({ from, to: heroCenter, type: "ancestor" });
+      });
+      const childWrappers = el.querySelectorAll(".river-children .river-node-wrapper");
+      childWrappers.forEach((w) => {
+        const r = (w as HTMLElement).getBoundingClientRect();
+        const from = toPct(r.left + r.width / 2, r.top);
+        segments.push({ from, to: heroCenter, type: "child" });
+      });
+    }
+    setLineSegments(segments);
+    if (segments.length > 0) {
+      DEBUG_LOG({ runId: "post-fix", lineSegmentsCount: segments.length, hasHero: !!heroCenter });
+    }
+  }, [isFullLineageView, ancestors.length, children.length, inspectedImageId]);
+
+  // #region agent log
+  useEffect(() => {
+    const el = riverRef.current;
+    if (!el || (ancestors.length === 0 && children.length === 0)) return;
+    const raf = requestAnimationFrame(() => {
+      const ancestorRow = el.querySelector(".river-ancestors") as HTMLElement | null;
+      const childrenRow = el.querySelector(".river-children") as HTMLElement | null;
+      const heroCard = el.querySelector(".hero-card") as HTMLElement | null;
+      const wrapper = el.querySelector(".river-node-wrapper") as HTMLElement | null;
+      const cs = (e: HTMLElement | null) => e ? window.getComputedStyle(e) : null;
+      const r = (e: HTMLElement | null) => e ? e.getBoundingClientRect() : null;
+      DEBUG_LOG({
+        runId: "post-fix",
+        hypothesisId: "H1-H5",
+        ancestorsCount: ancestors.length,
+        childrenCount: children.length,
+        riverOverflow: cs(el)?.overflow ?? "N/A",
+        riverOverflowY: cs(el)?.overflowY ?? "N/A",
+        ancestorRowOverflowY: ancestorRow ? cs(ancestorRow)?.overflowY : "no-el",
+        ancestorRowOverflowX: ancestorRow ? cs(ancestorRow)?.overflowX : "no-el",
+        ancestorRowHeight: r(ancestorRow)?.height ?? "N/A",
+        childrenRowOverflowY: childrenRow ? cs(childrenRow)?.overflowY : "no-el",
+        childrenRowOverflowX: childrenRow ? cs(childrenRow)?.overflowX : "no-el",
+        childrenRowHeight: r(childrenRow)?.height ?? "N/A",
+        heroCardZIndex: heroCard ? cs(heroCard)?.zIndex : "no-el",
+        heroCardPosition: heroCard ? cs(heroCard)?.position : "no-el",
+        wrapperHeight: r(wrapper)?.height ?? "N/A",
+        wrapperWidth: r(wrapper)?.width ?? "N/A",
+      });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [ancestors.length, children.length]);
+  // #endregion
 
   if (isCollapsed) {
     return (
@@ -68,7 +407,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
         <button
           className="inspector-expand-tab"
           onClick={() => setIsCollapsed(false)}
-          title="Open Inspector (click to expand)"
+          title="Open Inspector"
         >
           &#9664;
         </button>
@@ -76,10 +415,29 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     );
   }
 
+  const handleNodeClick = (id: number) => {
+    setInspectedImageId(id);
+    setFlyToImageId(id);
+  };
+
+  const handleAddToSelection = (id: number) => {
+    if (!selectedImageIds.includes(id)) {
+      toggleImageSelection(id, false);
+    }
+  };
+
+  const handleHeroAddClick = () => {
+    if (inspectedImageId != null && !selectedImageIds.includes(inspectedImageId)) {
+      toggleImageSelection(inspectedImageId, false);
+    }
+  };
+
+  const isHeroSelected = inspectedImageId != null && selectedImageIds.includes(inspectedImageId);
+
   return (
-    <div className="right-inspector">
+    <div className="ethereal-inspector">
       <div className="inspector-header">
-        <span className="inspector-title">Inspector</span>
+        <span className="inspector-title">INSPECTOR</span>
         <button
           className="inspector-collapse-btn"
           onClick={() => setIsCollapsed(true)}
@@ -90,185 +448,207 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
       </div>
 
       {selectedImageIds.length === 0 && (
-        <div className="section-placeholder">
-          Click a shoe on the canvas to inspect it
+        <div className="empty-state">
+          <div className="empty-icon">✦</div>
+          <p>Select a shoe to inspect its lineage</p>
         </div>
       )}
 
-      {/* Single selection detail */}
-      {selectedImage && (
+      {selectedImageIds.length > 0 && inspectedImage && (
         <>
-          <div className="inspector-section">
-            <div className="section-header" onClick={() => toggleSection("selection")}>
-              <span>Selection</span>
-              <span className={`section-chevron ${openSections.selection ? "open" : ""}`}>&#9660;</span>
+          {/* The Deck - 12vh Selection Master */}
+          <div className="selection-deck">
+            <div className="deck-scroll">
+              {selectedImages.map((img) => (
+                <div
+                  key={img.id}
+                  className={`deck-avatar ${inspectedImageId === img.id ? "active" : ""}`}
+                  onClick={() => handleNodeClick(img.id)}
+                  title={`#${img.id}`}
+                >
+                  <img src={`data:image/png;base64,${img.base64_image}`} alt={`#${img.id}`} />
+                </div>
+              ))}
             </div>
-            {openSections.selection && (
-              <div className="section-content">
-                <div className="selection-detail">
-                  <div className="selection-thumb">
-                    <img
-                      src={`data:image/png;base64,${selectedImage.base64_image}`}
-                      alt={selectedImage.prompt || "Selected"}
+          </div>
+
+          {/* River header: Full Lineage toggle */}
+          <div className="river-header-bar">
+            <button
+              className="river-mode-btn"
+              onClick={() => setIsFullLineageView(!isFullLineageView)}
+              title={isFullLineageView ? "Return to hero view" : "Show full lineage tree"}
+            >
+              {isFullLineageView ? "← Return" : "🌳 Full lineage"}
+            </button>
+          </div>
+
+          {/* Genealogy River - Fixed Grid Layout or Full Lineage */}
+          <div
+            className={`genealogy-river ${isFullLineageView ? "full-lineage-mode" : ""}`}
+            ref={riverRef}
+          >
+            {isFullLineageView ? (
+              <FullLineageView
+                levels={fullLineageLevels}
+                inspectedImageId={inspectedImageId}
+                selectedImageIds={selectedImageIds}
+                onNodeClick={handleNodeClick}
+                onAddToSelection={handleAddToSelection}
+              />
+            ) : (
+              <>
+            {/* Lines overlay: SVG so lines are never clipped by overflow */}
+            {lineSegments.length > 0 && (
+              <div className="river-lines-overlay" aria-hidden>
+                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="river-lines-svg">
+                  <defs>
+                    <linearGradient id="river-line-ancestor" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="rgba(0, 229, 255, 0.35)" />
+                      <stop offset="100%" stopColor="rgba(0, 229, 255, 0)" />
+                    </linearGradient>
+                    <linearGradient id="river-line-child" x1="0%" y1="100%" x2="0%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(255, 170, 0, 0.35)" />
+                      <stop offset="100%" stopColor="rgba(255, 170, 0, 0)" />
+                    </linearGradient>
+                  </defs>
+                  {lineSegments.map((seg, i) => (
+                    <line
+                      key={`${seg.type}-${i}`}
+                      x1={seg.from.x}
+                      y1={seg.from.y}
+                      x2={seg.to.x}
+                      y2={seg.to.y}
+                      stroke={seg.type === "ancestor" ? "url(#river-line-ancestor)" : "url(#river-line-child)"}
+                      strokeWidth={0.6}
+                      strokeDasharray="2 1.5"
+                      strokeLinecap="butt"
                     />
-                  </div>
-                  {selectedImage.prompt && (
-                    <p className="selection-prompt">{selectedImage.prompt}</p>
-                  )}
-                  <div className="selection-meta">
-                    <span>#{selectedImage.id}</span>
-                    <span>{selectedImage.generation_method}</span>
-                  </div>
-                  {selectedImage.parents.length > 0 && (
-                    <div className="selection-lineage">
-                      <span className="lineage-label">Parents:</span>
-                      <span className="lineage-ids">
-                        {selectedImage.parents.map((p) => `#${p}`).join(", ")}
-                      </span>
-                    </div>
-                  )}
-                  {selectedImage.children.length > 0 && (
-                    <div className="selection-lineage">
-                      <span className="lineage-label">Children:</span>
-                      <span className="lineage-ids">
-                        {selectedImage.children.map((c) => `#${c}`).join(", ")}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Genealogy section */}
-          <div className="inspector-section">
-            <div className="section-header" onClick={() => toggleSection("genealogy")}>
-              <span>Genealogy</span>
-              <span className={`section-chevron ${openSections.genealogy ? "open" : ""}`}>&#9660;</span>
-            </div>
-            {openSections.genealogy && (
-              <div className="section-content">
-                <GenealogyLens selectedImageIds={[selectedImage.id]} />
-              </div>
-            )}
-          </div>
-
-          {/* Actions section - at bottom, always visible */}
-          <div className="inspector-section inspector-section-actions">
-            <div className="section-header" onClick={() => toggleSection("actions")}>
-              <span>Actions</span>
-              <span className={`section-chevron ${openSections.actions ? "open" : ""}`}>&#9660;</span>
-            </div>
-            {openSections.actions && (
-              <div className="section-content">
-                <div className="inspector-actions">
-                  {onGenerateFromReference && (
-                    <button className="inspector-action-btn primary" onClick={onGenerateFromReference}>
-                      Generate with prompt...
-                    </button>
-                  )}
-                  {onRemoveSelected && (
-                    <button className="inspector-action-btn danger" onClick={onRemoveSelected}>
-                      Remove from space
-                    </button>
-                  )}
-                  <button className="inspector-action-btn" onClick={clearSelection}>
-                    Clear selection
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* Multi-select view */}
-      {selectedImageIds.length > 1 && (
-        <>
-          <div className="inspector-section">
-            <div className="section-header" onClick={() => toggleSection("selection")}>
-              <span>Selection ({selectedImageIds.length})</span>
-              <span className={`section-chevron ${openSections.selection ? "open" : ""}`}>&#9660;</span>
-            </div>
-            {openSections.selection && (
-              <div className="section-content">
-                {/* Tile grid */}
-                <div className="selection-grid">
-                  {selectedImages.map((img) => (
-                    <div
-                      key={img.id}
-                      className={`selection-tile ${focusedId === img.id ? "focused" : ""}`}
-                      onClick={() => {
-                        setFocusedId(img.id);
-                        setFlyToImageId(img.id);
-                      }}
-                    >
-                      <img
-                        src={`data:image/png;base64,${img.base64_image}`}
-                        alt={img.prompt || `#${img.id}`}
-                      />
-                      <span className="tile-id">#{img.id}</span>
-                    </div>
                   ))}
-                </div>
-
-                {/* Summary metadata */}
-                <div className="selection-summary">
-                  <div className="summary-row">
-                    <span className="summary-label">Methods:</span>
-                    <span className="summary-value">
-                      {[...new Set(selectedImages.map((img) => img.generation_method))].join(", ")}
-                    </span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="summary-label">Parents:</span>
-                    <span className="summary-value">
-                      {[...new Set(selectedImages.flatMap((img) => img.parents))].length} unique
-                    </span>
-                  </div>
-                </div>
+                </svg>
               </div>
             )}
-          </div>
-
-          {/* Genealogy section */}
-          <div className="inspector-section">
-            <div className="section-header" onClick={() => toggleSection("genealogy")}>
-              <span>Genealogy</span>
-              <span className={`section-chevron ${openSections.genealogy ? "open" : ""}`}>&#9660;</span>
-            </div>
-            {openSections.genealogy && (
-              <div className="section-content">
-                <GenealogyLens selectedImageIds={selectedImageIds} />
+            {/* Ancestors - Single row at top */}
+            {ancestors.length > 0 && (
+              <div className={`river-ancestors ${ancestors.length > 3 ? 'many-items' : ''} ${ancestors.length > 5 ? 'very-many-items' : ''}`}>
+                {ancestors.map((a) => {
+                  const isInSelection = selectedImageIds.includes(a.id);
+                  return (
+                    <div
+                      key={a.id}
+                      className="river-node-wrapper"
+                    >
+                      <div
+                        className={`river-thumb ${isInSelection ? 'in-selection' : ''}`}
+                        onClick={() => handleNodeClick(a.id)}
+                        title={`#${a.id}`}
+                      >
+                        <img src={`data:image/png;base64,${a.base64_image}`} alt={`#${a.id}`} />
+                      </div>
+                      {!isInSelection && (
+                        <button
+                          className="river-add-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToSelection(a.id);
+                          }}
+                          title="Add to selection"
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
-          </div>
 
-          {/* Actions section - at bottom, always visible */}
-          <div className="inspector-section inspector-section-actions">
-            <div className="section-header" onClick={() => toggleSection("actions")}>
-              <span>Actions</span>
-              <span className={`section-chevron ${openSections.actions ? "open" : ""}`}>&#9660;</span>
-            </div>
-            {openSections.actions && (
-              <div className="section-content">
-                <div className="inspector-actions">
-                  {onGenerateFromReference && (
-                    <button className="inspector-action-btn primary" onClick={onGenerateFromReference}>
-                      Generate from {selectedImageIds.length} references...
-                    </button>
-                  )}
-                  {onRemoveSelected && (
-                    <button className="inspector-action-btn danger" onClick={onRemoveSelected}>
-                      Remove selected
-                    </button>
-                  )}
-                  <button className="inspector-action-btn" onClick={clearSelection}>
-                    Clear selection
+            {/* Hero Card - Fixed center */}
+            <div className="hero-card">
+              <div
+                className={`hero-image-wrapper ${isHeroSelected ? "selected" : ""}`}
+                onMouseEnter={() => setHeroHoverAdd(!isHeroSelected)}
+                onMouseLeave={() => setHeroHoverAdd(false)}
+              >
+                <img
+                  src={`data:image/png;base64,${inspectedImage.base64_image}`}
+                  alt="Hero"
+                  className="hero-image"
+                />
+                {heroHoverAdd && !isHeroSelected && (
+                  <button className="hero-add-btn" onClick={handleHeroAddClick}>
+                    + Add to Selection
                   </button>
-                </div>
+                )}
+              </div>
+              <div className="hero-meta">
+                <span className="hero-id">#{inspectedImage.id}</span>
+                <span className="hero-method">{inspectedImage.generation_method}</span>
+                {inspectedImage.prompt && (
+                  <p className="hero-prompt">{inspectedImage.prompt}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Children - Single row at bottom */}
+            {children.length > 0 && (
+              <div className={`river-children ${children.length > 3 ? 'many-items' : ''} ${children.length > 5 ? 'very-many-items' : ''}`}>
+                {children.map((c) => {
+                  const isInSelection = selectedImageIds.includes(c.id);
+                  return (
+                    <div
+                      key={c.id}
+                      className="river-node-wrapper"
+                    >
+                      <div
+                        className={`river-thumb ${isInSelection ? 'in-selection' : ''}`}
+                        onClick={() => handleNodeClick(c.id)}
+                        title={`#${c.id}`}
+                      >
+                        <img src={`data:image/png;base64,${c.base64_image}`} alt={`#${c.id}`} />
+                      </div>
+                      {!isInSelection && (
+                        <button
+                          className="river-add-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToSelection(c.id);
+                          }}
+                          title="Add to selection"
+                        >
+                          +
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
+
+            {ancestors.length === 0 && children.length === 0 && (
+              <div className="no-lineage">No lineage</div>
+            )}
+              </>
+            )}
+          </div>
+
+          {/* Action Bar - High Contrast */}
+          <div className="action-bar">
+            {onGenerateFromReference && (
+              <button className="action-primary" onClick={onGenerateFromReference}>
+                Generate Variations
+              </button>
+            )}
+            <div className="action-row">
+              {onRemoveSelected && (
+                <button className="action-danger" onClick={onRemoveSelected}>
+                  Remove
+                </button>
+              )}
+              <button className="action-secondary" onClick={clearSelection}>
+                Deselect
+              </button>
+            </div>
           </div>
         </>
       )}

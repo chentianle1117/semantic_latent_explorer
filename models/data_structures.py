@@ -39,6 +39,9 @@ class ImageMetadata:
     reference_ids: List[int] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now)
     visible: bool = True
+    is_ghost: bool = False  # Whether this is a ghost/preview suggestion
+    suggested_prompt: str = ''  # Suggested prompt for ghost nodes
+    reasoning: str = ''  # Why this ghost was suggested
     _cached_base64_url: Optional[str] = field(default=None, repr=False)
 
     def get_base64_url(self, size: Optional[Tuple[int, int]] = None) -> str:

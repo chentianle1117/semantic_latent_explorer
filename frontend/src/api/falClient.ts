@@ -119,11 +119,15 @@ class FalClient {
       const fullPrompt = `${NANO_BANANA_SYSTEM_PROMPT}, ${request.prompt}`;
       console.log("Full prompt for edit:", fullPrompt);
 
+      // Cap references and output count to avoid fal.ai ValidationError
+      const cappedUrls = request.image_urls.slice(0, 4);
+      const cappedNum = Math.min(request.num_images || 1, 4);
+
       const result = await fal.subscribe("fal-ai/nano-banana/edit", {
         input: {
           prompt: fullPrompt,
-          image_urls: request.image_urls,
-          num_images: request.num_images || 1,
+          image_urls: cappedUrls,
+          num_images: cappedNum,
           output_format: request.output_format || "jpeg",
           aspect_ratio: request.aspect_ratio
         },

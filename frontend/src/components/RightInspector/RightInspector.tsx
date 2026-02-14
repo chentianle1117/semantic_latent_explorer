@@ -331,40 +331,46 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
       setLineSegments([]);
       return;
     }
-    const riverRect = el.getBoundingClientRect();
-    if (riverRect.width === 0 || riverRect.height === 0) {
-      setLineSegments([]);
-      return;
-    }
-    const toPct = (clientX: number, clientY: number) => ({
-      x: ((clientX - riverRect.left) / riverRect.width) * 100,
-      y: ((clientY - riverRect.top) / riverRect.height) * 100,
-    });
-    const heroEl = el.querySelector(".hero-image-wrapper") as HTMLElement | null;
-    const heroRect = heroEl?.getBoundingClientRect();
-    const heroCenter = heroRect
-      ? toPct(heroRect.left + heroRect.width / 2, heroRect.top + heroRect.height / 2)
-      : null;
 
-    const segments: LineSegment[] = [];
-    if (heroCenter) {
-      const ancestorWrappers = el.querySelectorAll(".river-ancestors .river-node-wrapper");
-      ancestorWrappers.forEach((w) => {
-        const r = (w as HTMLElement).getBoundingClientRect();
-        const from = toPct(r.left + r.width / 2, r.bottom);
-        segments.push({ from, to: heroCenter, type: "ancestor" });
+    // Use requestAnimationFrame to ensure DOM has painted
+    const raf = requestAnimationFrame(() => {
+      const riverRect = el.getBoundingClientRect();
+      if (riverRect.width === 0 || riverRect.height === 0) {
+        setLineSegments([]);
+        return;
+      }
+      const toPct = (clientX: number, clientY: number) => ({
+        x: ((clientX - riverRect.left) / riverRect.width) * 100,
+        y: ((clientY - riverRect.top) / riverRect.height) * 100,
       });
-      const childWrappers = el.querySelectorAll(".river-children .river-node-wrapper");
-      childWrappers.forEach((w) => {
-        const r = (w as HTMLElement).getBoundingClientRect();
-        const from = toPct(r.left + r.width / 2, r.top);
-        segments.push({ from, to: heroCenter, type: "child" });
-      });
-    }
-    setLineSegments(segments);
-    if (segments.length > 0) {
-      DEBUG_LOG({ runId: "post-fix", lineSegmentsCount: segments.length, hasHero: !!heroCenter });
-    }
+      const heroEl = el.querySelector(".hero-image-wrapper") as HTMLElement | null;
+      const heroRect = heroEl?.getBoundingClientRect();
+      const heroCenter = heroRect
+        ? toPct(heroRect.left + heroRect.width / 2, heroRect.top + heroRect.height / 2)
+        : null;
+
+      const segments: LineSegment[] = [];
+      if (heroCenter) {
+        const ancestorWrappers = el.querySelectorAll(".river-ancestors .river-node-wrapper");
+        ancestorWrappers.forEach((w) => {
+          const r = (w as HTMLElement).getBoundingClientRect();
+          const from = toPct(r.left + r.width / 2, r.bottom);
+          segments.push({ from, to: heroCenter, type: "ancestor" });
+        });
+        const childWrappers = el.querySelectorAll(".river-children .river-node-wrapper");
+        childWrappers.forEach((w) => {
+          const r = (w as HTMLElement).getBoundingClientRect();
+          const from = toPct(r.left + r.width / 2, r.top);
+          segments.push({ from, to: heroCenter, type: "child" });
+        });
+      }
+      setLineSegments(segments);
+      if (segments.length > 0) {
+        DEBUG_LOG({ runId: "post-fix", lineSegmentsCount: segments.length, hasHero: !!heroCenter });
+      }
+    });
+
+    return () => cancelAnimationFrame(raf);
   }, [isFullLineageView, ancestors.length, children.length, inspectedImageId]);
 
   // #region agent log
@@ -512,19 +518,26 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                       <stop offset="100%" stopColor="rgba(255, 170, 0, 0)" />
                     </linearGradient>
                   </defs>
-                  {lineSegments.map((seg, i) => (
-                    <line
-                      key={`${seg.type}-${i}`}
-                      x1={seg.from.x}
-                      y1={seg.from.y}
-                      x2={seg.to.x}
-                      y2={seg.to.y}
-                      stroke={seg.type === "ancestor" ? "url(#river-line-ancestor)" : "url(#river-line-child)"}
-                      strokeWidth={0.6}
-                      strokeDasharray="2 1.5"
-                      strokeLinecap="butt"
-                    />
-                  ))}
+                  {lineSegments.map((seg, i) => {
+                    // Quadratic bezier control point: slightly toward hero center
+                    const midX = (seg.from.x + seg.to.x) / 2;
+                    const midY = (seg.from.y + seg.to.y) / 2;
+                    const ctrlX = midX + (seg.to.x - midX) * 0.3;
+                    const ctrlY = midY + (seg.to.y - midY) * 0.3;
+                    const pathD = `M ${seg.from.x} ${seg.from.y} Q ${ctrlX} ${ctrlY} ${seg.to.x} ${seg.to.y}`;
+
+                    return (
+                      <path
+                        key={`${seg.type}-${i}`}
+                        d={pathD}
+                        stroke={seg.type === "ancestor" ? "url(#river-line-ancestor)" : "url(#river-line-child)"}
+                        strokeWidth={0.6}
+                        strokeDasharray="2 1.5"
+                        strokeLinecap="butt"
+                        fill="none"
+                      />
+                    );
+                  })}
                 </svg>
               </div>
             )}

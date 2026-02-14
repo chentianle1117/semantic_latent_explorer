@@ -72,6 +72,7 @@ export const App: React.FC = () => {
   const [showRadialDial, setShowRadialDial] = useState(false);
   const [radialDialPos, setRadialDialPos] = useState({ x: 0, y: 0 });
   const [showExplorationTreeModal, setShowExplorationTreeModal] = useState(false);
+  const [selectedGhost, setSelectedGhost] = useState<any>(null);
   const lastMousePosRef = useRef({
     x: typeof window !== "undefined" ? window.innerWidth / 2 : 400,
     y: typeof window !== "undefined" ? window.innerHeight / 2 : 300,
@@ -120,9 +121,23 @@ export const App: React.FC = () => {
           images: state.images.length,
           groups: state.history_groups.length,
           design_brief: state.design_brief ? "present" : "none",
+          clusters: state.cluster_centroids?.length || 0,
         });
         setImages(state.images);
         setHistoryGroups(state.history_groups);
+        // Load cluster data for edge bundling
+        if (state.cluster_centroids && state.cluster_labels) {
+          useAppStore.setState({
+            clusterCentroids: state.cluster_centroids,
+            clusterLabels: state.cluster_labels,
+          });
+        }
+        // Load grid cell size
+        if (state.grid_cell_size) {
+          useAppStore.setState({
+            gridCellSize: state.grid_cell_size,
+          });
+        }
         // Load design brief from backend state
         if (state.design_brief) {
           setCurrentBrief(state.design_brief);
@@ -990,6 +1005,43 @@ export const App: React.FC = () => {
     }
   };
 
+  const suggestGhostNodes = async () => {
+    if (images.length < 5) {
+      alert("Please generate at least 5 images before suggesting ideas");
+      return;
+    }
+
+    useProgressStore.getState().showProgress("analyzing", "AI suggesting ideas...", true);
+    try {
+      const result = await apiClient.suggestGhosts(currentBrief || "Explore shoe designs", 3);
+
+      // Clear existing ghosts and add new ones
+      useAppStore.getState().clearGhostNodes();
+      result.ghosts.forEach((ghost) => {
+        useAppStore.getState().addGhostNode({
+          ...ghost,
+          isGhost: true,
+          suggestedPrompt: ghost.suggested_prompt,
+          group_id: `ghost-${ghost.id}`,
+          parents: [],
+          children: [],
+          generation_method: 'batch',
+          prompt: ghost.suggested_prompt,
+          timestamp: new Date().toISOString(),
+          visible: true,
+          base64_image: '', // Ghost nodes don't have images yet
+        } as any);
+      });
+
+      useProgressStore.getState().hideProgress();
+      alert(`✨ ${result.ghosts.length} ideas suggested! Click the sparkles on canvas to accept.`);
+    } catch (error) {
+      console.error("Failed to suggest ghost nodes:", error);
+      useProgressStore.getState().hideProgress();
+      alert("Failed to generate suggestions. Ensure Gemini API is configured.");
+    }
+  };
+
   const analyzeCanvas = async () => {
     if (images.length < 5) {
       console.log("Skipping analysis: too few images (need at least 5)");
@@ -1472,6 +1524,7 @@ export const App: React.FC = () => {
                 pendingImages={pendingImages}
                 onAcceptPending={handleAcceptPending}
                 onDiscardPending={handleDiscardPending}
+                onGhostClick={setSelectedGhost}
               />
             )}
 
@@ -1638,6 +1691,123 @@ export const App: React.FC = () => {
         onClose={() => setShowExplorationTreeModal(false)}
       />
 
+      {/* Ghost Node Accept/Discard Modal */}
+      {selectedGhost && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setSelectedGhost(null)}
+        >
+          <div
+            style={{
+              background: "#161b22",
+              border: "1px solid #30363d",
+              borderRadius: "12px",
+              padding: "24px",
+              maxWidth: "500px",
+              width: "90%",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 16px 0", color: "#58a6ff", fontSize: "18px" }}>
+              ✨ AI Suggestion
+            </h3>
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ fontSize: "14px", color: "#8b949e", marginBottom: "8px" }}>
+                Suggested Prompt:
+              </div>
+              <div style={{ fontSize: "16px", color: "#c9d1d9", marginBottom: "16px" }}>
+                "{selectedGhost.suggested_prompt}"
+              </div>
+              <div style={{ fontSize: "14px", color: "#8b949e", marginBottom: "8px" }}>
+                Reasoning:
+              </div>
+              <div style={{ fontSize: "14px", color: "#8b949e" }}>
+                {selectedGhost.reasoning}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setSelectedGhost(null)}
+                style={{
+                  padding: "8px 16px",
+                  background: "#21262d",
+                  border: "1px solid #30363d",
+                  borderRadius: "6px",
+                  color: "#c9d1d9",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                Dismiss
+              </button>
+              <button
+                onClick={async () => {
+                  const ghost = selectedGhost;
+                  setSelectedGhost(null);
+
+                  // Generate image from ghost suggestion
+                  useProgressStore.getState().showProgress("generating", "Generating from suggestion...", true);
+                  try {
+                    const result = await falClient.generateTextToImage({
+                      prompt: ghost.suggested_prompt,
+                      num_images: 1,
+                    });
+
+                    if (result.images && result.images.length > 0) {
+                      await apiClient.addExternalImages({
+                        images: result.images.map(img => ({ url: img.url })),
+                        prompt: ghost.suggested_prompt,
+                        generation_method: "batch",
+                        remove_background: removeBackground,
+                        parent_ids: [],
+                      });
+
+                      // Remove ghost from store
+                      useAppStore.getState().removeGhostNode(ghost.id);
+
+                      // Fetch updated state
+                      const state = await apiClient.getState();
+                      setImages(state.images);
+                      setHistoryGroups(state.history_groups);
+                    }
+
+                    useProgressStore.getState().hideProgress();
+                  } catch (error) {
+                    console.error("Failed to generate from ghost:", error);
+                    useProgressStore.getState().hideProgress();
+                    alert("Failed to generate image from suggestion");
+                  }
+                }}
+                style={{
+                  padding: "8px 16px",
+                  background: "#238636",
+                  border: "1px solid #2ea043",
+                  borderRadius: "6px",
+                  color: "white",
+                  cursor: "pointer",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                }}
+              >
+                Generate ✨
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Radial Dial (global actions: Space or middle-click) */}
       <RadialDial
         x={radialDialPos.x}
@@ -1690,6 +1860,14 @@ export const App: React.FC = () => {
             description: "AI-generated starter prompts from brief",
             category: "agentic",
             onClick: handlePromptSuggestion,
+          },
+          {
+            id: "suggest-ghosts",
+            icon: "✨",
+            label: "Suggest Ideas",
+            description: "AI suggests unexplored gaps to fill",
+            category: "agentic",
+            onClick: suggestGhostNodes,
           },
           {
             id: "exploration-tree",

@@ -743,8 +743,16 @@ body {
 
 .image-node.selected-glow {
   filter: drop-shadow(0 0 2px #fff)
-          drop-shadow(0 0 15px #00FFFF);
+          drop-shadow(0 0 15px #00d2ff);
   opacity: 1.0;
+}
+
+.image-node.parent-glow {
+  filter: drop-shadow(0 0 10px rgba(63, 185, 80, 0.8));
+}
+
+.image-node.child-glow {
+  filter: drop-shadow(0 0 10px rgba(210, 153, 34, 0.8));
 }
 
 /* ===== Terrain Toggle ===== */

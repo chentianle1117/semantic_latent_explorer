@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 import google.generativeai as genai
 from dotenv import load_dotenv
 import re
+import socket
 
 # Load environment variables
 load_dotenv()
@@ -110,6 +111,9 @@ class ImageResponse(BaseModel):
     prompt: str
     timestamp: str
     visible: bool
+    is_ghost: bool = False  # Whether this is a ghost/preview suggestion
+    suggested_prompt: str = ''  # Suggested prompt for ghost nodes
+    reasoning: str = ''  # Why this ghost was suggested
 
 
 class StateResponse(BaseModel):
@@ -118,6 +122,7 @@ class StateResponse(BaseModel):
     axis_labels: Dict[str, Tuple[str, str]]
     is_3d_mode: bool = False  # New: track if in 3D mode
     design_brief: Optional[str] = None  # New: include design brief in state
+    grid_cell_size: Tuple[float, float] = (0.7, 0.7)  # Grid cell size in coordinate space
 
 
 # Global state
@@ -136,6 +141,9 @@ class AppState:
         self.next_id = 0
         self.websocket_connections: List[WebSocket] = []
         self.design_brief: Optional[str] = None  # New: persist design brief
+        self.cluster_centroids: List[List[float]] = []  # Cluster centers for edge bundling
+        self.cluster_labels: List[int] = []  # Cluster assignment per image
+        self.grid_cell_size: Tuple[float, float] = (0.7, 0.7)  # Grid cell size in coordinate space
 
 state = AppState()
 
@@ -198,14 +206,113 @@ def project_embeddings_to_coordinates(embeddings: np.ndarray, use_3d: bool = Non
     return coords
 
 
-# Minimum coord distance to avoid overlap — increased for stronger separation
-MIN_COORD_DISTANCE = 0.5
+# Grid-based layout parameters
+GRID_CELL_SIZE = 0.7  # Grid cell size as fraction of image size in coordinate space
 
 
-def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.5,
-                        max_iterations: int = 150) -> np.ndarray:
+def snap_to_grid(coords: np.ndarray, cell_size: float = GRID_CELL_SIZE,
+                 target_aspect_range: Tuple[float, float] = (16/9, 1.0)) -> np.ndarray:
+    """
+    Snap coordinates to a grid layout with aspect ratio enforcement.
+
+    Each shoe snaps to the nearest available grid cell. If multiple candidates,
+    uses closest-first priority. Enforces overall distribution between 16:9 and 1:1.
+
+    Args:
+        coords: Projected coordinates (N, 2)
+        cell_size: Grid cell size in coordinate space
+        target_aspect_range: (min_aspect, max_aspect) for overall distribution
+
+    Returns:
+        Grid-snapped coordinates (N, 2)
+    """
+    if len(coords) < 1:
+        return coords
+
+    n = len(coords)
+    result = coords.copy().astype(float)
+
+    # Normalize coordinates to [0, 1] range for aspect ratio calculation
+    min_vals = np.min(result, axis=0)
+    max_vals = np.max(result, axis=0)
+    extent = max_vals - min_vals
+
+    # Enforce aspect ratio by adjusting extent
+    current_aspect = extent[0] / max(extent[1], 1e-6)
+    min_aspect, max_aspect = target_aspect_range
+
+    if current_aspect < min_aspect:  # Too tall, stretch width
+        target_width = extent[1] * min_aspect
+        x_center = (min_vals[0] + max_vals[0]) / 2
+        result[:, 0] = (result[:, 0] - x_center) * (target_width / max(extent[0], 1e-6)) + x_center
+        extent[0] = target_width
+    elif current_aspect > max_aspect:  # Too wide, stretch height
+        target_height = extent[0] / max_aspect
+        y_center = (min_vals[1] + max_vals[1]) / 2
+        result[:, 1] = (result[:, 1] - y_center) * (target_height / max(extent[1], 1e-6)) + y_center
+        extent[1] = target_height
+
+    # Snap each point to nearest grid cell
+    # Build occupancy map as we go: cell -> list of point indices
+    occupied: Dict[Tuple[int, int], List[int]] = {}
+    snapped = np.zeros_like(result)
+
+    # Sort by distance from origin to process central points first
+    distances = np.linalg.norm(result, axis=1)
+    order = np.argsort(distances)
+
+    for idx in order:
+        point = result[idx]
+
+        # Find nearest grid cell
+        grid_x = int(np.round(point[0] / cell_size))
+        grid_y = int(np.round(point[1] / cell_size))
+
+        # Check if cell is available
+        cell = (grid_x, grid_y)
+        if cell not in occupied:
+            occupied[cell] = [idx]
+            snapped[idx] = np.array([grid_x * cell_size, grid_y * cell_size])
+        else:
+            # Cell occupied, spiral search for nearest available cell
+            found = False
+            for radius in range(1, 20):  # Max spiral radius
+                for dx in range(-radius, radius + 1):
+                    for dy in range(-radius, radius + 1):
+                        if max(abs(dx), abs(dy)) != radius:
+                            continue  # Only check perimeter of current radius
+
+                        candidate = (grid_x + dx, grid_y + dy)
+                        if candidate not in occupied:
+                            occupied[candidate] = [idx]
+                            snapped[idx] = np.array([candidate[0] * cell_size, candidate[1] * cell_size])
+                            found = True
+                            break
+                    if found:
+                        break
+                if found:
+                    break
+
+            if not found:
+                # Fallback: use original coordinate with small jitter
+                snapped[idx] = point + np.random.uniform(-0.1, 0.1, 2)
+
+    # Re-center to origin
+    center = np.mean(snapped, axis=0)
+    snapped -= center
+
+    return snapped
+
+
+# Minimum coord distance to avoid overlap — just enough to prevent image clipping
+MIN_COORD_DISTANCE = 0.15
+
+
+def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.2,
+                        max_iterations: int = 150, cluster_attraction: float = 0.10) -> np.ndarray:
     """
     Force-directed repulsion to prevent overlap while preserving relative positions.
+    Adds centripetal attraction toward cluster centers to form visible groups.
     Iteratively pushes overlapping nodes apart, then re-centers to origin.
     """
     if len(coords) < 2:
@@ -215,11 +322,11 @@ def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.5,
     result = coords.copy().astype(float)
     rng = np.random.default_rng(42)
 
-    # Pre-spread: scale coordinates so extent fills at least 2.0 units
+    # Pre-spread: scale coordinates so extent fills at least 1.0 units
     extent_pre = np.ptp(result, axis=0)
     max_extent_pre = float(np.max(extent_pre))
-    if max_extent_pre > 1e-6 and max_extent_pre < 2.0:
-        scale_factor = 2.0 / max_extent_pre
+    if max_extent_pre > 1e-6 and max_extent_pre < 1.0:
+        scale_factor = 1.0 / max_extent_pre
         center_pre = np.mean(result, axis=0)
         result = (result - center_pre) * scale_factor + center_pre
 
@@ -228,6 +335,11 @@ def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.5,
     if np.max(dists_check) < 1e-10:
         jitter = rng.uniform(-0.05, 0.05, result.shape)
         result += jitter
+
+    # Compute clusters for centripetal attraction
+    from sklearn.cluster import KMeans
+    k = min(5, max(2, n // 8))
+    km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(result)
 
     # Calculate minimum allowed distance in coordinate space
     extent = np.ptp(result, axis=0)
@@ -238,6 +350,7 @@ def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.5,
         forces = np.zeros_like(result)
         max_overlap = 0.0
 
+        # Repulsion forces — gentle, just prevent overlap
         for i in range(n):
             for j in range(i + 1, n):
                 delta = result[i] - result[j]
@@ -253,9 +366,15 @@ def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.5,
                     max_overlap = max(max_overlap, overlap)
                     # Repulsion force proportional to overlap
                     direction = delta / dist
-                    force_magnitude = overlap * 0.8  # Stronger repulsion
+                    force_magnitude = overlap * 0.5  # Gentler repulsion
                     forces[i] += direction * force_magnitude
                     forces[j] -= direction * force_magnitude
+
+        # Centripetal attraction toward cluster centers
+        for i in range(n):
+            centroid = km.cluster_centers_[km.labels_[i]]
+            attraction = (centroid - result[i]) * cluster_attraction
+            forces[i] += attraction
 
         if max_overlap < min_dist * 0.02:  # Converged: <2% overlap remaining
             break
@@ -267,6 +386,26 @@ def apply_layout_spread(coords: np.ndarray, min_spacing_ratio: float = 0.5,
     result -= center
 
     return result
+
+
+def update_clusters():
+    """Compute and store cluster centroids and labels for edge bundling."""
+    visible = [img for img in state.images_metadata if img.visible]
+    if len(visible) < 2:
+        state.cluster_centroids = []
+        state.cluster_labels = []
+        return
+
+    coords = np.array([img.coordinates for img in visible])
+    from sklearn.cluster import KMeans
+    k = min(5, max(2, len(visible) // 8))
+    km = KMeans(n_clusters=k, random_state=42, n_init=10).fit(coords)
+
+    state.cluster_centroids = km.cluster_centers_.tolist()
+    # Map image ID to cluster label
+    id_to_label = {visible[i].id: int(km.labels_[i]) for i in range(len(visible))}
+    # Create full label list aligned with images_metadata
+    state.cluster_labels = [id_to_label.get(img.id, -1) for img in state.images_metadata]
 
 
 def image_metadata_to_response(img: ImageMetadata) -> ImageResponse:
@@ -281,7 +420,10 @@ def image_metadata_to_response(img: ImageMetadata) -> ImageResponse:
         generation_method=img.generation_method,
         prompt=img.prompt,
         timestamp=img.timestamp.isoformat(),
-        visible=img.visible
+        visible=img.visible,
+        is_ghost=img.is_ghost,
+        suggested_prompt=img.suggested_prompt,
+        reasoning=img.reasoning
     )
 
 
@@ -307,7 +449,10 @@ async def broadcast_state_update():
                 for g in state.history_groups
             ],
             "axis_labels": state.axis_labels,
-            "design_brief": state.design_brief  # Include design brief in broadcast
+            "design_brief": state.design_brief,  # Include design brief in broadcast
+            "cluster_centroids": state.cluster_centroids,  # For edge bundling
+            "cluster_labels": state.cluster_labels,  # Per-image cluster assignment
+            "grid_cell_size": list(state.grid_cell_size)  # Grid cell size for canvas overlay
         }
     }
 
@@ -358,7 +503,8 @@ async def get_state():
         ],
         axis_labels=state.axis_labels,
         is_3d_mode=state.is_3d_mode,  # New: include 3D mode state
-        design_brief=state.design_brief  # New: include design brief
+        design_brief=state.design_brief,  # New: include design brief
+        grid_cell_size=state.grid_cell_size  # Grid cell size for canvas overlay
     )
 
 
@@ -374,6 +520,18 @@ async def initialize_clip_only():
         if state.axis_builder is None:
             state.axis_builder = SemanticAxisBuilder(state.embedder)
             print("Axis builder initialized")
+
+        # Recalculate and rescale all image positions whenever encoding/axes become available
+        if len(state.images_metadata) > 0 and state.axis_builder and state.embedder:
+            print("Recalculating positions and applying layout spread for existing images...")
+            all_embeddings = np.array([img.embedding for img in state.images_metadata])
+            new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=state.is_3d_mode)
+            new_coords = snap_to_grid(new_coords[:, :2] if new_coords.shape[1] > 2 else new_coords)
+            for i, img_meta in enumerate(state.images_metadata):
+                img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+            update_clusters()  # Update clusters for edge bundling
+            await broadcast_state_update()
+            print("OK: Positions recalculated and rescaled")
 
         return {"status": "success", "message": "CLIP initialized"}
     except Exception as e:
@@ -405,11 +563,12 @@ async def update_semantic_axes(request: AxisUpdateRequest):
             print(f"Recalculating positions for {len(state.images_metadata)} images...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings)
-            new_coords = apply_layout_spread(new_coords)
+            new_coords = snap_to_grid(new_coords[:, :2] if new_coords.shape[1] > 2 else new_coords)
 
             for i, img_meta in enumerate(state.images_metadata):
                 # Store coordinates as tuple (2D or 3D)
                 img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+            update_clusters()  # Update clusters for edge bundling
 
             print(f"OK: All positions recalculated")
         elif len(state.images_metadata) > 0:
@@ -442,11 +601,12 @@ async def set_3d_mode(use_3d: bool):
             print(f"Recalculating positions for {len(state.images_metadata)} images in {'3D' if use_3d else '2D'} mode...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=use_3d)
-            new_coords = apply_layout_spread(new_coords)
+            new_coords = snap_to_grid(new_coords[:, :2] if new_coords.shape[1] > 2 else new_coords)
 
             for i, img_meta in enumerate(state.images_metadata):
                 # Store coordinates as tuple (2D or 3D)
                 img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+            update_clusters()  # Update clusters for edge bundling
 
             print(f"OK: All positions recalculated to {'3D' if use_3d else '2D'}")
 
@@ -524,6 +684,7 @@ async def reapply_layout():
         new_coords = apply_layout_spread(new_coords)
         for i, img_meta in enumerate(state.images_metadata):
             img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+        update_clusters()  # Update clusters for edge bundling
         print("OK: Layout reapplied")
         await broadcast_state_update()
         return {"status": "success", "message": "Layout reapplied"}
@@ -666,15 +827,16 @@ async def add_external_images(request: AddExternalImagesRequest):
 
         state.images_metadata.extend(new_metadata)
 
-        # Reproject ALL images with layout spread to prevent overlap
-        if len(state.images_metadata) > 1:
-            print("Applying layout spread to prevent overlap...")
+        # Reproject ALL images and apply layout spread whenever we encode new images
+        if len(state.images_metadata) >= 1:
+            print("Recalculating positions and applying layout spread...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
-            all_coords = project_embeddings_to_coordinates(all_embeddings)
-            all_coords = apply_layout_spread(all_coords)
+            all_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=state.is_3d_mode)
+            all_coords = snap_to_grid(all_coords[:, :2] if all_coords.shape[1] > 2 else all_coords)
             for i, img_meta in enumerate(state.images_metadata):
                 img_meta.coordinates = tuple(float(c) for c in all_coords[i])
             print("OK: Layout spread applied")
+            update_clusters()  # Update clusters for edge bundling
 
         # Update parent images' children lists
         if request.parent_ids:
@@ -1488,6 +1650,123 @@ Return JSON ONLY (no markdown):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/agent/suggest-ghosts")
+async def suggest_ghost_nodes(request: Request):
+    """Generate ghost node suggestions for unexplored gaps in the semantic space.
+
+    Returns 3-5 suggested prompts with coordinates and reasoning.
+    Ghost nodes are preview suggestions rendered at 30% opacity before generation.
+    """
+    try:
+        body = await request.json()
+        brief = body.get("brief", "Explore shoe design variations")
+        num_suggestions = body.get("num_suggestions", 3)
+
+        # Get canvas digest for gap detection
+        digest_res = await get_canvas_digest()
+        if not digest_res or "gaps" not in digest_res:
+            return {"ghosts": []}
+
+        gaps = digest_res["gaps"]
+        if len(gaps) == 0:
+            return {"ghosts": []}
+
+        # Take top N largest gaps (by size)
+        top_gaps = sorted(gaps, key=lambda g: g.get("size", 0), reverse=True)[:num_suggestions]
+
+        # Build prompt for Gemini
+        gap_descriptions = []
+        for i, gap in enumerate(top_gaps):
+            center = gap.get("center", [0, 0])
+            gap_descriptions.append(
+                f"Gap {i+1}: Located at ({center[0]:.2f}, {center[1]:.2f}) in semantic space. "
+                f"Size: {gap.get('size', 0):.2f}. Bounded by: {gap.get('bounding_clusters', [])}"
+            )
+
+        prompt = f"""You are helping explore a shoe design semantic space. The user's design brief is:
+"{brief}"
+
+Current semantic axes:
+- X-axis: {state.axis_labels['x'][0]} (left) → {state.axis_labels['x'][1]} (right)
+- Y-axis: {state.axis_labels['y'][0]} (bottom) → {state.axis_labels['y'][1]} (top)
+
+We've detected {len(top_gaps)} unexplored gaps in the canvas:
+{chr(10).join(gap_descriptions)}
+
+For each gap, suggest a shoe design prompt that would fit that semantic location. Return EXACTLY {num_suggestions} suggestions in JSON format:
+
+{{
+  "suggestions": [
+    {{
+      "prompt": "specific shoe design prompt",
+      "reasoning": "why this fits the gap location",
+      "gap_index": 0
+    }},
+    ...
+  ]
+}}
+
+Make prompts diverse, creative, and aligned with the design brief."""
+
+        # Call Gemini
+        if not gemini_api_key:
+            # Fallback without Gemini
+            ghosts = []
+            for i, gap in enumerate(top_gaps):
+                center = gap.get("center", [0, 0])
+                ghosts.append({
+                    "id": state.next_id + i,
+                    "coordinates": center,
+                    "suggested_prompt": f"Shoe design at ({center[0]:.1f}, {center[1]:.1f})",
+                    "reasoning": f"Fills gap {i+1} in the semantic space",
+                    "is_ghost": True
+                })
+            return {"ghosts": ghosts}
+
+        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+
+        # Parse JSON from response
+        import json
+        import re
+
+        # Extract JSON block if wrapped in markdown
+        json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+        if json_match:
+            text = json_match.group(1)
+
+        result = json.loads(text)
+        suggestions = result.get("suggestions", [])
+
+        # Convert to ghost node format
+        ghosts = []
+        for i, suggestion in enumerate(suggestions[:num_suggestions]):
+            gap_index = suggestion.get("gap_index", i)
+            if gap_index >= len(top_gaps):
+                gap_index = 0
+
+            gap = top_gaps[gap_index]
+            center = gap.get("center", [0, 0])
+
+            ghosts.append({
+                "id": state.next_id + i,  # Temporary ID
+                "coordinates": center,
+                "suggested_prompt": suggestion.get("prompt", ""),
+                "reasoning": suggestion.get("reasoning", ""),
+                "is_ghost": True
+            })
+
+        return {"ghosts": ghosts}
+
+    except Exception as e:
+        print(f"ERROR in suggest-ghosts: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return empty on error rather than failing
+        return {"ghosts": []}
+
+
 @app.get("/api/export-zip")
 async def export_zip(ids: Optional[str] = None):
     """Export images and metadata as ZIP. If ids query param provided (comma-separated),
@@ -1666,4 +1945,33 @@ async def websocket_endpoint(websocket: WebSocket):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Allow port to be configured via env and automatically fall back
+    # to the next available port if the desired one is already in use.
+    def find_free_port(start_port: int = 8000, max_attempts: int = 20) -> int:
+        """
+        Find a free TCP port, starting from start_port and scanning upward.
+        This avoids crashes when the default backend port is already in use.
+        """
+        for port in range(start_port, start_port + max_attempts):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                try:
+                    s.bind(("0.0.0.0", port))
+                except OSError:
+                    continue
+                return port
+        raise RuntimeError(f"Could not find a free port in range {start_port}-{start_port + max_attempts - 1}")
+
+    # Prefer explicit env var if provided; otherwise start at 8000 and scan.
+    env_port = os.getenv("BACKEND_PORT") or os.getenv("PORT")
+    if env_port:
+        try:
+            port = int(env_port)
+        except ValueError:
+            print(f"⚠ Invalid BACKEND_PORT/PORT value '{env_port}', falling back to auto-detected port.")
+            port = find_free_port(8000)
+    else:
+        port = find_free_port(8000)
+
+    print(f"🚀 Starting Zappos Semantic Explorer backend on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

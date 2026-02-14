@@ -45,6 +45,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const visualSettings = useAppStore((s) => s.visualSettings);
   const updateVisualSettings = useAppStore((s) => s.updateVisualSettings);
   const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
+  const agentMode = useAppStore((s) => s.agentMode);
+  const setAgentMode = useAppStore((s) => s.setAgentMode);
   const [briefDraft, setBriefDraft] = useState(currentBrief || "");
 
   useEffect(() => {
@@ -135,6 +137,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
           </div>
 
+          {/* AI Agent Settings */}
+          <div className="settings-section">
+            <label className="settings-label">AI Agent</label>
+            <p className="settings-hint">
+              Control how the AI agent suggests new directions and variations.
+            </p>
+            <div className="settings-row">
+              <label>Agent Mode</label>
+              <select
+                value={agentMode}
+                onChange={(e) => setAgentMode(e.target.value as 'auto' | 'manual')}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-primary)',
+                  fontSize: '12px',
+                }}
+              >
+                <option value="auto">Proactive (Auto-suggest)</option>
+                <option value="manual">Manual (On-demand only)</option>
+              </select>
+            </div>
+            <p className="settings-hint" style={{ fontSize: '10px', marginTop: '8px', opacity: 0.7 }}>
+              {agentMode === 'auto'
+                ? '✨ Agent will proactively suggest gaps, axes, and variations'
+                : '⏸️ Agent will only analyze when you click "Analyze" button'}
+            </p>
+          </div>
+
           {/* Visual Settings */}
           <div className="settings-section visual-settings-content">
             <label className="settings-label">Visual</label>
@@ -184,6 +217,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               />
               <span className="setting-value">
                 {visualSettings.contourStrength ?? 6}
+              </span>
+            </div>
+            <div className="setting-row">
+              <label>Grid Density</label>
+              <input
+                type="range"
+                min="0.5"
+                max="2.0"
+                step="0.1"
+                value={visualSettings.gridDensity ?? 1.0}
+                onChange={(e) =>
+                  updateVisualSettings({
+                    gridDensity: parseFloat(e.target.value),
+                  })
+                }
+              />
+              <span className="setting-value">
+                {(visualSettings.gridDensity ?? 1.0).toFixed(1)}x
               </span>
             </div>
             <div className="setting-row">

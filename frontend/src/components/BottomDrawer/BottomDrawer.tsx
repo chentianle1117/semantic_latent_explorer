@@ -21,18 +21,31 @@ export const BottomDrawer: React.FC = () => {
           {historyGroups.length} batches &middot; {images.length} images
         </span>
         <div className="drawer-thumbs">
-          {images.slice(-8).map((img) => (
-            <img
-              key={img.id}
-              className="drawer-thumb"
-              src={`data:image/png;base64,${img.base64_image}`}
-              alt=""
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedImageIds([img.id]);
-              }}
-            />
-          ))}
+          {historyGroups.slice(-8).map((group) => {
+            const thumbnailImage =
+              group.thumbnail_id !== null
+                ? images.find((img) => img.id === group.thumbnail_id)
+                : null;
+            return (
+              <div
+                key={group.id}
+                className="drawer-batch-chip"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedImageIds(group.image_ids);
+                }}
+              >
+                {thumbnailImage && (
+                  <img
+                    className="drawer-thumb"
+                    src={`data:image/png;base64,${thumbnailImage.base64_image}`}
+                    alt=""
+                  />
+                )}
+                <span className="batch-count-badge">{group.image_ids.length}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 

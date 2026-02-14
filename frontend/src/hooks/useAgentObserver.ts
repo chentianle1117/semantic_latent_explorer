@@ -26,6 +26,7 @@ export function useAgentObserver({ brief }: UseAgentObserverOptions) {
   const setAgentStatus = useAppStore((s) => s.setAgentStatus);
   const setAgentInsight = useAppStore((s) => s.setAgentInsight);
   const agentInsight = useAppStore((s) => s.agentInsight);
+  const agentMode = useAppStore((s) => s.agentMode);
 
   const prevIsGeneratingRef = useRef(isGenerating);
   const postGenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -37,10 +38,15 @@ export function useAgentObserver({ brief }: UseAgentObserverOptions) {
 
   const effectiveBrief = brief || "Explore shoe design variations";
 
+  // Agent mode check: if manual mode, disable all proactive analysis
+  const isAutoMode = agentMode === 'auto';
+
   // Sticky check: if insight exists, do nothing
   const hasInsight = agentInsight !== null;
 
   const runAnalysis = useCallback(async () => {
+    // Agent mode check: if manual mode, don't run proactive analysis
+    if (!isAutoMode) return;
     // STICKY: if insight exists, STOP completely
     if (hasInsight) return;
     if (isAnalyzingRef.current) return;
@@ -100,13 +106,15 @@ export function useAgentObserver({ brief }: UseAgentObserverOptions) {
     } finally {
       isAnalyzingRef.current = false;
     }
-  }, [visibleImages.length, effectiveBrief, hasInsight, setAgentStatus, setAgentInsight]);
+  }, [visibleImages.length, effectiveBrief, hasInsight, isAutoMode, setAgentStatus, setAgentInsight]);
 
   // Trigger 1: Post-generation (isGenerating flips true -> false)
   useEffect(() => {
     const wasGenerating = prevIsGeneratingRef.current;
     prevIsGeneratingRef.current = isGenerating;
 
+    // Agent mode check: only run in auto mode
+    if (!isAutoMode) return;
     // STICKY: don't start timers if insight exists
     if (hasInsight) return;
 
@@ -120,10 +128,20 @@ export function useAgentObserver({ brief }: UseAgentObserverOptions) {
     return () => {
       if (postGenTimerRef.current) clearTimeout(postGenTimerRef.current);
     };
-  }, [isGenerating, runAnalysis, hasInsight]);
+  }, [isGenerating, runAnalysis, hasInsight, isAutoMode]);
 
-  // Trigger 2: Periodic interval — completely stopped when insight exists
+  // Trigger 2: Periodic interval — completely stopped when insight exists or in manual mode
   useEffect(() => {
+    // Agent mode check: only run in auto mode
+    if (!isAutoMode) {
+      // Clear any existing timers
+      if (periodicTimerRef.current) {
+        clearInterval(periodicTimerRef.current);
+        periodicTimerRef.current = null;
+      }
+      return;
+    }
+
     // STICKY: if insight exists, don't run any timers at all
     if (hasInsight) {
       // Clear any existing timers
@@ -134,7 +152,7 @@ export function useAgentObserver({ brief }: UseAgentObserverOptions) {
       return;
     }
 
-    // No insight — start periodic polling
+    // No insight and auto mode — start periodic polling
     const initialTimer = setTimeout(() => {
       runAnalysis();
     }, 5000);
@@ -147,5 +165,5 @@ export function useAgentObserver({ brief }: UseAgentObserverOptions) {
       clearTimeout(initialTimer);
       if (periodicTimerRef.current) clearInterval(periodicTimerRef.current);
     };
-  }, [runAnalysis, hasInsight]);
+  }, [runAnalysis, hasInsight, isAutoMode]);
 }

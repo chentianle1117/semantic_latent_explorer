@@ -9,10 +9,13 @@ export interface ImageData {
   coordinates: [number, number] | [number, number, number];  // 2D or 3D coordinates
   parents: number[];
   children: number[];
-  generation_method: 'batch' | 'reference' | 'interpolation' | 'dataset';
+  generation_method: 'batch' | 'reference' | 'interpolation' | 'dataset' | 'auto-variation';
   prompt: string;
   timestamp: string;
   visible: boolean;
+  is_ghost?: boolean;  // Whether this is a ghost/preview suggestion
+  suggested_prompt?: string;  // Suggested prompt for ghost nodes
+  reasoning?: string;  // Why this ghost was suggested
 }
 
 export interface HistoryGroup {
@@ -62,6 +65,17 @@ export interface AppState {
   isDrawerExpanded: boolean;
   activeToolbarFlyout: string | null; // 'generate' | 'batch' | 'analyze' | 'axes' | null
   flyToImageId: number | null;
+
+  // Cluster data for edge bundling
+  clusterCentroids: number[][]; // [[x,y], [x,y], ...]
+  clusterLabels: number[]; // Per-image cluster assignment
+
+  // Grid layout
+  gridCellSize: [number, number]; // Grid cell size in coordinate space [width, height]
+
+  // Agent proactive mode
+  agentMode: AgentMode; // 'auto' = proactive suggestions, 'manual' = only on demand
+  ghostNodes: GhostNode[]; // Preview suggestions (30% opacity) before generation
 }
 
 export interface VisualSettings {
@@ -73,6 +87,7 @@ export interface VisualSettings {
   coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
   contourStrength: number; // 1–10, controls contour highlight thickness/visibility
   showGenealogyOnCanvas: boolean; // Show parent/child lines on canvas (default: false)
+  gridDensity: number; // 0.5–2.0, grid cell size multiplier (higher = larger cells, lower density)
 }
 
 export interface AxisUpdateRequest {
@@ -176,3 +191,13 @@ export interface AgentInsight {
 }
 
 export type AgentStatus = 'idle' | 'thinking' | 'insight-ready';
+
+export type AgentMode = 'auto' | 'manual'; // auto = proactive suggestions, manual = only on demand
+
+// Ghost node (preview suggestion before generation)
+export interface GhostNode extends Omit<ImageData, 'base64_image'> {
+  isGhost: true;
+  suggestedPrompt: string;
+  reasoning: string;
+  previewUrl?: string; // Optional preview image URL
+}

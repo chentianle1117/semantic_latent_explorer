@@ -31,6 +31,9 @@ class APIClient {
     axis_labels: AxisLabels;
     design_brief?: string | null;
     is_3d_mode?: boolean;
+    cluster_centroids?: number[][];
+    cluster_labels?: number[];
+    grid_cell_size?: [number, number];
   }> {
     const response = await axios.get(`${API_BASE}/state`);
     return response.data;
@@ -165,6 +168,23 @@ class APIClient {
   // Update design brief
   async updateDesignBrief(brief: string): Promise<{ status: string; message: string; brief: string | null }> {
     const response = await axios.post(`${API_BASE}/update-design-brief`, { brief });
+    return response.data;
+  }
+
+  // Get ghost node suggestions for unexplored gaps
+  async suggestGhosts(brief: string, numSuggestions: number = 3): Promise<{
+    ghosts: Array<{
+      id: number;
+      coordinates: [number, number];
+      suggested_prompt: string;
+      reasoning: string;
+      is_ghost: boolean;
+    }>;
+  }> {
+    const response = await axios.post('http://localhost:8000/api/agent/suggest-ghosts', {
+      brief,
+      num_suggestions: numSuggestions
+    });
     return response.data;
   }
 }

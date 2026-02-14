@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode } from '../types';
 
 interface AppStore extends AppState {
   // Actions
@@ -52,6 +52,13 @@ interface AppStore extends AppState {
   setAgentInsight: (insight: AgentInsight | null) => void;
   dismissInsight: () => void;
 
+  // Agent proactive mode
+  setAgentMode: (mode: AgentMode) => void;
+  addGhostNode: (ghost: GhostNode) => void;
+  removeGhostNode: (id: number) => void;
+  clearGhostNodes: () => void;
+  acceptGhostNode: (id: number) => Promise<void>;
+
   clearAll: () => void;
 }
 
@@ -75,8 +82,12 @@ const initialState: AppState = {
     coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
     contourStrength: 6, // 1–10, contour highlight thickness (higher = more visible)
     showGenealogyOnCanvas: false, // Show parent/child lines on canvas (default off to reduce clutter)
+    gridDensity: 1.0, // Grid cell size multiplier (0.5–2.0)
   },
   canvasBounds: null, // Will auto-calculate on first render
+  clusterCentroids: [], // Cluster centers for edge bundling
+  clusterLabels: [], // Cluster assignment per image
+  gridCellSize: [0.7, 0.7], // Grid cell size in coordinate space
   removeBackground: true,
   isGenerating: false,
   isInitialized: false,
@@ -94,6 +105,8 @@ const initialState: AppState = {
   // Agent defaults
   agentStatus: 'idle' as AgentStatus,
   agentInsight: null as AgentInsight | null,
+  agentMode: 'auto' as AgentMode, // Default to proactive mode
+  ghostNodes: [] as GhostNode[],
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -211,6 +224,24 @@ export const useAppStore = create<AppStore>((set) => ({
     agentStatus: insight ? 'insight-ready' : 'idle',
   }),
   dismissInsight: () => set({ agentInsight: null, agentStatus: 'idle' }),
+
+  // Agent proactive mode actions
+  setAgentMode: (mode) => set({ agentMode: mode }),
+  addGhostNode: (ghost) => set((state) => ({ ghostNodes: [...state.ghostNodes, ghost] })),
+  removeGhostNode: (id) => set((state) => ({ ghostNodes: state.ghostNodes.filter(g => g.id !== id) })),
+  clearGhostNodes: () => set({ ghostNodes: [] }),
+  acceptGhostNode: async (id) => {
+    // Convert ghost to real image by generating it
+    const ghost = useAppStore.getState().ghostNodes.find(g => g.id === id);
+    if (!ghost) return;
+
+    // Remove from ghost nodes
+    useAppStore.getState().removeGhostNode(id);
+
+    // Trigger generation with the suggested prompt
+    // This will be implemented when we wire up the generation flow
+    console.log('Accepting ghost node:', ghost.suggestedPrompt);
+  },
 
   // Clear all
   clearAll: () =>

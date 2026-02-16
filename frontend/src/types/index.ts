@@ -77,6 +77,13 @@ export interface AppState {
 
   // CLIP model selection
   clipModelType: 'fashionclip' | 'huggingface';
+
+  // Axis update progress
+  isUpdatingAxes: boolean; // Whether axes are currently being recalculated
+  axisUpdateProgress: number; // 0-100, percentage completion
+
+  // Gemini-expanded concepts for axis labels (debug display)
+  expandedConcepts?: { x_negative?: string[]; x_positive?: string[]; y_negative?: string[]; y_positive?: string[]; z_negative?: string[]; z_positive?: string[] };
 }
 
 export interface VisualSettings {
@@ -86,6 +93,8 @@ export interface VisualSettings {
   layoutPadding: number; // Padding factor for canvas bounds (0.05 = 5%, 0.2 = 20%)
   coordinateScale: number; // Scale multiplier for coordinates (affects spacing between items)
   coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
+  axisScaleX: number; // Stretch X-axis from center (1 = no stretch, >1 = expand, <1 = compress)
+  axisScaleY: number; // Stretch Y-axis from center (1 = no stretch, >1 = expand, <1 = compress)
   contourStrength: number; // 1–10, controls contour highlight thickness/visibility
   showGenealogyOnCanvas: boolean; // Show parent/child lines on canvas (default: false)
 }

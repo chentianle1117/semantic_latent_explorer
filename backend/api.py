@@ -127,6 +127,7 @@ class StateResponse(BaseModel):
     grid_cell_size: Tuple[float, float] = (0.7, 0.7)  # Grid cell size in coordinate space
     neighbor_map: Dict[int, List[int]] = {}  # K-nearest neighbors for physics simulation
     clip_model_type: str = "fashionclip"  # Current CLIP model (fashionclip or huggingface)
+    expanded_concepts: Optional[Dict[str, List[str]]] = None  # Gemini-expanded concepts (x_neg, x_pos, y_neg, y_pos)
 
 
 # Global state
@@ -567,7 +568,8 @@ async def broadcast_state_update():
             "cluster_labels": state.cluster_labels,  # Per-image cluster assignment
             "grid_cell_size": list(state.grid_cell_size),  # Grid cell size for canvas overlay
             "neighbor_map": neighbor_map,  # K-nearest neighbors for physics simulation
-            "clip_model_type": state.clip_model_type  # Current CLIP model
+            "clip_model_type": state.clip_model_type,  # Current CLIP model
+            "expanded_concepts": _get_expanded_concepts_for_state()  # Gemini expansions for axis labels
         }
     }
 
@@ -599,6 +601,21 @@ async def test():
     return {"message": "Backend is working!", "status": "ok"}
 
 
+def _get_expanded_concepts_for_state() -> Optional[Dict[str, List[str]]]:
+    """Return cached Gemini expansions for current axis labels, if available."""
+    out: Dict[str, List[str]] = {}
+    axes = ("x", "y", "z") if "z" in state.axis_labels else ("x", "y")
+    for axis in axes:
+        neg, pos = state.axis_labels.get(axis, ("", ""))
+        key_neg = f"{axis}_negative"
+        key_pos = f"{axis}_positive"
+        for key, label in [(key_neg, neg), (key_pos, pos)]:
+            cache_key = f"{label}:4"
+            if label and cache_key in state._gemini_expansion_cache:
+                out[key] = state._gemini_expansion_cache[cache_key]
+    return out if out else None
+
+
 @app.get("/api/state")
 async def get_state():
     """Get current application state."""
@@ -625,7 +642,8 @@ async def get_state():
         design_brief=state.design_brief,  # New: include design brief
         grid_cell_size=state.grid_cell_size,  # Grid cell size for canvas overlay
         neighbor_map=neighbor_map,  # K-nearest neighbors for physics simulation
-        clip_model_type=state.clip_model_type  # Current CLIP model
+        clip_model_type=state.clip_model_type,  # Current CLIP model
+        expanded_concepts=_get_expanded_concepts_for_state()
     )
 
 

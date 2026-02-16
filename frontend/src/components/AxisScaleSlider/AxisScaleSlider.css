@@ -1,0 +1,152 @@
+/* Horizontal layout (X-axis) */
+.axis-scale-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+  transition: opacity 0.2s;
+}
+
+.axis-scale-slider.vertical {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: auto;
+  width: 40px;
+  height: 120px;
+  gap: 4px;
+}
+
+.axis-scale-slider.dragging {
+  opacity: 1;
+}
+
+.axis-scale-min,
+.axis-scale-max {
+  font-size: 9px;
+  font-weight: 500;
+  color: inherit;
+  opacity: 0.6;
+  min-width: 18px;
+}
+
+.axis-scale-slider.vertical .axis-scale-min,
+.axis-scale-slider.vertical .axis-scale-max {
+  text-align: center;
+  min-width: auto;
+  min-height: 10px;
+}
+
+/* Horizontal slider (X-axis) */
+.axis-scale-input {
+  flex: 1;
+  min-width: 60px;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(48, 54, 61, 0.8);
+  border-radius: 3px;
+  outline: none;
+  cursor: grab;
+  transition: background 0.2s;
+}
+
+/* Vertical slider (Y-axis) - use transform rotation */
+.axis-scale-slider.vertical .axis-scale-input {
+  width: 80px;
+  height: 6px;
+  min-width: 80px;
+  transform: rotate(-90deg);
+  transform-origin: center center;
+}
+
+.axis-scale-input:hover {
+  background: rgba(48, 54, 61, 1);
+}
+
+.axis-scale-input:active {
+  cursor: grabbing;
+}
+
+.axis-scale-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  cursor: grab;
+  transition: all 0.15s;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+.axis-scale-input::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+  transform: scale(1.15);
+}
+
+.axis-scale-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  cursor: grab;
+  transition: all 0.15s;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+}
+
+.axis-scale-input::-moz-range-thumb:active {
+  cursor: grabbing;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+  transform: scale(1.15);
+}
+
+/* Vertical slider uses same track as horizontal (since it's rotated) */
+
+/* X-axis colors */
+.axis-scale-slider.axis-x .axis-scale-input {
+  background: rgba(88, 166, 255, 0.15);
+}
+
+.axis-scale-slider.axis-x .axis-scale-input:hover {
+  background: rgba(88, 166, 255, 0.25);
+}
+
+.axis-scale-slider.axis-x .axis-scale-input::-webkit-slider-thumb {
+  background: #58a6ff;
+}
+
+.axis-scale-slider.axis-x .axis-scale-input::-moz-range-thumb {
+  background: #58a6ff;
+}
+
+/* Y-axis colors */
+.axis-scale-slider.axis-y .axis-scale-input {
+  background: rgba(188, 140, 255, 0.15);
+}
+
+.axis-scale-slider.axis-y .axis-scale-input:hover {
+  background: rgba(188, 140, 255, 0.25);
+}
+
+.axis-scale-slider.axis-y .axis-scale-input::-webkit-slider-thumb {
+  background: #bc8cff;
+}
+
+.axis-scale-slider.axis-y .axis-scale-input::-moz-range-thumb {
+  background: #bc8cff;
+}
+
+.axis-scale-value {
+  font-size: 10px;
+  font-weight: 600;
+  color: inherit;
+  opacity: 0.85;
+  min-width: 32px;
+  text-align: right;
+}
+
+.axis-scale-slider.vertical .axis-scale-value {
+  text-align: center;
+  min-width: auto;
+}

@@ -140,6 +140,10 @@ export const App: React.FC = () => {
             `✓ Loaded CLIP model type: ${state.clip_model_type}`
           );
         }
+        // Load expanded concepts (Gemini expansions for axis labels)
+        if (state.expanded_concepts) {
+          useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
+        }
         // Load design brief from backend state
         if (state.design_brief) {
           setCurrentBrief(state.design_brief);

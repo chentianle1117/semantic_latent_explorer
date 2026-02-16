@@ -1,7 +1,9 @@
 import React from "react";
 import { useAppStore } from "../../store/appStore";
+import { useProgressStore } from "../../store/progressStore";
 import { ToolbarFlyout } from "./ToolbarFlyout";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
+import { AxisScaleSlider } from "../AxisScaleSlider/AxisScaleSlider";
 import { apiClient } from "../../api/client";
 import "./LeftToolbar.css";
 
@@ -37,7 +39,11 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
   const activeToolbarFlyout = useAppStore((s) => s.activeToolbarFlyout);
   const setActiveToolbarFlyout = useAppStore((s) => s.setActiveToolbarFlyout);
   const axisLabels = useAppStore((s) => s.axisLabels);
+  const expandedConcepts = useAppStore((s) => s.expandedConcepts);
+  const visualSettings = useAppStore((s) => s.visualSettings);
   const images = useAppStore((s) => s.images.filter((img) => img.visible));
+  const isUpdatingAxes = useAppStore((s) => s.isUpdatingAxes);
+  const axisUpdateProgress = useAppStore((s) => s.axisUpdateProgress);
 
   const tools = [
     { id: "generate", icon: "✨", label: "Generate" },
@@ -54,13 +60,20 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
     positive: string
   ) => {
     try {
+      useAppStore.getState().setIsUpdatingAxes(true);
+      useAppStore.getState().setAxisUpdateProgress(0);
+      useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
       useAppStore.getState().resetCanvasBounds();
+
       await apiClient.updateAxes({
         x_negative: axis === "x" ? negative : axisLabels.x[0],
         x_positive: axis === "x" ? positive : axisLabels.x[1],
         y_negative: axis === "y" ? negative : axisLabels.y[0],
         y_positive: axis === "y" ? positive : axisLabels.y[1],
       });
+      useAppStore.getState().setAxisUpdateProgress(60);
+      useProgressStore.getState().updateProgress(70, "Updating canvas...");
+
       const state = await apiClient.getState();
       const newLabels = {
         ...axisLabels,
@@ -68,8 +81,21 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
       };
       useAppStore.setState({ axisLabels: newLabels });
       useAppStore.getState().setImages(state.images);
+      if (state.expanded_concepts) {
+        useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
+      }
+      useAppStore.getState().setAxisUpdateProgress(100);
+      useProgressStore.getState().updateProgress(100);
+      useProgressStore.getState().hideProgress();
+
+      // Dismiss progress after 500ms
+      setTimeout(() => {
+        useAppStore.getState().setIsUpdatingAxes(false);
+      }, 500);
     } catch (error) {
       console.error(`Failed to update ${axis.toUpperCase()}-axis:`, error);
+      useAppStore.getState().setIsUpdatingAxes(false);
+      useProgressStore.getState().hideProgress();
       alert(`Failed to update ${axis.toUpperCase()}-axis: ${error}`);
     }
   };
@@ -190,29 +216,59 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
       {/* Axes Flyout */}
       {activeToolbarFlyout === "axes" && (
         <ToolbarFlyout title="Semantic Axes" onClose={closeFlyout}>
-          <div className="flyout-axis-section">
+          {isUpdatingAxes && (
+            <div className="axis-progress-indicator">
+              <div className="axis-progress-bar">
+                <div className="axis-progress-fill" style={{ width: `${axisUpdateProgress}%` }} />
+              </div>
+              <span className="axis-progress-text">
+                {axisUpdateProgress < 100 ? `Updating axes... ${axisUpdateProgress}%` : "Complete!"}
+              </span>
+            </div>
+          )}
+          <div className="flyout-axis-section" style={{ opacity: isUpdatingAxes ? 0.6 : 1, pointerEvents: isUpdatingAxes ? 'none' : 'auto' }}>
             <label className="flyout-axis-label">X-Axis</label>
             <AxisEditor
               axis="x"
               negativeLabel={axisLabels.x[0]}
               positiveLabel={axisLabels.x[1]}
               onUpdate={(neg, pos) => handleAxisUpdate("x", neg, pos)}
+              expandedNegative={expandedConcepts?.x_negative}
+              expandedPositive={expandedConcepts?.x_positive}
             />
+            <div className="flyout-axis-scale">
+              <span className="flyout-scale-label">Stretch</span>
+              <AxisScaleSlider
+                axis="x"
+                value={visualSettings.axisScaleX ?? 1}
+                onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleX: v })}
+              />
+            </div>
           </div>
-          <div className="flyout-axis-section">
+          <div className="flyout-axis-section" style={{ opacity: isUpdatingAxes ? 0.6 : 1, pointerEvents: isUpdatingAxes ? 'none' : 'auto' }}>
             <label className="flyout-axis-label">Y-Axis</label>
             <AxisEditor
               axis="y"
               negativeLabel={axisLabels.y[0]}
               positiveLabel={axisLabels.y[1]}
               onUpdate={(neg, pos) => handleAxisUpdate("y", neg, pos)}
+              expandedNegative={expandedConcepts?.y_negative}
+              expandedPositive={expandedConcepts?.y_positive}
             />
+            <div className="flyout-axis-scale">
+              <span className="flyout-scale-label">Stretch</span>
+              <AxisScaleSlider
+                axis="y"
+                value={visualSettings.axisScaleY ?? 1}
+                onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleY: v })}
+              />
+            </div>
           </div>
           <div className="flyout-divider" />
           <button
             className="flyout-action-btn"
             onClick={onSuggestAxes}
-            disabled={isLoadingAxes || images.length < 3}
+            disabled={isLoadingAxes || images.length < 3 || isUpdatingAxes}
           >
             {isLoadingAxes ? "Loading..." : "🤖 AI Suggest Axes"}
           </button>

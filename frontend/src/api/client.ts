@@ -35,6 +35,7 @@ class APIClient {
     cluster_labels?: number[];
     grid_cell_size?: [number, number];
     clip_model_type?: 'fashionclip' | 'huggingface';
+    expanded_concepts?: { x_negative?: string[]; x_positive?: string[]; y_negative?: string[]; y_positive?: string[]; z_negative?: string[]; z_positive?: string[] };
   }> {
     const response = await axios.get(`${API_BASE}/state`);
     return response.data;

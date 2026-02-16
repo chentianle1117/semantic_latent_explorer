@@ -8,7 +8,9 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, Text, Html } from "@react-three/drei";
 import * as THREE from "three";
 import { useAppStore } from "../../store/appStore";
+import { useProgressStore } from "../../store/progressStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
+import { AxisScaleSlider } from "../AxisScaleSlider/AxisScaleSlider";
 import { apiClient } from "../../api/client";
 import type { ImageData } from "../../types";
 
@@ -421,20 +423,44 @@ const Scene: React.FC<{
   // Calculate scale from pixel size
   const scale = imageSize / 100;
 
-  // Create normalized images for lineage rendering
+  // Stretch-from-center (axisScaleX, axisScaleY) - post-transform
+  const axisScaleX = visualSettings.axisScaleX ?? 1.0;
+  const axisScaleY = visualSettings.axisScaleY ?? 1.0;
+
+  // Create normalized images for lineage rendering (with axis stretch)
   const normalizedImages = useMemo(() => {
     const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
     const coordScale = visualSettings.coordinateScale || 1.0;
 
-    return images.map(image => ({
-      ...image,
-      coordinates: [
-        ((image.coordinates[0] + coordOffset[0]) * coordScale) * xScale,
-        ((image.coordinates[1] + coordOffset[1]) * coordScale) * yScale,
-        ((image.coordinates.length === 3 ? image.coordinates[2] : 0) + coordOffset[2]) * coordScale * zScale
-      ] as [number, number, number]
+    const baseCoords = images.map(img => ({
+      x: (img.coordinates[0] + coordOffset[0]) * coordScale,
+      y: (img.coordinates[1] + coordOffset[1]) * coordScale,
     }));
-  }, [images, xScale, yScale, zScale, visualSettings.coordinateOffset, visualSettings.coordinateScale]);
+    const xExt: [number, number] = baseCoords.length
+      ? [Math.min(...baseCoords.map(c => c.x)), Math.max(...baseCoords.map(c => c.x))]
+      : [0, 1];
+    const yExt: [number, number] = baseCoords.length
+      ? [Math.min(...baseCoords.map(c => c.y)), Math.max(...baseCoords.map(c => c.y))]
+      : [0, 1];
+    const centerX = (xExt[0] + xExt[1]) / 2;
+    const centerY = (yExt[0] + yExt[1]) / 2;
+
+    return images.map(image => {
+      const bx = (image.coordinates[0] + coordOffset[0]) * coordScale;
+      const by = (image.coordinates[1] + coordOffset[1]) * coordScale;
+      const bz = ((image.coordinates.length === 3 ? image.coordinates[2] : 0) + coordOffset[2]) * coordScale;
+      const sx = centerX + (bx - centerX) * axisScaleX;
+      const sy = centerY + (by - centerY) * axisScaleY;
+      return {
+        ...image,
+        coordinates: [
+          sx * xScale,
+          sy * yScale,
+          bz * zScale
+        ] as [number, number, number]
+      };
+    });
+  }, [images, xScale, yScale, zScale, visualSettings.coordinateOffset, visualSettings.coordinateScale, axisScaleX, axisScaleY]);
 
   return (
     <>
@@ -461,21 +487,7 @@ const Scene: React.FC<{
       <CameraController targetPosition={cameraTarget} useOrthographic={useOrthographic} />
 
       {/* Render all image sprites with normalized coordinates */}
-      {images.map((image) => {
-        // Apply coordinate offset and scale
-        const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
-        const coordScale = visualSettings.coordinateScale || 1.0;
-
-        // Apply scaling to normalize coordinates and then apply user transformations
-        const normalizedImage = {
-          ...image,
-          coordinates: [
-            ((image.coordinates[0] + coordOffset[0]) * coordScale) * xScale,
-            ((image.coordinates[1] + coordOffset[1]) * coordScale) * yScale,
-            ((image.coordinates.length === 3 ? image.coordinates[2] : 0) + coordOffset[2]) * coordScale * zScale
-          ] as [number, number, number]
-        };
-
+      {normalizedImages.map((image) => {
         // Check if this image should be highlighted from history panel hover
         const isHighlightedFromHistory = hoveredGroupId !== null && image.group_id === hoveredGroupId;
 
@@ -521,6 +533,7 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
   const hoveredGroupId = useAppStore((state) => state.hoveredGroupId);
   const axisLabels = useAppStore((state) => state.axisLabels);
+  const expandedConcepts = useAppStore((state) => state.expandedConcepts);
 
   const [cameraTarget, setCameraTarget] = useState<THREE.Vector3 | null>(null);
   const [useOrthographic, setUseOrthographic] = useState(false);
@@ -557,24 +570,32 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
     negative: string,
     positive: string
   ) => {
-    const currentLabels = useAppStore.getState().axisLabels;
+    try {
+      useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
+      const currentLabels = useAppStore.getState().axisLabels;
 
-    await apiClient.updateAxes({
-      x_negative: axis === "x" ? negative : currentLabels.x[0],
-      x_positive: axis === "x" ? positive : currentLabels.x[1],
-      y_negative: axis === "y" ? negative : currentLabels.y[0],
-      y_positive: axis === "y" ? positive : currentLabels.y[1],
-      z_negative: axis === "z" ? negative : currentLabels.z?.[0],
-      z_positive: axis === "z" ? positive : currentLabels.z?.[1],
-    });
+      await apiClient.updateAxes({
+        x_negative: axis === "x" ? negative : currentLabels.x[0],
+        x_positive: axis === "x" ? positive : currentLabels.x[1],
+        y_negative: axis === "y" ? negative : currentLabels.y[0],
+        y_positive: axis === "y" ? positive : currentLabels.y[1],
+        z_negative: axis === "z" ? negative : currentLabels.z?.[0],
+        z_positive: axis === "z" ? positive : currentLabels.z?.[1],
+      });
 
-    console.log(`✓ ${axis.toUpperCase()}-axis updated to: ${negative} ↔ ${positive}`);
-
-    // Fetch updated state to get recalculated coordinates
-    const state = await apiClient.getState();
-    useAppStore.getState().setImages(state.images);
-    useAppStore.getState().setAxisLabels(state.axis_labels);
-    console.log(`✓ Coordinates recalculated for ${state.images.length} images`);
+      useProgressStore.getState().updateProgress(70, "Updating canvas...");
+      const state = await apiClient.getState();
+      useAppStore.getState().setImages(state.images);
+      useAppStore.getState().setAxisLabels(state.axis_labels);
+      if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
+      useProgressStore.getState().updateProgress(100);
+      useProgressStore.getState().hideProgress();
+      console.log(`✓ ${axis.toUpperCase()}-axis updated to: ${negative} ↔ ${positive}`);
+    } catch (error) {
+      console.error(`Failed to update ${axis.toUpperCase()}-axis:`, error);
+      useProgressStore.getState().hideProgress();
+      alert(`Failed to update ${axis.toUpperCase()}-axis: ${error}`);
+    }
   };
 
   return (
@@ -719,6 +740,13 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
             negativeLabel={axisLabels.x[0]}
             positiveLabel={axisLabels.x[1]}
             onUpdate={(neg, pos) => handleAxisUpdate("x", neg, pos)}
+            expandedNegative={expandedConcepts?.x_negative}
+            expandedPositive={expandedConcepts?.x_positive}
+          />
+          <AxisScaleSlider
+            axis="x"
+            value={visualSettings.axisScaleX ?? 1}
+            onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleX: v })}
           />
         </div>
 
@@ -738,6 +766,13 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
             negativeLabel={axisLabels.y[0]}
             positiveLabel={axisLabels.y[1]}
             onUpdate={(neg, pos) => handleAxisUpdate("y", neg, pos)}
+            expandedNegative={expandedConcepts?.y_negative}
+            expandedPositive={expandedConcepts?.y_positive}
+          />
+          <AxisScaleSlider
+            axis="y"
+            value={visualSettings.axisScaleY ?? 1}
+            onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleY: v })}
           />
         </div>
 
@@ -758,6 +793,8 @@ export const SemanticCanvas3D: React.FC<SemanticCanvas3DProps> = ({
               negativeLabel={axisLabels.z[0]}
               positiveLabel={axisLabels.z[1]}
               onUpdate={(neg, pos) => handleAxisUpdate("z", neg, pos)}
+              expandedNegative={expandedConcepts?.z_negative}
+              expandedPositive={expandedConcepts?.z_positive}
             />
           </div>
         )}

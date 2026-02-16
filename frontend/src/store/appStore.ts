@@ -62,6 +62,13 @@ interface AppStore extends AppState {
   // CLIP model selection
   setClipModelType: (modelType: 'fashionclip' | 'huggingface') => void;
 
+  // Axis update progress
+  setIsUpdatingAxes: (isUpdating: boolean) => void;
+  setAxisUpdateProgress: (progress: number) => void;
+
+  // Gemini-expanded concepts (from backend)
+  setExpandedConcepts: (c: { x_negative?: string[]; x_positive?: string[]; y_negative?: string[]; y_positive?: string[] } | undefined) => void;
+
   clearAll: () => void;
 }
 
@@ -82,7 +89,9 @@ const initialState: AppState = {
     removeBackground: true,
     layoutPadding: 0.2, // 20% padding by default (reduces clutter)
     coordinateScale: 1.0, // Scale multiplier for coordinates (affects spacing)
-    coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, y]
+    coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
+    axisScaleX: 1.0, // Stretch X from center (1 = no stretch)
+    axisScaleY: 1.0, // Stretch Y from center (1 = no stretch)
     contourStrength: 6, // 1–10, contour highlight thickness (higher = more visible)
     showGenealogyOnCanvas: false, // Show parent/child lines on canvas (default off to reduce clutter)
   },
@@ -111,6 +120,13 @@ const initialState: AppState = {
 
   // CLIP model selection
   clipModelType: 'fashionclip' as 'fashionclip' | 'huggingface',
+
+  // Axis update progress
+  isUpdatingAxes: false,
+  axisUpdateProgress: 0,
+
+  // Gemini-expanded concepts
+  expandedConcepts: undefined as { x_negative?: string[]; x_positive?: string[]; y_negative?: string[]; y_positive?: string[]; z_negative?: string[]; z_positive?: string[] } | undefined,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -180,9 +196,15 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // Visual settings
   updateVisualSettings: (settings) =>
-    set((state) => ({
-      visualSettings: { ...state.visualSettings, ...settings },
-    })),
+    set((state) => {
+      const axisXChanged = "axisScaleX" in settings && settings.axisScaleX !== state.visualSettings.axisScaleX;
+      const axisYChanged = "axisScaleY" in settings && settings.axisScaleY !== state.visualSettings.axisScaleY;
+      const resetBounds = axisXChanged || axisYChanged;
+      return {
+        visualSettings: { ...state.visualSettings, ...settings },
+        ...(resetBounds && { canvasBounds: null }),
+      };
+    }),
 
   // Axis labels
   setAxisLabels: (labels) => set({ axisLabels: labels }),
@@ -249,6 +271,13 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // CLIP model selection
   setClipModelType: (modelType) => set({ clipModelType: modelType }),
+
+  // Axis update progress
+  setIsUpdatingAxes: (isUpdating) => set({ isUpdatingAxes: isUpdating, axisUpdateProgress: isUpdating ? 0 : 100 }),
+  setAxisUpdateProgress: (progress) => set({ axisUpdateProgress: Math.min(100, Math.max(0, progress)) }),
+
+  // Gemini-expanded concepts
+  setExpandedConcepts: (c) => set({ expandedConcepts: c }),
 
   // Clear all
   clearAll: () =>

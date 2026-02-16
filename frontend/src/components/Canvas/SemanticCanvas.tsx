@@ -6,7 +6,9 @@
 import React, { useEffect, useRef, useMemo, useState } from "react";
 import * as d3 from "d3";
 import { useAppStore } from "../../store/appStore";
+import { useProgressStore } from "../../store/progressStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
+import { AxisScaleSlider } from "../AxisScaleSlider/AxisScaleSlider";
 import { apiClient } from "../../api/client";
 import type { RegionHighlight, PendingImage } from "../../types";
 
@@ -42,6 +44,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const hoveredGroupId = useAppStore((state) => state.hoveredGroupId);
   const hoveredImageId = useAppStore((state) => state.hoveredImageId);
   const axisLabels = useAppStore((state) => state.axisLabels);
+  const expandedConcepts = useAppStore((state) => state.expandedConcepts);
   const canvasBounds = useAppStore((state) => state.canvasBounds);
   const ghostNodes = useAppStore((state) => state.ghostNodes);
 
@@ -240,24 +243,45 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // - Otherwise: Use stored bounds (stable, prevents rescaling when adding images)
     let xMin, xMax, yMin, yMax;
 
+    const coordScale = visualSettings.coordinateScale || 1.0;
+    const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+    const axisScaleX = visualSettings.axisScaleX ?? 1.0;
+    const axisScaleY = visualSettings.axisScaleY ?? 1.0;
+
+    // Stretch-from-center transform: center + (base - center) * scale
+    const baseCoords = images.map((d) => ({
+      x: (d.coordinates[0] + coordOffset[0]) * coordScale,
+      y: (d.coordinates[1] + coordOffset[1]) * coordScale,
+    }));
+    const xExtentBase = d3.extent(baseCoords, (d) => d.x) as [number, number];
+    const yExtentBase = d3.extent(baseCoords, (d) => d.y) as [number, number];
+    const centerX = images.length ? (xExtentBase[0] + xExtentBase[1]) / 2 : 0;
+    const centerY = images.length ? (yExtentBase[0] + yExtentBase[1]) / 2 : 0;
+    const toStretched = (x: number, y: number) => [
+      centerX + (x - centerX) * axisScaleX,
+      centerY + (y - centerY) * axisScaleY,
+    ];
+
     if (canvasBounds === null) {
-      // Calculate from data extent using TRANSFORMED coordinates
+      // Calculate from data extent using TRANSFORMED (stretched) coordinates
       console.log("📐 Calculating bounds from data extent");
-      const coordScale = visualSettings.coordinateScale || 1.0;
-      const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
+      const stretchedExtent = images.map((d) => {
+        const [bx, by] = [(d.coordinates[0] + coordOffset[0]) * coordScale, (d.coordinates[1] + coordOffset[1]) * coordScale];
+        return toStretched(bx, by);
+      });
+      const xExtent = d3.extent(stretchedExtent, (d) => d[0]) as [number, number];
+      const yExtent = d3.extent(stretchedExtent, (d) => d[1]) as [number, number];
 
-      const xExtent = d3.extent(images, (d) => (d.coordinates[0] + coordOffset[0]) * coordScale) as [number, number];
-      const yExtent = d3.extent(images, (d) => (d.coordinates[1] + coordOffset[1]) * coordScale) as [number, number];
-
-      // Add padding based on user preference (layoutPadding setting)
       const paddingFactor = visualSettings.layoutPadding;
-      const xPadding = Math.max((xExtent[1] - xExtent[0]) * paddingFactor, 0.05);
-      const yPadding = Math.max((yExtent[1] - yExtent[0]) * paddingFactor, 0.05);
+      const xRange = (xExtent[1] ?? 1) - (xExtent[0] ?? 0) || 1;
+      const yRange = (yExtent[1] ?? 1) - (yExtent[0] ?? 0) || 1;
+      const xPadding = Math.max(xRange * paddingFactor, 0.05);
+      const yPadding = Math.max(yRange * paddingFactor, 0.05);
 
-      xMin = xExtent[0] - xPadding;
-      xMax = xExtent[1] + xPadding;
-      yMin = yExtent[0] - yPadding;
-      yMax = yExtent[1] + yPadding;
+      xMin = (xExtent[0] ?? 0) - xPadding;
+      xMax = (xExtent[1] ?? 1) + xPadding;
+      yMin = (yExtent[0] ?? 0) - yPadding;
+      yMax = (yExtent[1] ?? 1) + yPadding;
 
       // Save these bounds to state so future renders use them
       const newBounds = { xMin, xMax, yMin, yMax };
@@ -291,14 +315,18 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Group for ghost nodes (preview suggestions at 30% opacity)
     const ghostGroup = g.append("g").attr("class", "ghost-nodes");
 
-    // Render ghost nodes
+    // Render ghost nodes (apply same stretch transform as images)
     const ghostNodeElements = ghostGroup
       .selectAll(".ghost-node")
       .data(ghostNodes, (d: any) => d.id)
       .join("g")
       .attr("class", "ghost-node")
       .attr("id", (d) => `ghost-${d.id}`)
-      .attr("transform", (d) => `translate(${xScale(d.coordinates[0])}, ${yScale(d.coordinates[1])})`)
+      .attr("transform", (d) => {
+        const [bx, by] = [(d.coordinates[0] + coordOffset[0]) * coordScale, (d.coordinates[1] + coordOffset[1]) * coordScale];
+        const [sx, sy] = toStretched(bx, by);
+        return `translate(${xScale(sx)}, ${yScale(sy)})`;
+      })
       .attr("opacity", 0.3)
       .style("cursor", "pointer");
 
@@ -330,10 +358,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Group for images
     const imagesGroup = g.append("g").attr("class", "images");
 
-    // Render images - pure CLIP semantic projection
+    // Render images - pure CLIP semantic projection with axis stretch
     const imageSize = visualSettings.imageSize;
-    const coordScale = visualSettings.coordinateScale || 1.0; // Get coordinate scale multiplier
-    const coordOffset = visualSettings.coordinateOffset || [0, 0, 0]; // Get coordinate offset
 
     const imageNodes = imagesGroup
       .selectAll(".image-node")
@@ -341,11 +367,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .join("g")
       .attr("class", "image-node")
       .attr("id", (d) => `image-${d.id}`)
-      .attr(
-        "transform",
-        (d) =>
-          `translate(${xScale((d.coordinates[0] + coordOffset[0]) * coordScale)}, ${yScale((d.coordinates[1] + coordOffset[1]) * coordScale)})`
-      );
+      .attr("transform", (d) => {
+        const [bx, by] = [(d.coordinates[0] + coordOffset[0]) * coordScale, (d.coordinates[1] + coordOffset[1]) * coordScale];
+        const [sx, sy] = toStretched(bx, by);
+        return `translate(${xScale(sx)}, ${yScale(sy)})`;
+      });
 
     console.log("🎯 Attaching click handlers to", images.length, "image nodes");
 
@@ -474,11 +500,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         .join("g")
         .attr("class", "pending-image")
         .attr("id", (d) => `pending-${d.id}`)
-        .attr(
-          "transform",
-          (d) =>
-            `translate(${xScale((d.imageData.coordinates[0] + coordOffset[0]) * coordScale)}, ${yScale((d.imageData.coordinates[1] + coordOffset[1]) * coordScale)})`
-        )
+        .attr("transform", (d) => {
+          const [bx, by] = [(d.imageData.coordinates[0] + coordOffset[0]) * coordScale, (d.imageData.coordinates[1] + coordOffset[1]) * coordScale];
+          const [sx, sy] = toStretched(bx, by);
+          return `translate(${xScale(sx)}, ${yScale(sy)})`;
+        })
         .attr("opacity", 0.35);  // Faded opacity
 
       // Add image
@@ -617,10 +643,12 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       const canvasPixelH = yScale(yMin) - yScale(yMax); // Note: yScale is inverted
 
       filteredRegions.forEach((region) => {
-        // Region centers are in actual data coordinates from the backend
+        // Region centers are in actual data coordinates - apply same transform as images
         const [dataX, dataY] = region.center;
-        const pixelX = xScale(dataX);
-        const pixelY = yScale(dataY);
+        const [bx, by] = [(dataX + coordOffset[0]) * coordScale, (dataY + coordOffset[1]) * coordScale];
+        const [sx, sy] = toStretched(bx, by);
+        const pixelX = xScale(sx);
+        const pixelY = yScale(sy);
 
         const isCluster = region.type === 'cluster';
         const gradId = isCluster ? "url(#cluster-nebula)" : "url(#gap-nebula)";
@@ -910,12 +938,22 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     const coordScale = visualSettings.coordinateScale || 1.0;
     const coordOffset = visualSettings.coordinateOffset || [0, 0, 0];
-    const px = xScaleRef.current(
-      (img.coordinates[0] + coordOffset[0]) * coordScale
-    );
-    const py = yScaleRef.current(
-      (img.coordinates[1] + coordOffset[1]) * coordScale
-    );
+    const axisScaleX = visualSettings.axisScaleX ?? 1.0;
+    const axisScaleY = visualSettings.axisScaleY ?? 1.0;
+    const baseCoords = images.map((d) => ({
+      x: (d.coordinates[0] + coordOffset[0]) * coordScale,
+      y: (d.coordinates[1] + coordOffset[1]) * coordScale,
+    }));
+    const xExt = d3.extent(baseCoords, (d) => d.x) as [number, number];
+    const yExt = d3.extent(baseCoords, (d) => d.y) as [number, number];
+    const centerX = images.length ? (xExt[0] + xExt[1]) / 2 : 0;
+    const centerY = images.length ? (yExt[0] + yExt[1]) / 2 : 0;
+    const bx = (img.coordinates[0] + coordOffset[0]) * coordScale;
+    const by = (img.coordinates[1] + coordOffset[1]) * coordScale;
+    const sx = centerX + (bx - centerX) * axisScaleX;
+    const sy = centerY + (by - centerY) * axisScaleY;
+    const px = xScaleRef.current(sx);
+    const py = yScaleRef.current(sy);
 
     const svg = d3.select(svgRef.current);
     const width = svgRef.current.clientWidth;
@@ -945,91 +983,112 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         style={{ width: "100%", height: "100%", background: "#0d1117" }}
       />
 
-      {/* X-Axis Labels */}
-      <AxisEditor
-        axis="x"
-        negativeLabel={axisLabels.x[0]}
-        positiveLabel={axisLabels.x[1]}
+      {/* X-Axis Labels + Stretch Slider */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 6,
+        }}
+      >
+        <AxisEditor
+          axis="x"
+          negativeLabel={axisLabels.x[0]}
+          positiveLabel={axisLabels.x[1]}
         onUpdate={async (negative, positive) => {
           try {
-            // Reset bounds to trigger rescale with new axis organization
+            useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
             useAppStore.getState().resetCanvasBounds();
-
-            // Update backend first (this recalculates all positions)
             await apiClient.updateAxes({
               x_negative: negative,
               x_positive: positive,
               y_negative: axisLabels.y[0],
               y_positive: axisLabels.y[1],
             });
-
-            // Get updated state with new coordinates
+            useProgressStore.getState().updateProgress(70, "Updating canvas...");
             const state = await apiClient.getState();
-
-            // Update store with both new labels AND new coordinates
-            // This ensures canvas re-renders with correct positions
-            const newLabels = {
-              ...axisLabels,
-              x: [negative, positive] as [string, string],
-            };
+            const newLabels = { ...axisLabels, x: [negative, positive] as [string, string] };
             useAppStore.setState({ axisLabels: newLabels });
             useAppStore.getState().setImages(state.images);
+            if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
+            useProgressStore.getState().updateProgress(100);
+            useProgressStore.getState().hideProgress();
           } catch (error) {
             console.error("Failed to update X-axis:", error);
+            useProgressStore.getState().hideProgress();
             alert(`Failed to update X-axis: ${error}`);
           }
         }}
+        expandedNegative={expandedConcepts?.x_negative}
+        expandedPositive={expandedConcepts?.x_positive}
+        />
+        <AxisScaleSlider
+          axis="x"
+          value={visualSettings.axisScaleX ?? 1}
+          onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleX: v })}
+        />
+      </div>
+
+      {/* Y-Axis Labels + Stretch Slider */}
+      <div
         style={{
           position: "absolute",
-          bottom: 20,
-          left: "50%",
-          transform: "translateX(-50%)",
+          left: 16,
+          top: "50%",
+          transform: "translateY(-50%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 6,
         }}
-      />
-
-      {/* Y-Axis Labels */}
-      <AxisEditor
-        axis="y"
-        negativeLabel={axisLabels.y[0]}
-        positiveLabel={axisLabels.y[1]}
+      >
+        <AxisEditor
+          axis="y"
+          negativeLabel={axisLabels.y[0]}
+          positiveLabel={axisLabels.y[1]}
         onUpdate={async (negative, positive) => {
           try {
-            // Reset bounds to trigger rescale with new axis organization
+            useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
             useAppStore.getState().resetCanvasBounds();
-
-            // Update backend first (this recalculates all positions)
             await apiClient.updateAxes({
               x_negative: axisLabels.x[0],
               x_positive: axisLabels.x[1],
               y_negative: negative,
               y_positive: positive,
             });
-
-            // Get updated state with new coordinates
+            useProgressStore.getState().updateProgress(70, "Updating canvas...");
             const state = await apiClient.getState();
-
-            // Update store with both new labels AND new coordinates
-            // This ensures canvas re-renders with correct positions
-            const newLabels = {
-              ...axisLabels,
-              y: [negative, positive] as [string, string],
-            };
+            const newLabels = { ...axisLabels, y: [negative, positive] as [string, string] };
             useAppStore.setState({ axisLabels: newLabels });
             useAppStore.getState().setImages(state.images);
+            if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
+            useProgressStore.getState().updateProgress(100);
+            useProgressStore.getState().hideProgress();
           } catch (error) {
             console.error("Failed to update Y-axis:", error);
+            useProgressStore.getState().hideProgress();
             alert(`Failed to update Y-axis: ${error}`);
           }
         }}
+        expandedNegative={expandedConcepts?.y_negative}
+        expandedPositive={expandedConcepts?.y_positive}
         style={{
-          position: "absolute",
-          left: 16,
-          top: "50%",
-          transform: "translateY(-50%) rotate(-90deg)",
+          transform: "rotate(-90deg)",
           transformOrigin: "center",
           whiteSpace: "nowrap",
         }}
-      />
+        />
+        <AxisScaleSlider
+          axis="y"
+          value={visualSettings.axisScaleY ?? 1}
+          onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleY: v })}
+        />
+      </div>
 
       {/* Terrain toggle: Clusters vs Gaps */}
       {regionHighlights.length > 0 && (

@@ -30,6 +30,10 @@
   color: #bc8cff;
 }
 
+.axis-word.axis-z {
+  color: #3b82f6;
+}
+
 .axis-word:hover {
   background: rgba(88, 166, 255, 0.15);
   text-decoration: underline;
@@ -38,6 +42,10 @@
 
 .axis-word.axis-y:hover {
   background: rgba(188, 140, 255, 0.15);
+}
+
+.axis-word.axis-z:hover {
+  background: rgba(59, 130, 246, 0.15);
 }
 
 /* ── Arrow Between Words ── */
@@ -57,6 +65,10 @@
 
 .axis-arrow.axis-y {
   color: #bc8cff;
+}
+
+.axis-arrow.axis-z {
+  color: #3b82f6;
 }
 
 /* ── Edit Mode ── */
@@ -86,12 +98,21 @@
   color: #bc8cff;
 }
 
+.axis-word-input.axis-z {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
 .axis-word-input:focus {
   box-shadow: 0 0 8px rgba(88, 166, 255, 0.3);
 }
 
 .axis-word-input.axis-y:focus {
   box-shadow: 0 0 8px rgba(188, 140, 255, 0.3);
+}
+
+.axis-word-input.axis-z:focus {
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
 }
 
 .axis-apply-btn {
@@ -124,4 +145,30 @@
 .axis-cancel-btn:hover {
   background: #484f58;
   color: #e6edf3;
+}
+
+/* Edit both sides at once */
+.axis-edit-both {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Label + expanded concepts block */
+.axis-label-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Gemini expanded concepts (debug) - small, low opacity */
+.axis-expanded {
+  font-size: 9px;
+  opacity: 0.35;
+  color: inherit;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
 }

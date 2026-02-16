@@ -74,6 +74,9 @@ export interface AppState {
   // Agent proactive mode
   agentMode: AgentMode; // 'auto' = proactive suggestions, 'manual' = only on demand
   ghostNodes: GhostNode[]; // Preview suggestions (30% opacity) before generation
+
+  // CLIP model selection
+  clipModelType: 'fashionclip' | 'huggingface';
 }
 
 export interface VisualSettings {

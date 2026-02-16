@@ -47,7 +47,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
   const agentMode = useAppStore((s) => s.agentMode);
   const setAgentMode = useAppStore((s) => s.setAgentMode);
+  const clipModelType = useAppStore((s) => s.clipModelType);
+  const setClipModelType = useAppStore((s) => s.setClipModelType);
   const [briefDraft, setBriefDraft] = useState(currentBrief || "");
+  const [isSwitchingModel, setIsSwitchingModel] = useState(false);
 
   useEffect(() => {
     setBriefDraft(currentBrief || "");
@@ -72,6 +75,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       onBriefChange(trimmed);
     } catch (error) {
       console.error("Failed to save design brief:", error);
+    }
+  };
+
+  const handleModelChange = async (modelType: 'fashionclip' | 'huggingface') => {
+    if (modelType === clipModelType || isSwitchingModel) return;
+
+    setIsSwitchingModel(true);
+    try {
+      console.log(`🔄 Switching CLIP model to: ${modelType}`);
+      await apiClient.setClipModel(modelType);
+      setClipModelType(modelType);
+      console.log(`✅ Successfully switched to ${modelType}`);
+    } catch (error) {
+      console.error(`Failed to switch to ${modelType}:`, error);
+      alert(`Failed to switch model: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSwitchingModel(false);
     }
   };
 
@@ -166,6 +186,81 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 ? '✨ Agent will proactively suggest gaps, axes, and variations'
                 : '⏸️ Agent will only analyze when you click "Analyze" button'}
             </p>
+          </div>
+
+          {/* CLIP Model Selection */}
+          <div className="settings-section">
+            <label className="settings-label">CLIP Embedding Model</label>
+            <p className="settings-hint">
+              Choose between fashion-specialized (FashionCLIP) or general-purpose (sentence-transformers) embeddings.
+            </p>
+            <div className="model-selector">
+              <label
+                className={`model-option ${clipModelType === 'fashionclip' ? 'active' : ''}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '6px',
+                  cursor: isSwitchingModel ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: isSwitchingModel && clipModelType !== 'fashionclip' ? 0.5 : 1,
+                }}
+              >
+                <input
+                  type="radio"
+                  name="clip-model"
+                  value="fashionclip"
+                  checked={clipModelType === 'fashionclip'}
+                  onChange={() => handleModelChange('fashionclip')}
+                  disabled={isSwitchingModel}
+                />
+                <div style={{ flex: 1 }}>
+                  <strong style={{ display: 'block', fontSize: '14px' }}>FashionCLIP</strong>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                    Specialized for fashion (Gradio Space)
+                  </span>
+                </div>
+              </label>
+
+              <label
+                className={`model-option ${clipModelType === 'huggingface' ? 'active' : ''}`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '6px',
+                  cursor: isSwitchingModel ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  opacity: isSwitchingModel && clipModelType !== 'huggingface' ? 0.5 : 1,
+                  marginTop: '8px',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="clip-model"
+                  value="huggingface"
+                  checked={clipModelType === 'huggingface'}
+                  onChange={() => handleModelChange('huggingface')}
+                  disabled={isSwitchingModel}
+                />
+                <div style={{ flex: 1 }}>
+                  <strong style={{ display: 'block', fontSize: '14px' }}>sentence-transformers CLIP</strong>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)' }}>
+                    General-purpose, more reliable (HF Inference)
+                  </span>
+                </div>
+              </label>
+            </div>
+            {isSwitchingModel && (
+              <p className="settings-hint" style={{ fontSize: '11px', marginTop: '12px', color: '#ffaa00' }}>
+                ⏳ Switching model and re-projecting images...
+              </p>
+            )}
           </div>
 
           {/* Visual Settings */}

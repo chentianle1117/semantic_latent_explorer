@@ -18,8 +18,9 @@ class SemanticAxis:
     direction: np.ndarray
     positive_concept: str
     negative_concept: str
-    method: str  # 'clip_text', 'supervised', 'pca'
+    method: str  # 'clip_text', 'supervised', 'pca', 'ensemble'
     strength: float = 1.0
+    metadata: Optional[Dict] = None  # Optional metadata (e.g., concepts list for ensemble)
     
     def project(self, embeddings: np.ndarray) -> np.ndarray:
         """Project embeddings onto this semantic axis."""
@@ -77,7 +78,79 @@ class SemanticAxisBuilder:
         
         self.axes[axis_name] = axis
         return axis
-    
+
+    def create_ensemble_axis(
+        self,
+        concept_prompts: List[str],
+        name: str = "ensemble_axis",
+        positive_concept: str = "ensemble",
+        negative_concept: str = "opposite"
+    ) -> SemanticAxis:
+        """
+        Create semantic axis by averaging multiple concept embeddings.
+
+        This technique (prompt ensembling) dramatically improves axis quality
+        by using 5-10 concrete visual descriptions instead of single adjectives.
+
+        Args:
+            concept_prompts: List of 5-10 visual descriptions
+                           (e.g., ["running shoe", "mesh sneaker", "athletic footwear"])
+            name: Axis identifier
+            positive_concept: Label for positive direction (optional)
+            negative_concept: Label for negative direction (optional)
+
+        Returns:
+            SemanticAxis with robust direction from averaged embeddings
+        """
+        if not concept_prompts:
+            raise ValueError("concept_prompts cannot be empty")
+
+        print(f"🎯 Creating ensemble axis from {len(concept_prompts)} concepts")
+
+        # Extract embeddings for all concepts
+        concept_embeddings = self.embedder.extract_text_embeddings(
+            concept_prompts,
+            use_cache=True  # Cache individual concepts for reuse
+        )
+
+        # Filter out zero embeddings (API failures e.g. HTTP 410)
+        non_zero_mask = np.linalg.norm(concept_embeddings, axis=1) > 1e-6
+        if np.any(non_zero_mask):
+            concept_embeddings = concept_embeddings[non_zero_mask]
+        else:
+            raise ValueError(
+                "Embedding API returned errors for all concepts (e.g. HTTP 410). "
+                "The model may be deprecated. Try: 1) Switch to FashionCLIP in Settings, or 2) Check HF_API_KEY."
+            )
+
+        # Average to get robust direction (embeddings are L2-normalized)
+        ensemble_direction = np.mean(concept_embeddings, axis=0)
+
+        # Re-normalize after averaging
+        norm = np.linalg.norm(ensemble_direction)
+        if norm < 1e-12:
+            raise ValueError(
+                "Ensemble direction collapsed to zero vector. "
+                "Embedding API may be unavailable (HTTP 410). Try switching to FashionCLIP in Settings."
+            )
+        ensemble_direction = ensemble_direction / norm
+
+        axis = SemanticAxis(
+            name=name,
+            direction=ensemble_direction,
+            positive_concept=positive_concept,
+            negative_concept=negative_concept,
+            method='ensemble',
+            metadata={
+                "type": "ensemble",
+                "num_concepts": len(concept_prompts),
+                "concepts": concept_prompts
+            }
+        )
+
+        self.axes[name] = axis
+        return axis
+
     def create_supervised_axis(
         self,
         embeddings: np.ndarray,

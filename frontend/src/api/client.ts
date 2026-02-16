@@ -34,6 +34,7 @@ class APIClient {
     cluster_centroids?: number[][];
     cluster_labels?: number[];
     grid_cell_size?: [number, number];
+    clip_model_type?: 'fashionclip' | 'huggingface';
   }> {
     const response = await axios.get(`${API_BASE}/state`);
     return response.data;
@@ -79,6 +80,14 @@ class APIClient {
   async set3DMode(use3D: boolean): Promise<{ status: string; is_3d_mode: boolean; message: string }> {
     const response = await axios.post(`${API_BASE}/set-3d-mode`, null, {
       params: { use_3d: use3D }
+    });
+    return response.data;
+  }
+
+  // Set CLIP model
+  async setClipModel(modelType: 'fashionclip' | 'huggingface'): Promise<{ status: string; model_type: string; message: string }> {
+    const response = await axios.post(`${API_BASE}/set-clip-model`, null, {
+      params: { model_type: modelType }
     });
     return response.data;
   }

@@ -44,7 +44,7 @@ parent_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(parent_dir))
 
 # Import our models (SemanticGenerator removed - using fal.ai for generation)
-from models import CLIPEmbedder, SemanticAxisBuilder
+from models import CLIPEmbedder, HuggingFaceCLIPEmbedder, SemanticAxisBuilder
 from models.data_structures import ImageMetadata, HistoryGroup
 
 app = FastAPI(title="Zappos Semantic Explorer API")
@@ -126,6 +126,7 @@ class StateResponse(BaseModel):
     design_brief: Optional[str] = None  # New: include design brief in state
     grid_cell_size: Tuple[float, float] = (0.7, 0.7)  # Grid cell size in coordinate space
     neighbor_map: Dict[int, List[int]] = {}  # K-nearest neighbors for physics simulation
+    clip_model_type: str = "fashionclip"  # Current CLIP model (fashionclip or huggingface)
 
 
 # Global state
@@ -147,6 +148,10 @@ class AppState:
         self.cluster_centroids: List[List[float]] = []  # Cluster centers for edge bundling
         self.cluster_labels: List[int] = []  # Cluster assignment per image
         self.grid_cell_size: Tuple[float, float] = (0.7, 0.7)  # Grid cell size in coordinate space
+        self.clip_model_type: str = os.getenv("CLIP_MODEL", "fashionclip")  # "fashionclip" or "huggingface"
+        # Caches to avoid redundant Gemini/embedding calls
+        self._gemini_expansion_cache: Dict[str, List[str]] = {}  # concept -> expanded concepts
+        self._axis_directions_cache: Optional[Tuple] = None  # (labels_key, (x_dir, y_dir, z_dir?))
 
 state = AppState()
 
@@ -160,52 +165,116 @@ def pil_to_base64(pil_image: Image.Image) -> str:
     return img_str
 
 
+def _get_cached_expansion(concept: str, num_expansions: int = 4) -> Optional[List[str]]:
+    """Return cached Gemini expansion if available."""
+    key = f"{concept}:{num_expansions}"
+    if key in state._gemini_expansion_cache:
+        return state._gemini_expansion_cache[key]
+    return None
+
+
+def _set_cached_expansion(concept: str, concepts: List[str], num_expansions: int = 4) -> None:
+    """Store Gemini expansion in cache (bounded to ~50 entries)."""
+    key = f"{concept}:{num_expansions}"
+    state._gemini_expansion_cache[key] = concepts
+    if len(state._gemini_expansion_cache) > 50:
+        # Evict oldest half
+        keys = list(state._gemini_expansion_cache.keys())[:25]
+        for k in keys:
+            del state._gemini_expansion_cache[k]
+
+
 def project_embeddings_to_coordinates(embeddings: np.ndarray, use_3d: bool = None) -> np.ndarray:
     """
     Project embeddings onto semantic axes to get 2D or 3D coordinates.
     Uses current axis labels to create semantic directions.
-
-    Args:
-        embeddings: Image embeddings (N, embedding_dim)
-        use_3d: If True, use 3D projection. If None, use state.is_3d_mode
-
-    Returns:
-        Array of shape (N, 2) or (N, 3) depending on mode
+    Caches Gemini expansions and axis directions to avoid redundant API calls.
     """
     if state.axis_builder is None or state.embedder is None:
         raise RuntimeError("Models not initialized")
 
-    # Determine 3D mode
     if use_3d is None:
         use_3d = state.is_3d_mode
 
-    # Build semantic axes from current labels
-    x_axis = state.axis_builder.create_clip_text_axis(
-        f"shoe that is {state.axis_labels['x'][1]}",  # positive
-        f"shoe that is {state.axis_labels['x'][0]}"   # negative
+    # Cache key: axis labels tuple
+    labels_key = (
+        state.axis_labels['x'],
+        state.axis_labels['y'],
+        state.axis_labels.get('z', (None, None)) if use_3d else (None, None),
     )
-    y_axis = state.axis_builder.create_clip_text_axis(
-        f"shoe that is {state.axis_labels['y'][1]}",  # positive
-        f"shoe that is {state.axis_labels['y'][0]}"   # negative
-    )
+    if state._axis_directions_cache is not None:
+        cache_key, cached = state._axis_directions_cache
+        if cache_key == labels_key:
+            x_dir, y_dir, z_dir = cached
+            x_coords = embeddings @ x_dir
+            y_coords = embeddings @ y_dir
+            if z_dir is not None:
+                z_coords = embeddings @ z_dir
+                coords = np.column_stack([x_coords, y_coords, z_coords])
+            else:
+                coords = np.column_stack([x_coords, y_coords])
+            return coords
 
-    # Project embeddings onto axes
-    x_coords = embeddings @ x_axis.direction
-    y_coords = embeddings @ y_axis.direction
+    # Build semantic axes (Gemini + embeddings, with cache)
+    x_neg, x_pos = state.axis_labels['x']
+    x_neg_concepts = _get_cached_expansion(x_neg)
+    if x_neg_concepts is None:
+        x_neg_concepts = expand_concept_with_gemini(x_neg, num_expansions=4)
+        _set_cached_expansion(x_neg, x_neg_concepts)
+    x_pos_concepts = _get_cached_expansion(x_pos)
+    if x_pos_concepts is None:
+        x_pos_concepts = expand_concept_with_gemini(x_pos, num_expansions=4)
+        _set_cached_expansion(x_pos, x_pos_concepts)
 
-    # If 3D mode, add z-axis projection
+    x_neg_axis = state.axis_builder.create_ensemble_axis(x_neg_concepts, name=f"ensemble_{x_neg}", positive_concept="neg", negative_concept="neg")
+    x_pos_axis = state.axis_builder.create_ensemble_axis(x_pos_concepts, name=f"ensemble_{x_pos}", positive_concept="pos", negative_concept="neg")
+    x_direction = x_pos_axis.direction - x_neg_axis.direction
+    if np.linalg.norm(x_direction) > 1e-12:
+        x_direction = x_direction / np.linalg.norm(x_direction)
+
+    y_neg, y_pos = state.axis_labels['y']
+    y_neg_concepts = _get_cached_expansion(y_neg)
+    if y_neg_concepts is None:
+        y_neg_concepts = expand_concept_with_gemini(y_neg, num_expansions=4)
+        _set_cached_expansion(y_neg, y_neg_concepts)
+    y_pos_concepts = _get_cached_expansion(y_pos)
+    if y_pos_concepts is None:
+        y_pos_concepts = expand_concept_with_gemini(y_pos, num_expansions=4)
+        _set_cached_expansion(y_pos, y_pos_concepts)
+
+    y_neg_axis = state.axis_builder.create_ensemble_axis(y_neg_concepts, name=f"ensemble_{y_neg}", positive_concept="neg", negative_concept="neg")
+    y_pos_axis = state.axis_builder.create_ensemble_axis(y_pos_concepts, name=f"ensemble_{y_pos}", positive_concept="pos", negative_concept="neg")
+    y_direction = y_pos_axis.direction - y_neg_axis.direction
+    if np.linalg.norm(y_direction) > 1e-12:
+        y_direction = y_direction / np.linalg.norm(y_direction)
+
+    z_direction = None
     if use_3d and 'z' in state.axis_labels:
-        z_axis = state.axis_builder.create_clip_text_axis(
-            f"shoe that is {state.axis_labels['z'][1]}",  # positive
-            f"shoe that is {state.axis_labels['z'][0]}"   # negative
-        )
-        z_coords = embeddings @ z_axis.direction
+        z_neg, z_pos = state.axis_labels['z']
+        z_neg_concepts = _get_cached_expansion(z_neg)
+        if z_neg_concepts is None:
+            z_neg_concepts = expand_concept_with_gemini(z_neg, num_expansions=4)
+            _set_cached_expansion(z_neg, z_neg_concepts)
+        z_pos_concepts = _get_cached_expansion(z_pos)
+        if z_pos_concepts is None:
+            z_pos_concepts = expand_concept_with_gemini(z_pos, num_expansions=4)
+            _set_cached_expansion(z_pos, z_pos_concepts)
+        z_neg_axis = state.axis_builder.create_ensemble_axis(z_neg_concepts, name=f"ensemble_{z_neg}", positive_concept="neg", negative_concept="neg")
+        z_pos_axis = state.axis_builder.create_ensemble_axis(z_pos_concepts, name=f"ensemble_{z_pos}", positive_concept="pos", negative_concept="neg")
+        z_direction = z_pos_axis.direction - z_neg_axis.direction
+        if np.linalg.norm(z_direction) > 1e-12:
+            z_direction = z_direction / np.linalg.norm(z_direction)
+
+    # Cache directions for reuse
+    state._axis_directions_cache = (labels_key, (x_direction, y_direction, z_direction))
+
+    x_coords = embeddings @ x_direction
+    y_coords = embeddings @ y_direction
+    if z_direction is not None:
+        z_coords = embeddings @ z_direction
         coords = np.column_stack([x_coords, y_coords, z_coords])
     else:
         coords = np.column_stack([x_coords, y_coords])
-
-    # Center projections at origin (ensures canvas auto-centering after axis updates)
-    coords -= coords.mean(axis=0)
     return coords
 
 
@@ -479,7 +548,7 @@ async def broadcast_state_update():
     response = {
         "type": "state_update",
         "data": {
-            "images": [image_metadata_to_response(img, neighbor_map).dict() for img in visible_metadata],
+            "images": [image_metadata_to_response(img, neighbor_map).model_dump() for img in visible_metadata],
             "history_groups": [
                 {
                     "id": g.id,
@@ -497,7 +566,8 @@ async def broadcast_state_update():
             "cluster_centroids": state.cluster_centroids,  # For edge bundling
             "cluster_labels": state.cluster_labels,  # Per-image cluster assignment
             "grid_cell_size": list(state.grid_cell_size),  # Grid cell size for canvas overlay
-            "neighbor_map": neighbor_map  # K-nearest neighbors for physics simulation
+            "neighbor_map": neighbor_map,  # K-nearest neighbors for physics simulation
+            "clip_model_type": state.clip_model_type  # Current CLIP model
         }
     }
 
@@ -554,8 +624,85 @@ async def get_state():
         is_3d_mode=state.is_3d_mode,  # New: include 3D mode state
         design_brief=state.design_brief,  # New: include design brief
         grid_cell_size=state.grid_cell_size,  # Grid cell size for canvas overlay
-        neighbor_map=neighbor_map  # K-nearest neighbors for physics simulation
+        neighbor_map=neighbor_map,  # K-nearest neighbors for physics simulation
+        clip_model_type=state.clip_model_type  # Current CLIP model
     )
+
+
+def initialize_embedder(model_type: str = "fashionclip"):
+    """Initialize the appropriate CLIP embedder based on model type."""
+    print(f"🔄 Initializing {model_type} embedder...")
+    if model_type == "huggingface":
+        return HuggingFaceCLIPEmbedder()
+    else:
+        return CLIPEmbedder()
+
+
+def expand_concept_with_gemini(concept: str, num_expansions: int = 4) -> List[str]:
+    """
+    Use Gemini to expand a single concept into multiple visual descriptions.
+
+    Args:
+        concept: Single word/phrase (e.g., "sporty", "formal")
+        num_expansions: Number of concrete descriptions to generate (default 4)
+
+    Returns:
+        List of visual descriptions suitable for CLIP text encoder
+
+    Example:
+        expand_concept_with_gemini("sporty", 5) →
+        [
+            "running shoe with mesh upper",
+            "athletic sneaker with thick rubber sole",
+            "sportswear footwear with cushioned midsole",
+            "training shoe with breathable fabric",
+            "gym sneaker with flexible design"
+        ]
+    """
+    try:
+        gemini_model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
+        prompt = f"""You are a fashion expert helping to create visual descriptions for AI image understanding.
+
+Given the concept "{concept}", generate {num_expansions} diverse, concrete visual descriptions that capture different aspects of this concept in footwear.
+
+Requirements:
+- Each description should be 3-8 words
+- Focus on VISUAL attributes (materials, colors, shapes, textures, construction)
+- Be specific and concrete (avoid vague adjectives)
+- Cover different interpretations of the concept
+- Suitable for CLIP text encoder (trained on image captions)
+
+Format: Return ONLY a JSON array of strings, no other text.
+
+Example for "elegant":
+["leather pump with pointed toe", "satin heel with crystal embellishment", "minimalist patent leather oxford", "sleek ankle boot with slim profile"]
+
+Now generate {num_expansions} descriptions for "{concept}":"""
+
+        response = gemini_model.generate_content(prompt)
+        text = (getattr(response, "text", None) or "").strip()
+        # Strip markdown code block if present (Gemini often returns ```json\n[...]\n```)
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+            text = re.sub(r"\n?```\s*$", "", text)
+            text = text.strip()
+        # Extract JSON array by regex (handles any wrapping)
+        match = re.search(r"\[[\s\S]*\]", text)
+        if match:
+            text = match.group(0)
+        concepts = json.loads(text)
+
+        if not isinstance(concepts, list) or len(concepts) == 0:
+            print(f"⚠️ Gemini returned invalid format for '{concept}', using fallback")
+            return [concept]  # Fallback to original
+
+        print(f"✨ Expanded '{concept}' into {len(concepts)} concepts")
+        return concepts[:num_expansions]  # Trim to requested count
+
+    except Exception as e:
+        print(f"❌ Gemini expansion failed for '{concept}': {e}")
+        return [concept]  # Fallback to original single concept
 
 
 @app.post("/api/initialize-clip-only")
@@ -563,9 +710,9 @@ async def initialize_clip_only():
     """Initialize only CLIP embedder (for fal.ai mode)."""
     try:
         if state.embedder is None:
-            print("Loading CLIP embedder...")
-            state.embedder = CLIPEmbedder()
-            print("CLIP loaded successfully")
+            print(f"Loading {state.clip_model_type} embedder...")
+            state.embedder = initialize_embedder(state.clip_model_type)
+            print(f"{state.clip_model_type.upper()} loaded successfully")
 
         if state.axis_builder is None:
             state.axis_builder = SemanticAxisBuilder(state.embedder)
@@ -595,18 +742,27 @@ async def initialize_clip_only():
 async def update_semantic_axes(request: AxisUpdateRequest):
     """Update semantic axes and recalculate positions."""
     try:
+        # Deduplicate: skip if labels unchanged (avoids redundant work from double frontend calls)
+        new_x = (request.x_negative, request.x_positive)
+        new_y = (request.y_negative, request.y_positive)
+        new_z = (request.z_negative, request.z_positive) if request.z_positive and request.z_negative else state.axis_labels.get('z', (None, None))
+        if (state.axis_labels['x'] == new_x and state.axis_labels['y'] == new_y and
+            state.axis_labels.get('z', (None, None)) == new_z):
+            await broadcast_state_update()
+            return {"status": "success", "message": "Axes unchanged (skipped)"}
+
         print(f"\n=== Updating Semantic Axes ===")
         print(f"X: {request.x_negative} → {request.x_positive}")
         print(f"Y: {request.y_negative} → {request.y_positive}")
 
-        # Update axis labels (always allowed, even if models not initialized)
-        state.axis_labels['x'] = (request.x_negative, request.x_positive)
-        state.axis_labels['y'] = (request.y_negative, request.y_positive)
-
-        # Update z-axis if provided
+        state.axis_labels['x'] = new_x
+        state.axis_labels['y'] = new_y
         if request.z_positive and request.z_negative:
             print(f"Z: {request.z_negative} → {request.z_positive}")
-            state.axis_labels['z'] = (request.z_negative, request.z_positive)
+            state.axis_labels['z'] = new_z
+
+        # Invalidate axis cache when labels change
+        state._axis_directions_cache = None
 
         # Recalculate positions only if models are initialized and we have images
         if state.axis_builder is not None and state.embedder is not None and len(state.images_metadata) > 0:
@@ -670,6 +826,55 @@ async def set_3d_mode(use_3d: bool):
 
     except Exception as e:
         print(f"ERROR setting 3D mode: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/set-clip-model")
+async def set_clip_model(model_type: str):
+    """Switch between FashionCLIP and HuggingFace CLIP models."""
+    try:
+        if model_type not in ["fashionclip", "huggingface"]:
+            raise HTTPException(status_code=400, detail="Invalid model type. Must be 'fashionclip' or 'huggingface'")
+
+        print(f"\n=== Switching CLIP Model: {model_type} ===")
+
+        # Update model type
+        old_model = state.clip_model_type
+        state.clip_model_type = model_type
+
+        # Reinitialize embedder with new model
+        print(f"🔄 Reinitializing embedder from {old_model} to {model_type}...")
+        state.embedder = initialize_embedder(model_type)
+        state.axis_builder = SemanticAxisBuilder(state.embedder)
+        state._axis_directions_cache = None  # Invalidate: axes depend on embedder
+        print(f"✅ Embedder switched to {model_type}")
+
+        # Re-project all images with new model
+        if len(state.images_metadata) > 0:
+            print(f"🔄 Re-projecting {len(state.images_metadata)} images with new model...")
+            all_embeddings = np.array([img.embedding for img in state.images_metadata])
+            new_coords = project_embeddings_to_coordinates(all_embeddings)
+
+            for i, img_meta in enumerate(state.images_metadata):
+                img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+
+            update_clusters()
+            print(f"✅ All positions recalculated with {model_type} model")
+
+        await broadcast_state_update()
+
+        return {
+            "status": "success",
+            "model_type": model_type,
+            "message": f"Switched to {model_type} CLIP model"
+        }
+
+    except Exception as e:
+        # Revert on error
+        state.clip_model_type = old_model if 'old_model' in locals() else "fashionclip"
+        print(f"❌ ERROR switching CLIP model: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -848,22 +1053,17 @@ async def add_external_images(request: AddExternalImagesRequest):
         embeddings = state.embedder.extract_image_embeddings_from_pil(pil_images)
         print("OK: Embeddings extracted")
 
-        # Project embeddings onto semantic axes (for new images only, then reproject all for layout)
-        print("Projecting onto semantic axes...")
-        coords = project_embeddings_to_coordinates(embeddings)
-        print(f"OK: Coordinates calculated: {coords.shape}")
-
-        # Create ImageMetadata objects
+        # Create ImageMetadata objects (placeholder coords; we reproject all below)
         group_id = f"{request.generation_method}_{len(state.history_groups)}"
         new_metadata = []
 
-        for i, (img, emb, coord) in enumerate(zip(pil_images, embeddings, coords)):
+        for i, (img, emb) in enumerate(zip(pil_images, embeddings)):
             img_meta = ImageMetadata(
                 id=state.next_id,
                 group_id=group_id,
                 pil_image=img,
                 embedding=emb,
-                coordinates=tuple(float(c) for c in coord),  # Support 2D or 3D
+                coordinates=(0.0, 0.0),  # Placeholder; reprojected below
                 parents=request.parent_ids.copy(),  # Set parent relationships
                 children=[],
                 generation_method=request.generation_method,
@@ -877,15 +1077,13 @@ async def add_external_images(request: AddExternalImagesRequest):
 
         state.images_metadata.extend(new_metadata)
 
-        # Reproject ALL images whenever we encode new images
-        if len(state.images_metadata) >= 1:
-            print("Recalculating positions...")
-            all_embeddings = np.array([img.embedding for img in state.images_metadata])
-            all_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=state.is_3d_mode)
-            # Grid snapping disabled - using semantic projection directly
-            for i, img_meta in enumerate(state.images_metadata):
-                img_meta.coordinates = tuple(float(c) for c in all_coords[i])
-            print("OK: Positions recalculated")
+        # Incremental projection: only project new images onto current axes (existing images unchanged)
+        if len(new_metadata) >= 1:
+            print("Projecting new images onto axes...")
+            new_coords = project_embeddings_to_coordinates(embeddings, use_3d=state.is_3d_mode)
+            for i, img_meta in enumerate(new_metadata):
+                img_meta.coordinates = tuple(float(c) for c in new_coords[i])
+            print("OK: New positions assigned")
             update_clusters()  # Update clusters for edge bundling
 
         # Update parent images' children lists
@@ -921,7 +1119,7 @@ async def add_external_images(request: AddExternalImagesRequest):
         print(f"OK: Added {len(new_metadata)} external images to canvas")
         return {
             "status": "success",
-            "images": [image_metadata_to_response(img).dict() for img in new_metadata]
+            "images": [image_metadata_to_response(img).model_dump() for img in new_metadata]
         }
 
     except HTTPException:
@@ -1966,7 +2164,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.send_json({
             "type": "state_update",
             "data": {
-                "images": [image_metadata_to_response(img).dict() for img in state.images_metadata if img.visible],
+                "images": [image_metadata_to_response(img).model_dump() for img in state.images_metadata if img.visible],
                 "history_groups": [
                     {
                         "id": g.id,

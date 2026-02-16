@@ -122,6 +122,7 @@ export const App: React.FC = () => {
           groups: state.history_groups.length,
           design_brief: state.design_brief ? "present" : "none",
           clusters: state.cluster_centroids?.length || 0,
+          clip_model: state.clip_model_type || "fashionclip",
         });
         setImages(state.images);
         setHistoryGroups(state.history_groups);
@@ -131,6 +132,13 @@ export const App: React.FC = () => {
             clusterCentroids: state.cluster_centroids,
             clusterLabels: state.cluster_labels,
           });
+        }
+        // Load CLIP model type from backend
+        if (state.clip_model_type) {
+          useAppStore.getState().setClipModelType(state.clip_model_type);
+          console.log(
+            `✓ Loaded CLIP model type: ${state.clip_model_type}`
+          );
         }
         // Load design brief from backend state
         if (state.design_brief) {

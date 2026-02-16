@@ -59,6 +59,9 @@ interface AppStore extends AppState {
   clearGhostNodes: () => void;
   acceptGhostNode: (id: number) => Promise<void>;
 
+  // CLIP model selection
+  setClipModelType: (modelType: 'fashionclip' | 'huggingface') => void;
+
   clearAll: () => void;
 }
 
@@ -105,6 +108,9 @@ const initialState: AppState = {
   agentInsight: null as AgentInsight | null,
   agentMode: 'auto' as AgentMode, // Default to proactive mode
   ghostNodes: [] as GhostNode[],
+
+  // CLIP model selection
+  clipModelType: 'fashionclip' as 'fashionclip' | 'huggingface',
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -240,6 +246,9 @@ export const useAppStore = create<AppStore>((set) => ({
     // This will be implemented when we wire up the generation flow
     console.log('Accepting ghost node:', ghost.suggestedPrompt);
   },
+
+  // CLIP model selection
+  setClipModelType: (modelType) => set({ clipModelType: modelType }),
 
   // Clear all
   clearAll: () =>

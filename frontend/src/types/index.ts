@@ -16,6 +16,7 @@ export interface ImageData {
   is_ghost?: boolean;  // Whether this is a ghost/preview suggestion
   suggested_prompt?: string;  // Suggested prompt for ghost nodes
   reasoning?: string;  // Why this ghost was suggested
+  neighbors: number[];  // K-nearest semantic neighbors for physics simulation
 }
 
 export interface HistoryGroup {
@@ -70,9 +71,6 @@ export interface AppState {
   clusterCentroids: number[][]; // [[x,y], [x,y], ...]
   clusterLabels: number[]; // Per-image cluster assignment
 
-  // Grid layout
-  gridCellSize: [number, number]; // Grid cell size in coordinate space [width, height]
-
   // Agent proactive mode
   agentMode: AgentMode; // 'auto' = proactive suggestions, 'manual' = only on demand
   ghostNodes: GhostNode[]; // Preview suggestions (30% opacity) before generation
@@ -87,7 +85,6 @@ export interface VisualSettings {
   coordinateOffset: [number, number, number]; // Offset for recentering [x, y, z]
   contourStrength: number; // 1–10, controls contour highlight thickness/visibility
   showGenealogyOnCanvas: boolean; // Show parent/child lines on canvas (default: false)
-  gridDensity: number; // 0.5–2.0, grid cell size multiplier (higher = larger cells, lower density)
 }
 
 export interface AxisUpdateRequest {

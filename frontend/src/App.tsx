@@ -132,12 +132,6 @@ export const App: React.FC = () => {
             clusterLabels: state.cluster_labels,
           });
         }
-        // Load grid cell size
-        if (state.grid_cell_size) {
-          useAppStore.setState({
-            gridCellSize: state.grid_cell_size,
-          });
-        }
         // Load design brief from backend state
         if (state.design_brief) {
           setCurrentBrief(state.design_brief);

@@ -219,24 +219,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 {visualSettings.contourStrength ?? 6}
               </span>
             </div>
-            <div className="setting-row">
-              <label>Grid Density</label>
-              <input
-                type="range"
-                min="0.5"
-                max="2.0"
-                step="0.1"
-                value={visualSettings.gridDensity ?? 1.0}
-                onChange={(e) =>
-                  updateVisualSettings({
-                    gridDensity: parseFloat(e.target.value),
-                  })
-                }
-              />
-              <span className="setting-value">
-                {(visualSettings.gridDensity ?? 1.0).toFixed(1)}x
-              </span>
-            </div>
+
             <div className="setting-row">
               <label>Background</label>
               <input

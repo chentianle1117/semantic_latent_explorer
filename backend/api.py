@@ -26,6 +26,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 import re
 import socket
+from sklearn.neighbors import NearestNeighbors
 
 # Load environment variables
 load_dotenv()
@@ -114,6 +115,7 @@ class ImageResponse(BaseModel):
     is_ghost: bool = False  # Whether this is a ghost/preview suggestion
     suggested_prompt: str = ''  # Suggested prompt for ghost nodes
     reasoning: str = ''  # Why this ghost was suggested
+    neighbors: List[int] = []  # K-nearest semantic neighbors for physics simulation
 
 
 class StateResponse(BaseModel):
@@ -123,6 +125,7 @@ class StateResponse(BaseModel):
     is_3d_mode: bool = False  # New: track if in 3D mode
     design_brief: Optional[str] = None  # New: include design brief in state
     grid_cell_size: Tuple[float, float] = (0.7, 0.7)  # Grid cell size in coordinate space
+    neighbor_map: Dict[int, List[int]] = {}  # K-nearest neighbors for physics simulation
 
 
 # Global state
@@ -304,6 +307,41 @@ def snap_to_grid(coords: np.ndarray, cell_size: float = GRID_CELL_SIZE,
     return snapped
 
 
+def get_semantic_neighbors(metadata: List[ImageMetadata], k: int = 5) -> Dict[int, List[int]]:
+    """
+    Calculate K-nearest neighbors for each image based on CLIP embeddings.
+
+    Args:
+        metadata: List of ImageMetadata objects
+        k: Number of neighbors to find for each image
+
+    Returns:
+        Dict mapping image_id -> list of neighbor image_ids
+    """
+    if len(metadata) < 2:
+        return {img.id: [] for img in metadata}
+
+    # Extract embeddings and IDs
+    embeddings = np.array([img.embedding for img in metadata])
+    image_ids = [img.id for img in metadata]
+
+    # Use cosine similarity (1 - cosine distance) for semantic similarity
+    # KNN with cosine metric
+    k_actual = min(k + 1, len(metadata))  # +1 because each point is its own nearest neighbor
+    nbrs = NearestNeighbors(n_neighbors=k_actual, metric='cosine').fit(embeddings)
+    distances, indices = nbrs.kneighbors(embeddings)
+
+    # Build neighbor map
+    neighbor_map = {}
+    for i, neighbors in enumerate(indices):
+        source_id = image_ids[i]
+        # Exclude self (first neighbor is always self with distance 0)
+        neighbor_ids = [image_ids[n] for n in neighbors[1:]]
+        neighbor_map[source_id] = neighbor_ids
+
+    return neighbor_map
+
+
 # Minimum coord distance to avoid overlap — just enough to prevent image clipping
 MIN_COORD_DISTANCE = 0.15
 
@@ -408,8 +446,9 @@ def update_clusters():
     state.cluster_labels = [id_to_label.get(img.id, -1) for img in state.images_metadata]
 
 
-def image_metadata_to_response(img: ImageMetadata) -> ImageResponse:
+def image_metadata_to_response(img: ImageMetadata, neighbor_map: Optional[Dict[int, List[int]]] = None) -> ImageResponse:
     """Convert ImageMetadata to API response."""
+    neighbors = neighbor_map.get(img.id, []) if neighbor_map else []
     return ImageResponse(
         id=img.id,
         group_id=img.group_id,
@@ -423,7 +462,8 @@ def image_metadata_to_response(img: ImageMetadata) -> ImageResponse:
         visible=img.visible,
         is_ghost=img.is_ghost,
         suggested_prompt=img.suggested_prompt,
-        reasoning=img.reasoning
+        reasoning=img.reasoning,
+        neighbors=neighbors
     )
 
 
@@ -432,10 +472,14 @@ async def broadcast_state_update():
     if not state.websocket_connections:
         return
 
+    # Calculate K-nearest neighbors for physics simulation
+    visible_metadata = [img for img in state.images_metadata if img.visible]
+    neighbor_map = get_semantic_neighbors(visible_metadata, k=5) if len(visible_metadata) > 1 else {}
+
     response = {
         "type": "state_update",
         "data": {
-            "images": [image_metadata_to_response(img).dict() for img in state.images_metadata if img.visible],
+            "images": [image_metadata_to_response(img, neighbor_map).dict() for img in visible_metadata],
             "history_groups": [
                 {
                     "id": g.id,
@@ -452,7 +496,8 @@ async def broadcast_state_update():
             "design_brief": state.design_brief,  # Include design brief in broadcast
             "cluster_centroids": state.cluster_centroids,  # For edge bundling
             "cluster_labels": state.cluster_labels,  # Per-image cluster assignment
-            "grid_cell_size": list(state.grid_cell_size)  # Grid cell size for canvas overlay
+            "grid_cell_size": list(state.grid_cell_size),  # Grid cell size for canvas overlay
+            "neighbor_map": neighbor_map  # K-nearest neighbors for physics simulation
         }
     }
 
@@ -487,8 +532,12 @@ async def test():
 @app.get("/api/state")
 async def get_state():
     """Get current application state."""
+    # Calculate K-nearest neighbors for physics simulation
+    visible_metadata = [img for img in state.images_metadata if img.visible]
+    neighbor_map = get_semantic_neighbors(visible_metadata, k=5) if len(visible_metadata) > 1 else {}
+
     return StateResponse(
-        images=[image_metadata_to_response(img) for img in state.images_metadata if img.visible],
+        images=[image_metadata_to_response(img, neighbor_map) for img in visible_metadata],
         history_groups=[
             {
                 "id": g.id,
@@ -504,7 +553,8 @@ async def get_state():
         axis_labels=state.axis_labels,
         is_3d_mode=state.is_3d_mode,  # New: include 3D mode state
         design_brief=state.design_brief,  # New: include design brief
-        grid_cell_size=state.grid_cell_size  # Grid cell size for canvas overlay
+        grid_cell_size=state.grid_cell_size,  # Grid cell size for canvas overlay
+        neighbor_map=neighbor_map  # K-nearest neighbors for physics simulation
     )
 
 
@@ -523,10 +573,10 @@ async def initialize_clip_only():
 
         # Recalculate and rescale all image positions whenever encoding/axes become available
         if len(state.images_metadata) > 0 and state.axis_builder and state.embedder:
-            print("Recalculating positions and applying layout spread for existing images...")
+            print("Recalculating positions for existing images...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=state.is_3d_mode)
-            new_coords = snap_to_grid(new_coords[:, :2] if new_coords.shape[1] > 2 else new_coords)
+            # Grid snapping disabled - using semantic projection directly
             for i, img_meta in enumerate(state.images_metadata):
                 img_meta.coordinates = tuple(float(c) for c in new_coords[i])
             update_clusters()  # Update clusters for edge bundling
@@ -563,7 +613,7 @@ async def update_semantic_axes(request: AxisUpdateRequest):
             print(f"Recalculating positions for {len(state.images_metadata)} images...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings)
-            new_coords = snap_to_grid(new_coords[:, :2] if new_coords.shape[1] > 2 else new_coords)
+            # Grid snapping disabled - using semantic projection directly
 
             for i, img_meta in enumerate(state.images_metadata):
                 # Store coordinates as tuple (2D or 3D)
@@ -601,7 +651,7 @@ async def set_3d_mode(use_3d: bool):
             print(f"Recalculating positions for {len(state.images_metadata)} images in {'3D' if use_3d else '2D'} mode...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=use_3d)
-            new_coords = snap_to_grid(new_coords[:, :2] if new_coords.shape[1] > 2 else new_coords)
+            # Grid snapping disabled - using semantic projection directly
 
             for i, img_meta in enumerate(state.images_metadata):
                 # Store coordinates as tuple (2D or 3D)
@@ -678,14 +728,14 @@ async def reapply_layout():
         if len(state.images_metadata) < 2:
             return {"status": "success", "message": "Nothing to spread"}
 
-        print("Reapplying layout spread to fix overlap...")
+        print("Reapplying pure CLIP semantic projection...")
         all_embeddings = np.array([img.embedding for img in state.images_metadata])
         new_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=state.is_3d_mode)
-        new_coords = apply_layout_spread(new_coords)
+        # Pure CLIP projection - no grid, physics, or collision
         for i, img_meta in enumerate(state.images_metadata):
             img_meta.coordinates = tuple(float(c) for c in new_coords[i])
         update_clusters()  # Update clusters for edge bundling
-        print("OK: Layout reapplied")
+        print("OK: Pure semantic layout applied")
         await broadcast_state_update()
         return {"status": "success", "message": "Layout reapplied"}
     except HTTPException:
@@ -827,15 +877,15 @@ async def add_external_images(request: AddExternalImagesRequest):
 
         state.images_metadata.extend(new_metadata)
 
-        # Reproject ALL images and apply layout spread whenever we encode new images
+        # Reproject ALL images whenever we encode new images
         if len(state.images_metadata) >= 1:
-            print("Recalculating positions and applying layout spread...")
+            print("Recalculating positions...")
             all_embeddings = np.array([img.embedding for img in state.images_metadata])
             all_coords = project_embeddings_to_coordinates(all_embeddings, use_3d=state.is_3d_mode)
-            all_coords = snap_to_grid(all_coords[:, :2] if all_coords.shape[1] > 2 else all_coords)
+            # Grid snapping disabled - using semantic projection directly
             for i, img_meta in enumerate(state.images_metadata):
                 img_meta.coordinates = tuple(float(c) for c in all_coords[i])
-            print("OK: Layout spread applied")
+            print("OK: Positions recalculated")
             update_clusters()  # Update clusters for edge bundling
 
         # Update parent images' children lists

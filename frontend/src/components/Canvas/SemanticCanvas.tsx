@@ -43,8 +43,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const hoveredImageId = useAppStore((state) => state.hoveredImageId);
   const axisLabels = useAppStore((state) => state.axisLabels);
   const canvasBounds = useAppStore((state) => state.canvasBounds);
-  const clusterCentroids = useAppStore((state) => state.clusterCentroids);
-  const gridCellSize = useAppStore((state) => state.gridCellSize);
   const ghostNodes = useAppStore((state) => state.ghostNodes);
 
   // Terrain mode: show clusters, gaps, or nothing
@@ -284,44 +282,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     xScaleRef.current = xScale;
     yScaleRef.current = yScale;
 
-    // Render grid overlay (5% opacity, always visible)
-    const gridGroup = g.append("g").attr("class", "grid-overlay");
-    const gridDensity = visualSettings.gridDensity ?? 1.0;
-    const cellWidth = gridCellSize[0] * gridDensity;
-    const cellHeight = gridCellSize[1] * gridDensity;
-
-    // Calculate grid extent based on bounds
-    const gridXMin = Math.floor(xScale.domain()[0] / cellWidth) * cellWidth;
-    const gridXMax = Math.ceil(xScale.domain()[1] / cellWidth) * cellWidth;
-    const gridYMin = Math.floor(yScale.domain()[0] / cellHeight) * cellHeight;
-    const gridYMax = Math.ceil(yScale.domain()[1] / cellHeight) * cellHeight;
-
-    // Render vertical grid lines
-    for (let x = gridXMin; x <= gridXMax; x += cellWidth) {
-      gridGroup
-        .append("line")
-        .attr("x1", xScale(x))
-        .attr("y1", yScale(gridYMin))
-        .attr("x2", xScale(x))
-        .attr("y2", yScale(gridYMax))
-        .attr("stroke", "#ffffff")
-        .attr("stroke-width", 0.5)
-        .attr("opacity", 0.05);
-    }
-
-    // Render horizontal grid lines
-    for (let y = gridYMin; y <= gridYMax; y += cellHeight) {
-      gridGroup
-        .append("line")
-        .attr("x1", xScale(gridXMin))
-        .attr("y1", yScale(y))
-        .attr("x2", xScale(gridXMax))
-        .attr("y2", yScale(y))
-        .attr("stroke", "#ffffff")
-        .attr("stroke-width", 0.5)
-        .attr("opacity", 0.05);
-    }
-
     // Group for region highlights (behind images)
     const regionHighlightsGroup = g.append("g").attr("class", "region-highlights");
 
@@ -370,10 +330,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Group for images
     const imagesGroup = g.append("g").attr("class", "images");
 
-    // Render images
+    // Render images - pure CLIP semantic projection
     const imageSize = visualSettings.imageSize;
     const coordScale = visualSettings.coordinateScale || 1.0; // Get coordinate scale multiplier
     const coordOffset = visualSettings.coordinateOffset || [0, 0, 0]; // Get coordinate offset
+
     const imageNodes = imagesGroup
       .selectAll(".image-node")
       .data(images, (d: any) => d.id)
@@ -776,6 +737,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         onSelectionChange(0, 0, 0);
       }
     });
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     images,
@@ -850,11 +812,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     }
 
     // Draw directional genealogy lines ONLY for selected images
-    const genealogyLines = svg.select(".genealogy-lines");
-    genealogyLines.selectAll("*").remove(); // Clear previous
-
-    const coordScaleSel = visualSettings.coordinateScale || 1.0;
-    const coordOffsetSel = visualSettings.coordinateOffset || [0, 0, 0];
+    // Use actual positions from DOM elements (works for both static and physics modes)
+    const genealogyLinesGroup = svg.select(".genealogy-lines");
+    genealogyLinesGroup.selectAll("*").remove();
 
     if (selectedImageIds.length > 0) {
       const drawnLinks = new Set<string>();
@@ -862,49 +822,42 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       selectedImageIds.forEach((selectedId) => {
         const selectedImg = images.find((img) => img.id === selectedId);
         if (!selectedImg) return;
-        const sx = xScaleRef.current!((selectedImg.coordinates[0] + coordOffsetSel[0]) * coordScaleSel);
-        const sy = yScaleRef.current!((selectedImg.coordinates[1] + coordOffsetSel[1]) * coordScaleSel);
+
+        // Get actual position from DOM element
+        const selectedNode = svg.select(`#image-${selectedId}`).node() as SVGGElement;
+        if (!selectedNode) return;
+        const selectedTransform = selectedNode.getAttribute("transform");
+        const selectedMatch = selectedTransform?.match(/translate\(([^,]+),\s*([^)]+)\)/);
+        if (!selectedMatch) return;
+        const sx = parseFloat(selectedMatch[1]);
+        const sy = parseFloat(selectedMatch[2]);
 
         // Parent → Selection: Cyan (#00E5FF) — input flow
         selectedImg.parents.forEach((parentId) => {
           const key = `${parentId}->${selectedId}`;
           if (drawnLinks.has(key)) return;
           drawnLinks.add(key);
-          const parent = images.find((p) => p.id === parentId);
-          if (!parent) return;
-          const px = xScaleRef.current!((parent.coordinates[0] + coordOffsetSel[0]) * coordScaleSel);
-          const py = yScaleRef.current!((parent.coordinates[1] + coordOffsetSel[1]) * coordScaleSel);
 
-          // Cluster-routed spline: route through nearest cluster centroid
-          let cp1x = px, cp1y = py + (sy - py) * 0.4;
-          let cp2x = sx, cp2y = sy - (sy - py) * 0.4;
+          const parentNode = svg.select(`#image-${parentId}`).node() as SVGGElement;
+          if (!parentNode) return;
+          const parentTransform = parentNode.getAttribute("transform");
+          const parentMatch = parentTransform?.match(/translate\(([^,]+),\s*([^)]+)\)/);
+          if (!parentMatch) return;
+          const px = parseFloat(parentMatch[1]);
+          const py = parseFloat(parentMatch[2]);
 
-          if (clusterCentroids && clusterCentroids.length > 0) {
-            const midX = (px + sx) / 2, midY = (py + sy) / 2;
-            let bestCentroid = {x: midX, y: midY};
-            let bestDist = Infinity;
-            const edgeLen = Math.hypot(sx - px, sy - py);
+          // Simple Bezier curve
+          const cp1x = px;
+          const cp1y = py + (sy - py) * 0.4;
+          const cp2x = sx;
+          const cp2y = sy - (sy - py) * 0.4;
 
-            clusterCentroids.forEach(([cx, cy]) => {
-              const cpx = xScaleRef.current!(cx * coordScaleSel);
-              const cpy = yScaleRef.current!(cy * coordScaleSel);
-              const d = Math.hypot(cpx - midX, cpy - midY);
-              if (d < bestDist && d < edgeLen * 0.6) {
-                bestDist = d;
-                bestCentroid = {x: cpx, y: cpy};
-              }
-            });
-
-            cp1x = px + (bestCentroid.x - px) * 0.6;
-            cp1y = py + (bestCentroid.y - py) * 0.6;
-            cp2x = sx + (bestCentroid.x - sx) * 0.6;
-            cp2y = sy + (bestCentroid.y - sy) * 0.6;
-          }
-
-          genealogyLines.append("path")
+          genealogyLinesGroup.append("path")
             .attr("d", `M ${px} ${py} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${sx} ${sy}`)
-            .attr("stroke", "#00E5FF").attr("stroke-width", 2)
-            .attr("fill", "none").attr("opacity", 0.8)
+            .attr("stroke", "#00E5FF")
+            .attr("stroke-width", 2)
+            .attr("fill", "none")
+            .attr("opacity", 0.8)
             .attr("marker-end", "url(#arrow-cyan)");
         });
 
@@ -913,41 +866,27 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const key = `${selectedId}->${childId}`;
           if (drawnLinks.has(key)) return;
           drawnLinks.add(key);
-          const child = images.find((c) => c.id === childId);
-          if (!child) return;
-          const cx = xScaleRef.current!((child.coordinates[0] + coordOffsetSel[0]) * coordScaleSel);
-          const cy = yScaleRef.current!((child.coordinates[1] + coordOffsetSel[1]) * coordScaleSel);
 
-          // Cluster-routed spline: route through nearest cluster centroid
-          let cp1x = sx, cp1y = sy + (cy - sy) * 0.4;
-          let cp2x = cx, cp2y = cy - (cy - sy) * 0.4;
+          const childNode = svg.select(`#image-${childId}`).node() as SVGGElement;
+          if (!childNode) return;
+          const childTransform = childNode.getAttribute("transform");
+          const childMatch = childTransform?.match(/translate\(([^,]+),\s*([^)]+)\)/);
+          if (!childMatch) return;
+          const cx = parseFloat(childMatch[1]);
+          const cy = parseFloat(childMatch[2]);
 
-          if (clusterCentroids && clusterCentroids.length > 0) {
-            const midX = (sx + cx) / 2, midY = (sy + cy) / 2;
-            let bestCentroid = {x: midX, y: midY};
-            let bestDist = Infinity;
-            const edgeLen = Math.hypot(cx - sx, cy - sy);
+          // Simple Bezier curve
+          const cp1x = sx;
+          const cp1y = sy + (cy - sy) * 0.4;
+          const cp2x = cx;
+          const cp2y = cy - (cy - sy) * 0.4;
 
-            clusterCentroids.forEach(([centX, centY]) => {
-              const cpx = xScaleRef.current!(centX * coordScaleSel);
-              const cpy = yScaleRef.current!(centY * coordScaleSel);
-              const d = Math.hypot(cpx - midX, cpy - midY);
-              if (d < bestDist && d < edgeLen * 0.6) {
-                bestDist = d;
-                bestCentroid = {x: cpx, y: cpy};
-              }
-            });
-
-            cp1x = sx + (bestCentroid.x - sx) * 0.6;
-            cp1y = sy + (bestCentroid.y - sy) * 0.6;
-            cp2x = cx + (bestCentroid.x - cx) * 0.6;
-            cp2y = cy + (bestCentroid.y - cy) * 0.6;
-          }
-
-          genealogyLines.append("path")
+          genealogyLinesGroup.append("path")
             .attr("d", `M ${sx} ${sy} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${cx} ${cy}`)
-            .attr("stroke", "#FFAA00").attr("stroke-width", 2)
-            .attr("fill", "none").attr("opacity", 0.8)
+            .attr("stroke", "#FFAA00")
+            .attr("stroke-width", 2)
+            .attr("fill", "none")
+            .attr("opacity", 0.8)
             .attr("marker-end", "url(#arrow-amber)");
         });
       });

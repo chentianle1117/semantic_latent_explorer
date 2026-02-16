@@ -79,15 +79,13 @@ const initialState: AppState = {
     removeBackground: true,
     layoutPadding: 0.2, // 20% padding by default (reduces clutter)
     coordinateScale: 1.0, // Scale multiplier for coordinates (affects spacing)
-    coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
+    coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, y]
     contourStrength: 6, // 1–10, contour highlight thickness (higher = more visible)
     showGenealogyOnCanvas: false, // Show parent/child lines on canvas (default off to reduce clutter)
-    gridDensity: 1.0, // Grid cell size multiplier (0.5–2.0)
   },
   canvasBounds: null, // Will auto-calculate on first render
   clusterCentroids: [], // Cluster centers for edge bundling
   clusterLabels: [], // Cluster assignment per image
-  gridCellSize: [0.7, 0.7], // Grid cell size in coordinate space
   removeBackground: true,
   isGenerating: false,
   isInitialized: false,

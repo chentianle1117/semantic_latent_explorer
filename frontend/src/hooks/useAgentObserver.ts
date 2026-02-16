@@ -108,62 +108,13 @@ export function useAgentObserver({ brief }: UseAgentObserverOptions) {
     }
   }, [visibleImages.length, effectiveBrief, hasInsight, isAutoMode, setAgentStatus, setAgentInsight]);
 
-  // Trigger 1: Post-generation (isGenerating flips true -> false)
+  // DISABLED: Automatic triggers temporarily removed for UX refinement
+  // Trigger 1 & 2: Post-generation and periodic interval — on-demand only via Suggest Ideas button
   useEffect(() => {
-    const wasGenerating = prevIsGeneratingRef.current;
-    prevIsGeneratingRef.current = isGenerating;
-
-    // Agent mode check: only run in auto mode
-    if (!isAutoMode) return;
-    // STICKY: don't start timers if insight exists
-    if (hasInsight) return;
-
-    if (wasGenerating && !isGenerating) {
-      if (postGenTimerRef.current) clearTimeout(postGenTimerRef.current);
-      postGenTimerRef.current = setTimeout(() => {
-        runAnalysis();
-      }, POST_GENERATION_DELAY);
-    }
-
+    // Clean up any existing timers on unmount
     return () => {
       if (postGenTimerRef.current) clearTimeout(postGenTimerRef.current);
-    };
-  }, [isGenerating, runAnalysis, hasInsight, isAutoMode]);
-
-  // Trigger 2: Periodic interval — completely stopped when insight exists or in manual mode
-  useEffect(() => {
-    // Agent mode check: only run in auto mode
-    if (!isAutoMode) {
-      // Clear any existing timers
-      if (periodicTimerRef.current) {
-        clearInterval(periodicTimerRef.current);
-        periodicTimerRef.current = null;
-      }
-      return;
-    }
-
-    // STICKY: if insight exists, don't run any timers at all
-    if (hasInsight) {
-      // Clear any existing timers
-      if (periodicTimerRef.current) {
-        clearInterval(periodicTimerRef.current);
-        periodicTimerRef.current = null;
-      }
-      return;
-    }
-
-    // No insight and auto mode — start periodic polling
-    const initialTimer = setTimeout(() => {
-      runAnalysis();
-    }, 5000);
-
-    periodicTimerRef.current = setInterval(() => {
-      runAnalysis();
-    }, PERIODIC_INTERVAL);
-
-    return () => {
-      clearTimeout(initialTimer);
       if (periodicTimerRef.current) clearInterval(periodicTimerRef.current);
     };
-  }, [runAnalysis, hasInsight, isAutoMode]);
+  }, []);
 }

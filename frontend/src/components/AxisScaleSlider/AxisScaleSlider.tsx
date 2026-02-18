@@ -1,77 +1,77 @@
 /**
- * Slider to stretch/compress an axis from center (like video editing software).
- * 1.0 = no change, >1 = expand, <1 = compress.
- * Range: 0.2 to 10.0x
+ * Slider to stretch/compress an axis from center, or adjust image size.
+ * Default: logarithmic 0.2–10× scale for axes.
+ * With isLinear=true + custom minVal/maxVal: linear scale for image size etc.
  */
 
-import React, { useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import "./AxisScaleSlider.css";
 
 interface AxisScaleSliderProps {
-  axis: "x" | "y";
+  axis: "x" | "y" | "size";
   value: number;
   onChange: (value: number) => void;
+  compact?: boolean;
+  minVal?: number;
+  maxVal?: number;
+  isLinear?: boolean;
+  unit?: string;
 }
 
 export const AxisScaleSlider: React.FC<AxisScaleSliderProps> = ({
   axis,
   value,
   onChange,
+  compact = false,
+  minVal = 0.2,
+  maxVal = 10,
+  isLinear = false,
+  unit = "×",
 }) => {
-  const colorClass = axis === "x" ? "axis-x" : "axis-y";
-  const [isDragging, setIsDragging] = useState(false);
-  const isVertical = axis === "y";
+  const colorClass = axis === "x" ? "axis-x" : axis === "y" ? "axis-y" : "axis-size";
 
-  // Logarithmic scaling for better feel across 0.2-10 range
-  // Maps [0, 100] slider to log space to get exponential feel
-  const valueToSlider = useCallback((v: number) => {
-    const clamped = Math.max(0.2, Math.min(10, v));
-    const logMin = Math.log(0.2);
-    const logMax = Math.log(10);
-    const logV = Math.log(clamped);
-    return ((logV - logMin) / (logMax - logMin)) * 100;
-  }, []);
+  const valueToSlider = useCallback((v: number): number => {
+    const clamped = Math.max(minVal, Math.min(maxVal, v));
+    if (isLinear) {
+      return ((clamped - minVal) / (maxVal - minVal)) * 100;
+    }
+    const logMin = Math.log(minVal);
+    const logMax = Math.log(maxVal);
+    return ((Math.log(clamped) - logMin) / (logMax - logMin)) * 100;
+  }, [minVal, maxVal, isLinear]);
 
-  const sliderToValue = useCallback((sliderVal: number) => {
-    const clamped = Math.max(0, Math.min(100, sliderVal));
-    const logMin = Math.log(0.2);
-    const logMax = Math.log(10);
-    const logV = logMin + (clamped / 100) * (logMax - logMin);
-    return Math.exp(logV);
-  }, []);
+  const sliderToValue = useCallback((s: number): number => {
+    const clamped = Math.max(0, Math.min(100, s));
+    if (isLinear) {
+      return minVal + (clamped / 100) * (maxVal - minVal);
+    }
+    const logMin = Math.log(minVal);
+    const logMax = Math.log(maxVal);
+    return Math.exp(logMin + (clamped / 100) * (logMax - logMin));
+  }, [minVal, maxVal, isLinear]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const sliderPosition = parseFloat(e.target.value);
-    const newValue = sliderToValue(sliderPosition);
-    console.log(`[AxisScaleSlider ${axis}] Slider: ${sliderPosition.toFixed(1)} → Value: ${newValue.toFixed(3)}`);
-    onChange(newValue);
+    onChange(sliderToValue(parseFloat(e.target.value)));
   };
 
-  const currentSliderPos = valueToSlider(value);
+  const displayValue = isLinear
+    ? `${Math.round(value)}${unit}`
+    : `${value.toFixed(2)}${unit}`;
 
   return (
-    <div
-      className={`axis-scale-slider ${colorClass} ${isDragging ? "dragging" : ""} ${isVertical ? "vertical" : ""}`}
-      title={`Stretch ${axis.toUpperCase()}-axis (${value.toFixed(2)}x)`}
-    >
-      {isVertical && <span className="axis-scale-min">10×</span>}
-      {!isVertical && <span className="axis-scale-min">0.2×</span>}
+    <div className={`axis-scale-slider ${colorClass}${compact ? " compact" : ""}`}>
+      {!compact && <span className="axis-scale-min">{isLinear ? `${minVal}${unit}` : `${minVal}×`}</span>}
       <input
         type="range"
         min="0"
         max="100"
         step="0.5"
-        value={currentSliderPos}
+        value={valueToSlider(value)}
         onChange={handleChange}
-        onMouseDown={() => setIsDragging(true)}
-        onMouseUp={() => setIsDragging(false)}
-        onTouchStart={() => setIsDragging(true)}
-        onTouchEnd={() => setIsDragging(false)}
         className="axis-scale-input"
       />
-      {isVertical && <span className="axis-scale-max">0.2×</span>}
-      {!isVertical && <span className="axis-scale-max">10×</span>}
-      <span className="axis-scale-value">{value.toFixed(2)}×</span>
+      {!compact && <span className="axis-scale-max">{isLinear ? `${maxVal}${unit}` : `${maxVal}×`}</span>}
+      <span className="axis-scale-value">{displayValue}</span>
     </div>
   );
 };

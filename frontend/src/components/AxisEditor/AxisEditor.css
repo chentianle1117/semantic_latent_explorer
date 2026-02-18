@@ -10,7 +10,7 @@
 /* ── Clickable Word Labels ── */
 
 .axis-word {
-  font-size: clamp(14px, 1.2vw, 20px);
+  font-size: clamp(16px, 1.4vw, 22px);
   font-weight: 700;
   cursor: pointer;
   padding: 4px 12px;
@@ -51,8 +51,8 @@
 /* ── Arrow Between Words ── */
 
 .axis-arrow {
-  font-size: clamp(10px, 0.8vw, 14px);
-  opacity: 0.3;
+  font-size: clamp(12px, 1vw, 16px);
+  opacity: 0.4;
   letter-spacing: -2px;
   user-select: none;
   flex-shrink: 1;

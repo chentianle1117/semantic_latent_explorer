@@ -491,8 +491,8 @@ body {
 /* Ethereal Layout Structure - Expert Workspace */
 .app-layout {
   display: grid;
-  /* Left Toolbar (4rem) | Canvas (flex) | Right Inspector (responsive elastic) */
-  grid-template-columns: 4rem 1fr min(28vw, 380px);
+  /* Canvas (flex) | Right Inspector (responsive elastic) — Left Toolbar removed */
+  grid-template-columns: 0 1fr min(28vw, 380px);
   /* Canvas Area (full height) | Bottom Timeline Strip (auto) */
   grid-template-rows: 1fr auto;
   height: 100vh;

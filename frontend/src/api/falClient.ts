@@ -7,6 +7,18 @@ import { fal } from "@fal-ai/client";
 // System prompt for consistent shoe generation
 const NANO_BANANA_SYSTEM_PROMPT = "side view, a realistic rendering of a shoe, toe towards right, white background, without logo";
 
+// Diversity suffixes to append to each batch for more varied results
+const DIVERSITY_SUFFIXES = [
+  ", unique creative interpretation, bold design choices",
+  ", distinctive style variation, unexpected material combination",
+  ", fresh perspective, novel silhouette, inventive details",
+  ", experimental design approach, striking visual contrast",
+  ", unconventional proportions, creative color palette",
+  ", artistic reinterpretation, innovative construction",
+  ", avant-garde aesthetic, surprising texture mix",
+  ", dynamic form factor, eye-catching details",
+];
+
 // Configure fal.ai with API key from environment
 const FAL_API_KEY = import.meta.env.VITE_FAL_API_KEY;
 
@@ -58,30 +70,25 @@ class FalClient {
   async generateTextToImage(request: FalTextToImageRequest): Promise<FalTextToImageResponse> {
     try {
       const numImages = request.num_images || 1;
-      const MAX_IMAGES_PER_BATCH = 4; // fal.ai nano-banana limit
 
       // Combine system prompt with user prompt
-      const fullPrompt = `${NANO_BANANA_SYSTEM_PROMPT}, ${request.prompt}`;
-      console.log("Full prompt:", fullPrompt);
-      console.log(`Generating ${numImages} images (batches of ${MAX_IMAGES_PER_BATCH})`);
+      const basePrompt = `${NANO_BANANA_SYSTEM_PROMPT}, ${request.prompt}`;
+      console.log("Base prompt:", basePrompt);
+      console.log(`Generating ${numImages} images individually for maximum diversity`);
 
       const allImages: FalImageFile[] = [];
 
-      // Calculate number of batches needed
-      const numBatches = Math.ceil(numImages / MAX_IMAGES_PER_BATCH);
-
-      for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
-        const imagesInThisBatch = Math.min(
-          MAX_IMAGES_PER_BATCH,
-          numImages - (batchIdx * MAX_IMAGES_PER_BATCH)
-        );
-
-        console.log(`📦 Batch ${batchIdx + 1}/${numBatches}: Generating ${imagesInThisBatch} images...`);
+      // Generate each image individually with a unique diversity suffix
+      // This produces much more varied results than batching num_images > 1
+      for (let i = 0; i < numImages; i++) {
+        const suffix = DIVERSITY_SUFFIXES[i % DIVERSITY_SUFFIXES.length];
+        const fullPrompt = numImages > 1 ? `${basePrompt}${suffix}` : basePrompt;
+        console.log(`📦 Image ${i + 1}/${numImages}: Generating...`);
 
         const result = await fal.subscribe("fal-ai/nano-banana", {
           input: {
             prompt: fullPrompt,
-            num_images: imagesInThisBatch,
+            num_images: 1,
             output_format: request.output_format || "jpeg",
             aspect_ratio: request.aspect_ratio || "1:1"
           },
@@ -95,14 +102,14 @@ class FalClient {
 
         const batchData = result.data as FalTextToImageResponse;
         allImages.push(...batchData.images);
-        console.log(`✓ Batch ${batchIdx + 1}/${numBatches} complete: ${batchData.images.length} images`);
+        console.log(`✓ Image ${i + 1}/${numImages} complete`);
       }
 
-      console.log(`✓ All batches complete: ${allImages.length} total images`);
+      console.log(`✓ All ${allImages.length} images generated`);
 
       return {
         images: allImages,
-        description: `Generated ${allImages.length} images in ${numBatches} batch(es)`
+        description: `Generated ${allImages.length} images`
       };
     } catch (error) {
       console.error("fal.ai text-to-image generation failed:", error);

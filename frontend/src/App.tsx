@@ -219,7 +219,7 @@ export const App: React.FC = () => {
 
       // Send images to backend for CLIP embedding extraction
       useProgressStore.getState().updateProgress(60, "Computing embeddings...");
-      await apiClient.addExternalImages({
+      const addResult = await apiClient.addExternalImages({
         images: result.images.map((img) => ({ url: img.url })),
         prompt: prompt,
         generation_method: "batch",
@@ -233,6 +233,12 @@ export const App: React.FC = () => {
       const state = await apiClient.getState();
       setImages(state.images);
       setHistoryGroups(state.history_groups);
+
+      // Auto-recenter canvas and select the newly generated images
+      resetCanvasBounds();
+      if (addResult.images && addResult.images.length > 0) {
+        useAppStore.getState().setSelectedImageIds(addResult.images.map((img) => img.id));
+      }
 
       useProgressStore.getState().updateProgress(100);
 
@@ -583,46 +589,28 @@ export const App: React.FC = () => {
     useProgressStore.getState().updateProgress(0);
 
     try {
-      // Process images one at a time to avoid overwhelming the server
-      const BATCH_SIZE = 1; // Process 1 image at a time for stability
-      const numBatches = Math.ceil(urls.length / BATCH_SIZE);
+      // Send all images in a single request so they form one history group/batch
+      console.log(`📦 Sending all ${urls.length} images as one batch...`);
+      const importResult = await apiClient.addExternalImages({
+        images: urls.map((url) => ({ url })),
+        prompt: prompt,
+        generation_method: "external",
+        remove_background: removeBackground,
+      });
 
-      if (numBatches > 1) {
-        console.log(`📦 Processing ${urls.length} images one at a time...`);
-      }
+      useProgressStore.getState().updateProgress(80, "Updating canvas...");
 
-      for (let i = 0; i < numBatches; i++) {
-        const start = i * BATCH_SIZE;
-        const end = Math.min(start + BATCH_SIZE, urls.length);
-        const batchUrls = urls.slice(start, end);
+      const state = await apiClient.getState();
+      setImages(state.images);
+      setHistoryGroups(state.history_groups);
 
-        console.log(`📷 Loading image ${i + 1}/${numBatches}...`);
-
-        // Send batch to backend for CLIP embedding extraction
-        await apiClient.addExternalImages({
-          images: batchUrls.map((url) => ({ url })),
-          prompt: prompt,
-          generation_method: "external",
-          remove_background: removeBackground,
-        });
-
-        console.log(`✓ Image ${i + 1}/${numBatches} complete`);
-
-        // Immediately fetch and update state after each image so it appears on canvas
-        const state = await apiClient.getState();
-        setImages(state.images);
-        setHistoryGroups(state.history_groups);
-
-        // Update progress
-        const processed = end;
-        const progress = (processed / urls.length) * 100;
-        useProgressStore
-          .getState()
-          .updateProgress(progress, `Image ${processed}/${urls.length}`);
+      // Auto-recenter canvas and select the newly imported images
+      resetCanvasBounds();
+      if (importResult.images && importResult.images.length > 0) {
+        useAppStore.getState().setSelectedImageIds(importResult.images.map((img) => img.id));
       }
 
       console.log(`✓ All ${urls.length} images loaded successfully`);
-
       useProgressStore.getState().updateProgress(100, "Complete");
 
       alert(`✅ Successfully loaded ${urls.length} images to canvas!`);

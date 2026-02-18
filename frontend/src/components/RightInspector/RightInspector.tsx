@@ -345,28 +345,32 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
       });
       const heroEl = el.querySelector(".hero-image-wrapper") as HTMLElement | null;
       const heroRect = heroEl?.getBoundingClientRect();
-      const heroCenter = heroRect
-        ? toPct(heroRect.left + heroRect.width / 2, heroRect.top + heroRect.height / 2)
+      // Lines from ancestors connect to hero TOP edge; lines from children connect to hero BOTTOM edge
+      const heroTopCenter = heroRect
+        ? toPct(heroRect.left + heroRect.width / 2, heroRect.top)
+        : null;
+      const heroBottomCenter = heroRect
+        ? toPct(heroRect.left + heroRect.width / 2, heroRect.bottom)
         : null;
 
       const segments: LineSegment[] = [];
-      if (heroCenter) {
+      if (heroTopCenter && heroBottomCenter) {
         const ancestorWrappers = el.querySelectorAll(".river-ancestors .river-node-wrapper");
         ancestorWrappers.forEach((w) => {
           const r = (w as HTMLElement).getBoundingClientRect();
           const from = toPct(r.left + r.width / 2, r.bottom);
-          segments.push({ from, to: heroCenter, type: "ancestor" });
+          segments.push({ from, to: heroTopCenter, type: "ancestor" });
         });
         const childWrappers = el.querySelectorAll(".river-children .river-node-wrapper");
         childWrappers.forEach((w) => {
           const r = (w as HTMLElement).getBoundingClientRect();
           const from = toPct(r.left + r.width / 2, r.top);
-          segments.push({ from, to: heroCenter, type: "child" });
+          segments.push({ from, to: heroBottomCenter, type: "child" });
         });
       }
       setLineSegments(segments);
       if (segments.length > 0) {
-        DEBUG_LOG({ runId: "post-fix", lineSegmentsCount: segments.length, hasHero: !!heroCenter });
+        DEBUG_LOG({ runId: "post-fix", lineSegmentsCount: segments.length, hasHero: !!heroTopCenter });
       }
     });
 

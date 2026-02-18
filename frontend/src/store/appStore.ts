@@ -85,7 +85,7 @@ const initialState: AppState = {
   hoveredGroupId: null,
   visualSettings: {
     imageSize: 120,
-    imageOpacity: 0.9,
+    imageOpacity: 1.0,
     removeBackground: true,
     layoutPadding: 0.2, // 20% padding by default (reduces clutter)
     coordinateScale: 1.0, // Scale multiplier for coordinates (affects spacing)
@@ -196,15 +196,9 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // Visual settings
   updateVisualSettings: (settings) =>
-    set((state) => {
-      const axisXChanged = "axisScaleX" in settings && settings.axisScaleX !== state.visualSettings.axisScaleX;
-      const axisYChanged = "axisScaleY" in settings && settings.axisScaleY !== state.visualSettings.axisScaleY;
-      const resetBounds = axisXChanged || axisYChanged;
-      return {
-        visualSettings: { ...state.visualSettings, ...settings },
-        ...(resetBounds && { canvasBounds: null }),
-      };
-    }),
+    set((state) => ({
+      visualSettings: { ...state.visualSettings, ...settings },
+    })),
 
   // Axis labels
   setAxisLabels: (labels) => set({ axisLabels: labels }),

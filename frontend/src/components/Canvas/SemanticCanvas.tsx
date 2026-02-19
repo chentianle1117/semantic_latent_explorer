@@ -10,12 +10,11 @@ import { useProgressStore } from "../../store/progressStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
 import { AxisScaleSlider } from "../AxisScaleSlider/AxisScaleSlider";
 import { apiClient } from "../../api/client";
-import type { RegionHighlight, PendingImage } from "../../types";
+import type { PendingImage } from "../../types";
 
 interface SemanticCanvasProps {
   onSelectionChange: (x: number, y: number, count: number) => void;
-  regionHighlights?: RegionHighlight[];
-  onGenerateFromRegion?: (prompt: string, region: RegionHighlight) => void;
+  onMiddleClick?: (x: number, y: number) => void;
   pendingImages?: PendingImage[];
   onAcceptPending?: (pendingId: string) => void;
   onDiscardPending?: (pendingId: string) => void;
@@ -26,8 +25,7 @@ interface SemanticCanvasProps {
 
 export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   onSelectionChange,
-  regionHighlights = [],
-  onGenerateFromRegion,
+  onMiddleClick,
   pendingImages = [],
   onAcceptPending,
   onDiscardPending,
@@ -58,15 +56,24 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const expandedConcepts = useAppStore((state) => state.expandedConcepts);
   const canvasBounds = useAppStore((state) => state.canvasBounds);
   const ghostNodes = useAppStore((state) => state.ghostNodes);
+  const layers = useAppStore((state) => state.layers);
+  const imageLayerMap = useAppStore((state) => state.imageLayerMap);
 
-  // Terrain mode: show clusters, gaps, or nothing
-  const [terrainMode, setTerrainMode] = useState<'clusters' | 'gaps' | 'off'>('off');
+  // Memoize filtered images — respects both individual visibility and layer visibility
+  const images = useMemo(() => {
+    const layerVisMap: Record<string, boolean> = {};
+    layers.forEach((l) => { layerVisMap[l.id] = l.visible; });
+    return allImages.filter((img) => {
+      if (!img.visible) return false;
+      const lid = imageLayerMap[img.id] ?? "default";
+      return layerVisMap[lid] ?? true;
+    });
+  }, [allImages, layers, imageLayerMap]);
 
-  // Memoize filtered images to prevent new array on every render
-  const images = useMemo(
-    () => allImages.filter((img) => img.visible),
-    [allImages]
-  );
+  // Rubber-band selection state
+  const [brush, setBrush] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const brushActiveRef = useRef(false);
+  const brushRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
 
   // Get functions directly from store without subscribing to state changes
   const toggleImageSelection = React.useCallback(
@@ -78,6 +85,150 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
   // Don't call setHoveredImageId - it causes unnecessary store updates and re-renders
   // We handle hover state locally through D3 DOM manipulation
+
+  // Always-current ref for onMiddleClick callback (so native handler closure stays fresh)
+  const onMiddleClickRef = React.useRef(onMiddleClick);
+  React.useEffect(() => { onMiddleClickRef.current = onMiddleClick; }, [onMiddleClick]);
+
+  // Native pointer-event brush + context-menu prevention (separate from D3 zoom)
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    // Prevent right-click context menu and middle-click autoscroll popup
+    const preventContextMenu = (e: MouseEvent) => e.preventDefault();
+    const preventMiddleScroll = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };
+    svg.addEventListener("contextmenu", preventContextMenu);
+    svg.addEventListener("mousedown", preventMiddleScroll);
+
+    // ── Rubber-band brush (pointer events for reliable capture) ──
+    let brushStart: { x: number; y: number } | null = null;
+    let capturedPointerId: number | null = null;
+
+    const svgCoords = (e: PointerEvent) => {
+      const r = svg.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      // Middle-click → radial dial
+      if (e.button === 1) {
+        e.preventDefault();
+        onMiddleClickRef.current?.(e.clientX, e.clientY);
+        return;
+      }
+      if (e.button !== 0) return;
+      // Only brush on background, not on image/ghost nodes
+      const target = e.target as Element;
+      if (target.closest(".image-node") || target.closest(".ghost-node") || target.closest(".pending-image")) return;
+
+      const coords = svgCoords(e);
+      brushStart = coords;
+      capturedPointerId = e.pointerId;
+      svg.setPointerCapture(e.pointerId);
+      brushActiveRef.current = true;
+      brushRectRef.current = null;
+      setBrush(null);
+      console.log("🔲 Brush START at", coords);
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!brushActiveRef.current || !brushStart || e.pointerId !== capturedPointerId) return;
+      const { x: ex, y: ey } = svgCoords(e);
+      const { x: sx, y: sy } = brushStart;
+      const rect = { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
+      brushRectRef.current = rect;
+      setBrush(rect);
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      if (!brushActiveRef.current || e.pointerId !== capturedPointerId) return;
+      brushActiveRef.current = false;
+      capturedPointerId = null;
+      try { svg.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+
+      const currentBrush = brushRectRef.current;
+      brushRectRef.current = null;
+      setBrush(null);
+
+      if (!currentBrush || currentBrush.w < 4 || currentBrush.h < 4) {
+        console.log("🔲 Brush too small, skipping selection");
+        return;
+      }
+
+      const xScale = xScaleRef.current;
+      const yScale = yScaleRef.current;
+      const transform = zoomTransformRef.current ?? d3.zoomIdentity;
+      if (!xScale || !yScale) { console.warn("🔲 No scales available"); return; }
+
+      const vs = visualSettingsRef.current;
+      const coordScale = coordScaleRef.current;
+      const coordOffset = coordOffsetRef.current;
+      const pivotX = stretchPivotXRef.current;
+      const pivotY = stretchPivotYRef.current;
+      const axisScaleX = vs.axisScaleX ?? 1;
+      const axisScaleY = vs.axisScaleY ?? 1;
+
+      // Get all visible images from store (with layer filter)
+      const state = useAppStore.getState();
+      const layerVisMap: Record<string, boolean> = {};
+      state.layers.forEach((l) => { layerVisMap[l.id] = l.visible; });
+      const allVisible = state.images.filter((img) => {
+        if (!img.visible) return false;
+        const lid = state.imageLayerMap[img.id] ?? "default";
+        return layerVisMap[lid] ?? true;
+      });
+
+      console.log(`🔲 Brush END: rect=${JSON.stringify(currentBrush)}, checking ${allVisible.length} images`);
+
+      const inside: number[] = [];
+      allVisible.forEach((img) => {
+        const bx = (img.coordinates[0] + coordOffset[0]) * coordScale;
+        const by = (img.coordinates[1] + coordOffset[1]) * coordScale;
+        const sx = pivotX + (bx - pivotX) * axisScaleX;
+        const sy = pivotY + (by - pivotY) * axisScaleY;
+        const screenX = transform.applyX(xScale(sx));
+        const screenY = transform.applyY(yScale(sy));
+        const hit = screenX >= currentBrush.x && screenX <= currentBrush.x + currentBrush.w &&
+                    screenY >= currentBrush.y && screenY <= currentBrush.y + currentBrush.h;
+        if (hit) inside.push(img.id);
+        // Debug first few images
+        if (allVisible.indexOf(img) < 4) {
+          console.log(`  img#${img.id} coords=${img.coordinates.slice(0,2).map((v: number)=>v.toFixed(3))} → screen(${screenX.toFixed(0)},${screenY.toFixed(0)}) hit=${hit}`);
+        }
+      });
+
+      console.log(`🔲 Selected ${inside.length} images:`, inside.slice(0, 10));
+
+      if (inside.length > 0) {
+        if (e.shiftKey) {
+          const current = state.selectedImageIds;
+          state.setSelectedImageIds([...new Set([...current, ...inside])]);
+        } else {
+          state.setSelectedImageIds(inside);
+        }
+      }
+    };
+
+    svg.addEventListener("pointerdown", onPointerDown);
+    svg.addEventListener("pointermove", onPointerMove);
+    svg.addEventListener("pointerup", onPointerUp);
+    svg.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      svg.removeEventListener("contextmenu", preventContextMenu);
+      svg.removeEventListener("mousedown", preventMiddleScroll);
+      svg.removeEventListener("pointerdown", onPointerDown);
+      svg.removeEventListener("pointermove", onPointerMove);
+      svg.removeEventListener("pointerup", onPointerUp);
+      svg.removeEventListener("pointercancel", onPointerUp);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);  // Intentionally no deps — uses refs for all mutable data
+
+  // Always-current ref for visualSettings (used by native event handlers that can't read React state)
+  const visualSettingsRef = React.useRef(visualSettings);
+  React.useEffect(() => { visualSettingsRef.current = visualSettings; }, [visualSettings]);
 
   // Track previous values to see what changed
   const prevImagesRef = React.useRef(images);
@@ -341,10 +492,16 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Create main group for zoom/pan
     const g = svg.append("g").attr("class", "main-group");
 
-    // Set up zoom behavior
+    // Zoom: scroll = zoom, right-click drag = pan; left-drag = rubber-band, middle = radial dial
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 10])
+      .filter((event: any) => {
+        if (event.type === "wheel") return true;
+        // Right-click drag pans; handle both D3 v6 (mousedown) and v7+ (pointerdown)
+        if (event.type === "mousedown" || event.type === "pointerdown") return event.button === 2;
+        return false;
+      })
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
         zoomTransformRef.current = event.transform;
@@ -477,9 +634,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         .attr("x2", 50000).attr("y2", yScale(y))
         .attr("stroke", "#21262d").attr("stroke-width", 1);
     });
-
-    // Group for region highlights (behind images)
-    const regionHighlightsGroup = g.append("g").attr("class", "region-highlights");
 
     // Group for genealogy lines (drawn in selection effect only for selected images)
     g.append("g").attr("class", "genealogy-lines");
@@ -645,6 +799,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .join("g")
       .attr("class", "image-node")
       .attr("id", (d) => `image-${d.id}`)
+      .attr("data-image-id", (d) => d.id)
       .attr("transform", (d) => {
         const bx = (d.coordinates[0] + coordOffset[0]) * coordScale;
         const by = (d.coordinates[1] + coordOffset[1]) * coordScale;
@@ -912,121 +1067,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       });
     }
 
-    // Render region highlights as nebula blobs (behind shoes)
-    // Filter by terrain mode: clusters, gaps, or off
-    const filteredRegions = terrainMode === 'off'
-      ? []
-      : regionHighlights.filter(r => terrainMode === 'clusters' ? r.type === 'cluster' : r.type === 'gap');
-
-    if (filteredRegions.length > 0) {
-      const canvasPixelW = xScale(xMax) - xScale(xMin);
-      const canvasPixelH = yScale(yMin) - yScale(yMax); // Note: yScale is inverted
-
-      filteredRegions.forEach((region) => {
-        // Region centers in data coordinates — apply stretch individually
-        const [dataX, dataY] = region.center;
-        const bx = (dataX + coordOffset[0]) * coordScale;
-        const by = (dataY + coordOffset[1]) * coordScale;
-        const [stretchedX, stretchedY] = toStretched(bx, by);
-        const pixelX = xScale(stretchedX);
-        const pixelY = yScale(stretchedY);
-
-        const isCluster = region.type === 'cluster';
-        const gradId = isCluster ? "url(#cluster-nebula)" : "url(#gap-nebula)";
-
-        // Use ellipse data from backend if available, or defaults
-        const ellipse = (region as any).ellipse || { rx: 0.1, ry: 0.08, angle: 0 };
-        const rxPx = Math.max(60, ellipse.rx * canvasPixelW * 0.5);
-        const ryPx = Math.max(50, ellipse.ry * canvasPixelH * 0.5);
-        const angle = ellipse.angle || 0;
-
-        // Main soft blob
-        regionHighlightsGroup
-          .append("ellipse")
-          .attr("cx", pixelX)
-          .attr("cy", pixelY)
-          .attr("rx", rxPx)
-          .attr("ry", ryPx)
-          .attr("fill", gradId)
-          .attr("transform", `rotate(${angle}, ${pixelX}, ${pixelY})`)
-          .attr("filter", "url(#terrain-blur)")
-          .style("pointer-events", "all")
-          .style("cursor", "pointer")
-          .on("click", function (event) {
-            event.stopPropagation();
-            // Remove any existing tooltip
-            regionHighlightsGroup.selectAll(".terrain-tooltip").remove();
-
-            // Show minimal tooltip
-            const tooltipFO = regionHighlightsGroup
-              .append("foreignObject")
-              .attr("class", "terrain-tooltip")
-              .attr("x", pixelX + 20)
-              .attr("y", pixelY - 40)
-              .attr("width", 220)
-              .attr("height", 100)
-              .style("pointer-events", "all");
-
-            const tooltipDiv = tooltipFO
-              .append("xhtml:div")
-              .style("background", "rgba(13, 17, 23, 0.9)")
-              .style("backdrop-filter", "blur(8px)")
-              .style("border", `1px solid ${isCluster ? '#58a6ff40' : '#ffa65840'}`)
-              .style("border-radius", "8px")
-              .style("padding", "10px 14px")
-              .style("color", "#c9d1d9")
-              .style("font-size", "12px")
-              .style("font-family", "system-ui, -apple-system, sans-serif")
-              .style("box-shadow", "0 4px 16px rgba(0, 0, 0, 0.5)");
-
-            tooltipDiv.append("xhtml:div")
-              .style("font-weight", "600")
-              .style("color", isCluster ? "#58a6ff" : "#ffa658")
-              .style("margin-bottom", "6px")
-              .text(region.title);
-
-            if (region.description) {
-              tooltipDiv.append("xhtml:div")
-                .style("font-size", "11px")
-                .style("opacity", "0.7")
-                .style("margin-bottom", "8px")
-                .text(region.description);
-            }
-
-            if (region.suggested_prompts.length > 0) {
-              tooltipDiv.append("xhtml:button")
-                .style("background", "rgba(88, 166, 255, 0.2)")
-                .style("border", "1px solid #58a6ff60")
-                .style("border-radius", "4px")
-                .style("padding", "4px 10px")
-                .style("color", "#58a6ff")
-                .style("font-size", "11px")
-                .style("cursor", "pointer")
-                .style("pointer-events", "all")
-                .text("Explore")
-                .on("click", (e: any) => {
-                  e.stopPropagation();
-                  if (onGenerateFromRegion) {
-                    onGenerateFromRegion(region.suggested_prompts[0], region);
-                  }
-                });
-            }
-          });
-
-        // Second smaller overlapping blob for density center emphasis
-        regionHighlightsGroup
-          .append("ellipse")
-          .attr("cx", pixelX)
-          .attr("cy", pixelY)
-          .attr("rx", rxPx * 0.5)
-          .attr("ry", ryPx * 0.5)
-          .attr("fill", gradId)
-          .attr("opacity", 0.6)
-          .attr("transform", `rotate(${angle + 15}, ${pixelX}, ${pixelY})`)
-          .style("pointer-events", "none");
-      });
-    }
-
     // Click on canvas background to deselect
     svg.on("click", (event) => {
       const target = event.target as Element;
@@ -1053,8 +1093,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     visualSettings,
     axisLabels,
     canvasBounds,
-    regionHighlights,
-    terrainMode,
     pendingImages,
     ghostNodes,
     // Note: Excluded selectedImageIds and hoveredGroupId to prevent full redraws on selection/hover changes
@@ -1259,6 +1297,19 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         ref={svgRef}
         style={{ width: "100%", height: "100%", background: "#0d1117" }}
       />
+      {brush && (
+        <svg
+          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }}
+        >
+          <rect
+            x={brush.x} y={brush.y} width={brush.w} height={brush.h}
+            fill="rgba(0,210,255,0.06)"
+            stroke="rgba(0,210,255,0.45)"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+          />
+        </svg>
+      )}
 
       {/* X-Axis: label centred at bottom edge, slider directly below */}
       <div style={{
@@ -1409,7 +1460,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       <button
         style={{
           position: "absolute",
-          bottom: regionHighlights.length > 0 ? 100 : 60,
+          bottom: 60,
           right: 16,
           background: "rgba(22, 27, 34, 0.85)",
           backdropFilter: "blur(6px)",
@@ -1437,23 +1488,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         Recenter
       </button>
 
-      {/* Terrain toggle: Clusters vs Gaps */}
-      {regionHighlights.length > 0 && (
-        <div className="terrain-toggle" style={{ position: "absolute", bottom: 60, right: 16 }}>
-          <button
-            className={terrainMode === 'clusters' ? 'active' : ''}
-            onClick={() => setTerrainMode(m => m === 'clusters' ? 'off' : 'clusters')}
-          >
-            Clusters
-          </button>
-          <button
-            className={terrainMode === 'gaps' ? 'active' : ''}
-            onClick={() => setTerrainMode(m => m === 'gaps' ? 'off' : 'gaps')}
-          >
-            Gaps
-          </button>
-        </div>
-      )}
     </div>
   );
 };

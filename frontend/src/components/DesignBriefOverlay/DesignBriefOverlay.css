@@ -1,53 +1,80 @@
 .design-brief-overlay {
   position: absolute;
-  top: 16px;
+  /* 56px = 40px header + 16px gap, to clear the header bar which overlays at y=0 */
+  top: 56px;
   left: 84px;
   z-index: 50;
-  max-width: 280px;
+  max-width: 300px;
   pointer-events: all;
 }
 
 .dbo-read {
-  background: rgba(13, 17, 23, 0.55);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border: 1px solid rgba(48, 54, 61, 0.4);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 11px;
-  line-height: 1.5;
-  color: rgba(200, 210, 220, 0.85);
+  background: none;
+  border: none;
+  border-left: 1.5px solid rgba(0, 210, 255, 0.2);
+  padding: 2px 0 3px 9px;
   cursor: pointer;
-  opacity: 0.75;
-  transition: opacity 0.2s, border-color 0.2s;
-  max-height: 4.5em;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  transition: border-color 0.25s;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .dbo-read:hover {
-  opacity: 0.95;
-  border-color: rgba(88, 166, 255, 0.4);
+  border-left-color: rgba(0, 210, 255, 0.55);
 }
 
-.dbo-empty {
-  color: rgba(180, 195, 210, 0.7);
+.dbo-label {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(0, 210, 255, 0.35);
+  line-height: 1;
+  transition: color 0.25s;
+}
+
+.dbo-read:hover .dbo-label {
+  color: rgba(0, 210, 255, 0.65);
+}
+
+.dbo-text {
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: rgba(200, 215, 230, 0.55);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  transition: color 0.25s;
+}
+
+.dbo-read:hover .dbo-text {
+  color: rgba(200, 215, 230, 0.82);
+}
+
+.dbo-empty .dbo-label {
+  color: rgba(0, 210, 255, 0.2);
+}
+
+.dbo-empty .dbo-text {
+  color: rgba(150, 165, 180, 0.28);
   font-style: italic;
-  border: 1px dashed rgba(88, 166, 255, 0.25);
 }
 
 .dbo-edit {
-  background: rgba(13, 17, 23, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(88, 166, 255, 0.35);
+  background: rgba(13, 17, 23, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(88, 166, 255, 0.25);
   border-radius: 8px;
   padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .dbo-textarea {
@@ -56,13 +83,14 @@
   border: 1px solid rgba(48, 54, 61, 0.6);
   border-radius: 6px;
   color: rgba(200, 210, 220, 0.9);
-  font-size: 11px;
-  line-height: 1.5;
-  padding: 6px 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 7px 9px;
   resize: none;
   outline: none;
   box-sizing: border-box;
   font-family: inherit;
+  min-width: 260px;
 }
 
 .dbo-textarea:focus {

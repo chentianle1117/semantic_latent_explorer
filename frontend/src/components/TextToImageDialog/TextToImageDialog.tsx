@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
 import { SuggestionsPanel } from '../SuggestionsPanel/SuggestionsPanel';
-import './TextToImageDialog.css';
+import '../PromptDialog/PromptDialog.css';
 
 interface TextToImageDialogProps {
   onClose: () => void;
@@ -24,54 +24,53 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
     onClose();
   };
 
-  return (
-    <div className="text-to-image-overlay" onClick={onClose}>
-      <div className="text-to-image-dialog tti-wide" onClick={(e) => e.stopPropagation()}>
-        <div className="dialog-header">
-          <h3>🎨 Generate Images from Text</h3>
-          <button className="close-button" onClick={onClose}>
-            ×
-          </button>
-        </div>
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
+    if (e.key === 'Escape') onClose();
+  };
 
-        <div className="dialog-body tti-columns">
-          {/* Left: prompt + count */}
-          <div className="tti-left">
-            <div className="prompt-section">
-              <label>Prompt</label>
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the shoe design you want to generate… (e.g., 'minimalist white sneaker with futuristic details')"
-                rows={5}
-                autoFocus
-              />
-            </div>
-            <div className="count-section">
-              <ImageCountSlider
-                value={imageCount}
-                onChange={setImageCount}
-                label="Number of Images"
-              />
-            </div>
+  return (
+    <div className="dialog-overlay" onClick={onClose}>
+      <div className="prompt-dialog-outer" onClick={(e) => e.stopPropagation()}>
+
+        {/* Left panel: prompt + count */}
+        <div className="dialog prompt-dialog-main">
+          <h2>Generate from Text</h2>
+
+          <div className="input-section" style={{ flex: 1 }}>
+            <label>Prompt</label>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe the shoe design you want to generate… (e.g., 'minimalist white sneaker with futuristic details')"
+              rows={5}
+              autoFocus
+            />
+            <ImageCountSlider
+              value={imageCount}
+              onChange={setImageCount}
+              label="Number of Images"
+            />
           </div>
 
-          {/* Right: AI suggestions */}
+          <div className="dialog-actions">
+            <button onClick={onClose}>Cancel</button>
+            <button
+              className="primary"
+              onClick={handleSubmit}
+              disabled={!prompt.trim()}
+            >
+              Generate {imageCount} Image{imageCount > 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+
+        {/* Right panel: AI suggestions — separate frame */}
+        <div className="dialog prompt-dialog-suggestions">
           <SuggestionsPanel onSelectPrompt={setPrompt} />
         </div>
 
-        <div className="dialog-actions">
-          <button className="button-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="button-primary"
-            onClick={handleSubmit}
-            disabled={!prompt.trim()}
-          >
-            Generate {imageCount} Image{imageCount > 1 ? 's' : ''}
-          </button>
-        </div>
       </div>
     </div>
   );

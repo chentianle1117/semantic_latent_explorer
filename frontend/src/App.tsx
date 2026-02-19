@@ -7,12 +7,12 @@ import { ProgressModal } from "./components/ProgressModal/ProgressModal";
 import { HeaderBar } from "./components/HeaderBar/HeaderBar";
 import { RightInspector } from "./components/RightInspector/RightInspector";
 import { BottomDrawer } from "./components/BottomDrawer/BottomDrawer";
+import { LayersSidebar } from "./components/LayersSidebar/LayersSidebar";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
 import { useProgressStore } from "./store/progressStore";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
 import { StarterPromptsModal } from "./components/StarterPromptsModal/StarterPromptsModal";
-import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPromptDialog";
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
@@ -25,7 +25,6 @@ import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
 import type {
   SuggestedPrompt,
-  RegionHighlight,
   PendingImage,
 } from "./types";
 import "./styles/app.css";
@@ -45,10 +44,6 @@ export const App: React.FC = () => {
     total: number;
     currentPrompt: string;
   } | null>(null);
-  const [regionPromptDialog, setRegionPromptDialog] = useState<{
-    prompt: string;
-    region: RegionHighlight;
-  } | null>(null);
 
   // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
   const currentBrief = useAppStore((s) => s.designBrief);
@@ -56,10 +51,6 @@ export const App: React.FC = () => {
   const [suggestedPrompts, setSuggestedPrompts] = useState<SuggestedPrompt[]>(
     []
   );
-  const [regionHighlights, setRegionHighlights] = useState<RegionHighlight[]>(
-    []
-  );
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   // AxisSuggestionModal removed — axes now shown via InlineAxisSuggestions + Dynamic Island
   const [isLoadingAxes, setIsLoadingAxes] = useState(false);
@@ -574,7 +565,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleLoadExternalImages = async (urls: string[], prompt: string) => {
+  const handleLoadExternalImages = async (urls: string[]) => {
     console.log(`📥 Loading ${urls.length} external images...`);
     setShowExternalImageLoader(false);
     setIsGenerating(true);
@@ -592,9 +583,9 @@ export const App: React.FC = () => {
       console.log(`📦 Sending all ${urls.length} images as one batch...`);
       const importResult = await apiClient.addExternalImages({
         images: urls.map((url) => ({ url })),
-        prompt: prompt,
+        prompt: "Reference images",
         generation_method: "external",
-        remove_background: removeBackground,
+        remove_background: false,  // never strip backgrounds from reference images
       });
 
       useProgressStore.getState().updateProgress(80, "Updating canvas...");
@@ -606,7 +597,10 @@ export const App: React.FC = () => {
       // Auto-recenter canvas and select the newly imported images
       resetCanvasBounds();
       if (importResult.images && importResult.images.length > 0) {
-        useAppStore.getState().setSelectedImageIds(importResult.images.map((img) => img.id));
+        const newIds = importResult.images.map((img) => img.id);
+        useAppStore.getState().setSelectedImageIds(newIds);
+        // Auto-assign imported images to the References layer
+        useAppStore.getState().setImagesLayer(newIds, "references");
       }
 
       console.log(`✓ All ${urls.length} images loaded successfully`);
@@ -1049,193 +1043,8 @@ export const App: React.FC = () => {
     }
   };
 
-  const analyzeCanvas = async () => {
-    if (images.length < 3) {
-      useAppStore.getState().setAgentInsight({
-        id: `insight-analyze-warn-${Date.now()}`,
-        type: "gap",
-        message: "Need at least 3 images on canvas before analyzing",
-        data: { allRegions: [] },
-        isRead: false,
-        timestamp: Date.now(),
-      });
-      return;
-    }
-
-    setIsAnalyzing(true);
-    useAppStore.getState().setAgentStatus("thinking");
-    try {
-      const digestResponse = await fetch(
-        "http://localhost:8000/api/canvas-digest"
-      );
-      const digest = await digestResponse.json();
-
-      const analysisResponse = await fetch(
-        "http://localhost:8000/api/agent/analyze-canvas",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            brief: currentBrief || "Explore shoe design variations",
-            canvas_summary: digest,
-          }),
-        }
-      );
-
-      const analysis = await analysisResponse.json();
-      const regions = analysis.regions || [];
-      setRegionHighlights(regions);
-
-      useAppStore.getState().setAgentInsight({
-        id: `insight-analyze-${Date.now()}`,
-        type: "gap",
-        message: regions.length > 0
-          ? `Found ${regions.length} exploration region${regions.length > 1 ? "s" : ""} on canvas`
-          : "Canvas looks well-covered — no obvious gaps found",
-        data: { allRegions: regions },
-        isRead: false,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      console.error("Canvas analysis failed:", error);
-      useAppStore.getState().setAgentStatus("idle");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleRegionPromptClick = (prompt: string, region: RegionHighlight) => {
-    setRegionPromptDialog({ prompt, region });
-  };
-
-  const handleConfirmRegionGeneration = async (count: number) => {
-    if (!regionPromptDialog) return;
-
-    const { prompt, region } = regionPromptDialog;
-    setRegionPromptDialog(null); // Close dialog
-
-    console.log(
-      "Generating from region:",
-      region.title,
-      "with prompt:",
-      prompt,
-      `(${count} images)`
-    );
-    setIsGenerating(true);
-    useProgressStore
-      .getState()
-      .showProgress(
-        "generating",
-        `Generating from ${region.type} region...`,
-        true
-      );
-    useProgressStore.getState().updateProgress(0);
-
-    try {
-      if (!falClient.isConfigured()) {
-        alert(
-          "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
-        );
-        setIsGenerating(false);
-        useProgressStore.getState().hideProgress();
-        return;
-      }
-
-      // Generate using fal.ai
-      useProgressStore
-        .getState()
-        .updateProgress(10, "Generating with fal.ai...");
-      const result = await falClient.generateTextToImage({
-        prompt,
-        num_images: count,
-        aspect_ratio: "1:1",
-        output_format: "jpeg",
-      });
-
-      // Send to backend for CLIP embeddings
-      useProgressStore.getState().updateProgress(60, "Computing embeddings...");
-      await apiClient.addExternalImages({
-        images: result.images.map((img) => ({ url: img.url })),
-        prompt: prompt,
-        generation_method: "batch",
-        remove_background: removeBackground,
-      });
-
-      useProgressStore.getState().updateProgress(90, "Updating canvas...");
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-
-      useProgressStore.getState().updateProgress(100);
-      console.log("✓ Region generation complete");
-
-      // Auto-generate variations if brief is set
-      if (currentBrief && unexpectedImagesCount > 0) {
-        console.log(
-          `🎨 Generating ${unexpectedImagesCount} variations for region...`
-        );
-        useProgressStore
-          .getState()
-          .updateProgress(100, "Generating variations...");
-        try {
-          const variations = await apiClient.generateVariation(
-            prompt,
-            currentBrief,
-            unexpectedImagesCount
-          );
-
-          for (const variation of variations.variations) {
-            try {
-              const result = await falClient.generateTextToImage({
-                prompt: variation.prompt,
-                num_images: 1,
-                aspect_ratio: "1:1",
-                output_format: "jpeg",
-              });
-
-              await apiClient.addExternalImages({
-                images: result.images.map((img) => ({ url: img.url })),
-                prompt: variation.prompt,
-                generation_method: "auto-variation",
-                remove_background: removeBackground,
-              });
-
-              // Refresh state to get the new image
-              const updatedState = await apiClient.getState();
-              const newImage =
-                updatedState.images[updatedState.images.length - 1];
-
-              setPendingImages((prev) => [
-                ...prev,
-                {
-                  id: `pending-${Date.now()}-${Math.random()}`,
-                  imageData: newImage,
-                  originalPrompt: prompt,
-                  variation: variation,
-                  isPending: true,
-                },
-              ]);
-            } catch (error) {
-              console.error("Failed to generate variation image:", error);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to generate variations:", error);
-        }
-      }
-    } catch (error) {
-      console.error("Region generation failed:", error);
-      useProgressStore.getState().hideProgress();
-      alert(
-        `Generation failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsGenerating(false);
-      useProgressStore.getState().hideProgress();
-    }
-  };
+  // analyzeCanvas now redirects to suggestGhostNodes (regions UI removed)
+  const analyzeCanvas = suggestGhostNodes;
 
   const handleAcceptPending = async (pendingId: string) => {
     console.log("Accepting pending image:", pendingId);
@@ -1474,17 +1283,12 @@ export const App: React.FC = () => {
         <HeaderBar
           imageCount={images.length}
           isInitialized={isInitialized}
-          isAnalyzing={isAnalyzing}
+          isAnalyzing={false}
           isLoadingAxes={isLoadingAxes}
           is3DMode={is3DMode}
           onToggle3D={() => useAppStore.getState().setIs3DMode(!is3DMode)}
           onOpenSettings={() => setShowSettingsModal(true)}
           onInsightClick={() => {
-            // When clicking the insight pill, show the regions on canvas
-            const insight = useAppStore.getState().agentInsight;
-            if (insight?.data?.allRegions) {
-              setRegionHighlights(insight.data.allRegions);
-            }
             useAppStore.getState().dismissInsight();
           }}
         />
@@ -1494,20 +1298,13 @@ export const App: React.FC = () => {
         {/* Center Canvas */}
         <div className="center-canvas">
           {/* Dynamic Island — agent notifications */}
-          <DynamicIsland onShowGap={(regions) => setRegionHighlights(regions)} />
+          <DynamicIsland />
 
           {/* Inline axis suggestions — shown when agent suggests axes */}
           <InlineAxisSuggestions onApply={handleApplyAxes} />
 
           <div
             className="canvas-container"
-            onMouseDown={(e) => {
-              if (e.button === 1) {
-                e.preventDefault();
-                setRadialDialPos({ x: e.clientX, y: e.clientY });
-                setShowRadialDial(true);
-              }
-            }}
           >
             {/* Design Brief floating overlay */}
             <DesignBriefOverlay />
@@ -1523,12 +1320,11 @@ export const App: React.FC = () => {
               <SemanticCanvas
                 onSelectionChange={React.useCallback((_x: number, _y: number, _count: number) => {
                   // Selection tracking handled by store (selectedImageIds)
-                  // FloatingActionPanel removed — actions now in RightInspector
                 }, [])}
-                regionHighlights={regionHighlights}
-                onGenerateFromRegion={(prompt, region) =>
-                  handleRegionPromptClick(prompt, region)
-                }
+                onMiddleClick={React.useCallback((x: number, y: number) => {
+                  setRadialDialPos({ x, y });
+                  setShowRadialDial(true);
+                }, [])}
                 pendingImages={pendingImages}
                 onAcceptPending={handleAcceptPending}
                 onDiscardPending={handleDiscardPending}
@@ -1679,16 +1475,6 @@ export const App: React.FC = () => {
               />
             )}
 
-            {/* Region Prompt Dialog */}
-            {regionPromptDialog && (
-              <RegionPromptDialog
-                prompt={regionPromptDialog.prompt}
-                regionTitle={regionPromptDialog.region.title}
-                regionType={regionPromptDialog.region.type}
-                onConfirm={handleConfirmRegionGeneration}
-                onCancel={() => setRegionPromptDialog(null)}
-              />
-            )}
           </div>
         </div>
 
@@ -1715,6 +1501,8 @@ export const App: React.FC = () => {
 
         {/* Bottom Drawer */}
         <BottomDrawer />
+        {/* Layers Sidebar — grid-row 3, grid-col 3, flush with inspector */}
+        <LayersSidebar />
       </div>
 
       {/* Settings Modal */}

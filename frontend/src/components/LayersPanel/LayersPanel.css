@@ -1,0 +1,170 @@
+.layers-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.lp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 8px;
+  flex-shrink: 0;
+}
+
+.lp-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(0, 210, 255, 0.5);
+  text-transform: uppercase;
+}
+
+.lp-add-btn {
+  background: none;
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 4px;
+  color: rgba(88, 166, 255, 0.8);
+  font-size: 16px;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s;
+}
+
+.lp-add-btn:hover {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+}
+
+.lp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.lp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  flex-wrap: wrap;
+  min-height: 34px;
+}
+
+.lp-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.lp-row--hidden {
+  opacity: 0.45;
+}
+
+.lp-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 0.12s, transform 0.12s;
+}
+.lp-dot:hover {
+  opacity: 0.7;
+  transform: scale(1.25);
+}
+
+.lp-name {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(200, 215, 230, 0.85);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.lp-name:hover {
+  color: rgba(200, 215, 230, 1);
+}
+
+.lp-name-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(88, 166, 255, 0.45);
+  border-radius: 3px;
+  color: rgba(200, 215, 230, 0.95);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 2px 5px;
+  outline: none;
+  min-width: 0;
+}
+
+.lp-count {
+  font-size: 10px;
+  color: rgba(150, 165, 180, 0.5);
+  flex-shrink: 0;
+  min-width: 14px;
+  text-align: right;
+}
+
+/* Icon buttons — unified style, bigger than before */
+.lp-icon-btn {
+  background: none;
+  border: none;
+  color: rgba(150, 165, 180, 0.55);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+  line-height: 1;
+  min-width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-icon-btn:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.lp-select-btn:not(:disabled):hover {
+  color: rgba(88, 166, 255, 0.9);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.lp-eye-btn:hover {
+  color: rgba(0, 210, 255, 0.9);
+  background: rgba(0, 210, 255, 0.08);
+}
+
+.lp-move-btn:not(:disabled):hover {
+  color: rgba(200, 215, 230, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.lp-trash-btn:hover {
+  color: rgba(255, 100, 100, 0.9);
+  background: rgba(255, 100, 100, 0.1);
+}
+
+/* Assign-selected icon button (← arrow, shown inline when selection exists) */
+.lp-assign-icon-btn:hover {
+  color: rgba(88, 166, 255, 0.9);
+  background: rgba(88, 166, 255, 0.12);
+}

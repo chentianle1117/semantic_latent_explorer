@@ -72,7 +72,10 @@ export const DesignBriefOverlay: React.FC = () => {
           onClick={() => setIsEditing(true)}
           title="Click to edit design brief"
         >
-          {designBrief || "Click to add a design brief…"}
+          <span className="dbo-label">Brief</span>
+          <span className="dbo-text">
+            {designBrief || "Add a design brief…"}
+          </span>
         </div>
       )}
     </div>

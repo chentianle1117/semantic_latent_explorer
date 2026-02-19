@@ -17,6 +17,14 @@ export interface ImageData {
   suggested_prompt?: string;  // Suggested prompt for ghost nodes
   reasoning?: string;  // Why this ghost was suggested
   neighbors: number[];  // K-nearest semantic neighbors for physics simulation
+  layerId?: string;  // undefined = 'default' layer
+}
+
+export interface CanvasLayer {
+  id: string;
+  name: string;
+  visible: boolean;
+  color: string; // hex accent for dot/chip
 }
 
 export interface HistoryGroup {
@@ -90,6 +98,10 @@ export interface AppState {
 
   // Inline axis suggestions (decoupled from agentInsight so DI dismiss doesn't kill them)
   inlineAxisData: Array<{ x_axis: string; y_axis: string; reasoning: string }> | null;
+
+  // Layer system
+  layers: CanvasLayer[];
+  imageLayerMap: Record<number, string>; // imageId → layerId
 }
 
 export interface VisualSettings {

@@ -173,6 +173,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   const toggleImageSelection = useAppStore((s) => s.toggleImageSelection);
   const setFlyToImageId = useAppStore((s) => s.setFlyToImageId);
   const images = useAppStore((s) => s.images);
+  const layers = useAppStore((s) => s.layers);
+  const imageLayerMap = useAppStore((s) => s.imageLayerMap);
+  const setImageLayer = useAppStore((s) => s.setImageLayer);
+  const setImagesLayer = useAppStore((s) => s.setImagesLayer);
 
   // Split-state: inspectedImageId can diverge from selectedImageIds
   const [inspectedImageId, setInspectedImageId] = useState<number | null>(null);
@@ -655,6 +659,33 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 Generate Variations
               </button>
             )}
+            {/* Layer assignment row — always visible */}
+            {(() => {
+              const lid = imageLayerMap[inspectedImage.id] ?? "default";
+              const layer = layers.find((l) => l.id === lid) ?? layers[0];
+              return (
+                <div className="action-layer-row">
+                  <span className="action-layer-dot" style={{ background: layer?.color }} />
+                  <select
+                    className="action-layer-select-inline"
+                    value={selectedImageIds.length > 1 ? "" : lid}
+                    onChange={(e) => {
+                      if (selectedImageIds.length > 1) {
+                        setImagesLayer(selectedImageIds, e.target.value);
+                      } else {
+                        setImageLayer(inspectedImage.id, e.target.value);
+                      }
+                    }}
+                    title={selectedImageIds.length > 1 ? `Move ${selectedImageIds.length} selected to layer` : "Change layer"}
+                  >
+                    {selectedImageIds.length > 1 && <option value="" disabled>Move {selectedImageIds.length} to →</option>}
+                    {layers.map((l) => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
             <div className="action-row">
               {onRemoveSelected && (
                 <button className="action-danger" onClick={onRemoveSelected}>

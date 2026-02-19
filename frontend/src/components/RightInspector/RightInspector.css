@@ -564,6 +564,37 @@
   letter-spacing: 1px;
 }
 
+.hero-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.hero-layer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.hero-layer-select {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(200, 215, 230, 0.6);
+  font-size: 10px;
+  padding: 1px 4px;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+}
+
+.hero-layer-select:hover {
+  border-color: rgba(88, 166, 255, 0.4);
+  color: rgba(200, 215, 230, 0.9);
+}
+
 .hero-prompt {
   font-size: 12px;
   color: #999;
@@ -677,6 +708,60 @@
 .action-secondary {
   color: #888;
   border-color: #333;
+}
+
+.action-layer-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.action-layer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.action-layer-select-inline {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  background: rgba(88, 166, 255, 0.06);
+  color: rgba(200, 215, 230, 0.8);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.action-layer-select-inline:hover {
+  border-color: rgba(88, 166, 255, 0.6);
+  background: rgba(88, 166, 255, 0.12);
+  color: rgba(200, 215, 230, 1);
+}
+
+/* Legacy — keep for any remaining references */
+.action-layer-select {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  background: rgba(88, 166, 255, 0.06);
+  color: #58a6ff;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.action-layer-select:hover {
+  border-color: rgba(88, 166, 255, 0.6);
+  background: rgba(88, 166, 255, 0.12);
 }
 
 .action-secondary:hover {

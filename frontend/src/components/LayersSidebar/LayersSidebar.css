@@ -1,0 +1,83 @@
+/* LayersSidebar — grid-row 3, grid-column 3 — flush with inspector */
+.layers-sidebar {
+  grid-row: 3;
+  grid-column: 3;
+  background: #161b22;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 50;
+  /* Collapsed height matches BottomDrawer collapsed */
+  height: var(--drawer-collapsed, clamp(48px, 4.5vh, 64px));
+}
+
+.layers-sidebar.expanded {
+  height: var(--drawer-expanded, clamp(220px, 24vh, 360px));
+}
+
+/* Collapsed state — horizontal row of named layer dots */
+.layers-sidebar-collapsed {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 12px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.ls-dot-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 2px;
+  border-radius: 4px;
+  transition: background 0.12s;
+  width: 100%;
+  text-align: left;
+}
+
+.ls-dot-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ls-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot-color, #58a6ff);
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.ls-dot-hidden .ls-dot {
+  opacity: 0.25;
+}
+
+.ls-dot-label {
+  font-size: 11px;
+  color: rgba(200, 215, 230, 0.7);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.ls-dot-hidden .ls-dot-label {
+  opacity: 0.35;
+  text-decoration: line-through;
+}
+
+/* Expanded state — full layers panel */
+.layers-sidebar-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+}

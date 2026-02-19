@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer } from '../types';
 
 interface AppStore extends AppState {
   // Actions
@@ -76,6 +76,16 @@ interface AppStore extends AppState {
   setInlineAxisData: (data: Array<{ x_axis: string; y_axis: string; reasoning: string }> | null) => void;
   clearInlineAxisData: () => void;
 
+  // Layer system
+  addLayer: (name: string) => string;
+  removeLayer: (id: string) => void;
+  renameLayer: (id: string, name: string) => void;
+  toggleLayerVisibility: (id: string) => void;
+  setImageLayer: (imageId: number, layerId: string) => void;
+  setImagesLayer: (imageIds: number[], layerId: string) => void;
+  moveLayerUp: (id: string) => void;
+  moveLayerDown: (id: string) => void;
+
   clearAll: () => void;
 }
 
@@ -140,6 +150,13 @@ const initialState: AppState = {
 
   // Inline axis suggestions (decoupled from agentInsight so DynamicIsland dismiss doesn't kill them)
   inlineAxisData: null as Array<{ x_axis: string; y_axis: string; reasoning: string }> | null,
+
+  // Layer system
+  layers: [
+    { id: 'default', name: 'Shoes', visible: true, color: '#58a6ff' },
+    { id: 'references', name: 'References', visible: true, color: '#ff7b72' },
+  ] as CanvasLayer[],
+  imageLayerMap: {} as Record<number, string>,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -292,6 +309,64 @@ export const useAppStore = create<AppStore>((set) => ({
   // Inline axis suggestions (persists independently of agentInsight)
   setInlineAxisData: (data: Array<{ x_axis: string; y_axis: string; reasoning: string }> | null) => set({ inlineAxisData: data }),
   clearInlineAxisData: () => set({ inlineAxisData: null }),
+
+  // Layer system
+  addLayer: (name) => {
+    const id = `layer_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const colors = ['#f0883e', '#3fb950', '#a371f7', '#ec6547', '#d2a022', '#58a6ff'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const newLayer: CanvasLayer = { id, name, visible: true, color };
+    set((state) => ({ layers: [...state.layers, newLayer] }));
+    return id;
+  },
+
+  removeLayer: (id) =>
+    set((state) => {
+      if (id === 'default') return state; // can't remove default
+      const newMap = { ...state.imageLayerMap };
+      Object.entries(newMap).forEach(([imgId, lid]) => {
+        if (lid === id) newMap[Number(imgId)] = 'default';
+      });
+      return { layers: state.layers.filter((l) => l.id !== id), imageLayerMap: newMap };
+    }),
+
+  renameLayer: (id, name) =>
+    set((state) => ({
+      layers: state.layers.map((l) => (l.id === id ? { ...l, name } : l)),
+    })),
+
+  toggleLayerVisibility: (id) =>
+    set((state) => ({
+      layers: state.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
+    })),
+
+  setImageLayer: (imageId, layerId) =>
+    set((state) => ({ imageLayerMap: { ...state.imageLayerMap, [imageId]: layerId } })),
+
+  setImagesLayer: (imageIds, layerId) =>
+    set((state) => {
+      const updates: Record<number, string> = {};
+      imageIds.forEach((id) => { updates[id] = layerId; });
+      return { imageLayerMap: { ...state.imageLayerMap, ...updates } };
+    }),
+
+  moveLayerUp: (id) =>
+    set((state) => {
+      const idx = state.layers.findIndex((l) => l.id === id);
+      if (idx <= 0) return state;
+      const layers = [...state.layers];
+      [layers[idx - 1], layers[idx]] = [layers[idx], layers[idx - 1]];
+      return { layers };
+    }),
+
+  moveLayerDown: (id) =>
+    set((state) => {
+      const idx = state.layers.findIndex((l) => l.id === id);
+      if (idx < 0 || idx >= state.layers.length - 1) return state;
+      const layers = [...state.layers];
+      [layers[idx], layers[idx + 1]] = [layers[idx + 1], layers[idx]];
+      return { layers };
+    }),
 
   // Clear all
   clearAll: () =>

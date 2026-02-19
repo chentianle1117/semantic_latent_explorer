@@ -8,14 +8,9 @@
 
 import React, { useEffect, useRef } from "react";
 import { useAppStore } from "../../store/appStore";
-import type { RegionHighlight } from "../../types";
 import "./DynamicIsland.css";
 
-interface DynamicIslandProps {
-  onShowGap: (regions: RegionHighlight[]) => void;
-}
-
-export const DynamicIsland: React.FC<DynamicIslandProps> = ({ onShowGap }) => {
+export const DynamicIsland: React.FC = () => {
   const agentStatus = useAppStore((s) => s.agentStatus);
   const insight = useAppStore((s) => s.agentInsight);
   const dismissInsight = useAppStore((s) => s.dismissInsight);
@@ -26,7 +21,6 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({ onShowGap }) => {
     if (!insight) return;
     if (autoDismissRef.current) clearTimeout(autoDismissRef.current);
     autoDismissRef.current = setTimeout(() => {
-      // Just dismiss the DI notification — inlineAxisData persists independently
       dismissInsight();
     }, 8000);
     return () => {
@@ -35,13 +29,6 @@ export const DynamicIsland: React.FC<DynamicIslandProps> = ({ onShowGap }) => {
   }, [insight, dismissInsight]);
 
   const handleAction = () => {
-    if (!insight) return;
-    if (insight.type === "gap" || insight.type === "prompt") {
-      const regions = insight.data?.allRegions || [];
-      if (regions.length > 0) onShowGap(regions);
-    }
-    // For axis type: InlineAxisSuggestions panel is already visible at the bottom,
-    // so clicking "Show" just dismisses the DI notification — axis data persists.
     dismissInsight();
   };
 

@@ -7,8 +7,6 @@ import "../VisualSettingsModal/VisualSettingsModal.css";
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentBrief: string | null;
-  onBriefChange: (brief: string) => void;
   unexpectedImagesCount?: number;
   onUnexpectedImagesCountChange?: (count: number) => void;
   showLabels?: boolean;
@@ -25,8 +23,6 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
-  currentBrief,
-  onBriefChange,
   unexpectedImagesCount = 2,
   onUnexpectedImagesCountChange,
   showLabels = false,
@@ -49,12 +45,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const setAgentMode = useAppStore((s) => s.setAgentMode);
   const clipModelType = useAppStore((s) => s.clipModelType);
   const setClipModelType = useAppStore((s) => s.setClipModelType);
-  const [briefDraft, setBriefDraft] = useState(currentBrief || "");
   const [isSwitchingModel, setIsSwitchingModel] = useState(false);
-
-  useEffect(() => {
-    setBriefDraft(currentBrief || "");
-  }, [currentBrief, isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -66,17 +57,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
-
-  const handleSaveBrief = async () => {
-    const trimmed = briefDraft.trim();
-    if (!trimmed) return;
-    try {
-      await apiClient.updateDesignBrief(trimmed);
-      onBriefChange(trimmed);
-    } catch (error) {
-      console.error("Failed to save design brief:", error);
-    }
-  };
 
   const handleModelChange = async (modelType: 'fashionclip' | 'huggingface') => {
     if (modelType === clipModelType || isSwitchingModel) return;
@@ -106,29 +86,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="settings-body">
-          {/* Design Brief */}
-          <div className="settings-section">
-            <label className="settings-label">Design Brief</label>
-            <p className="settings-hint">
-              Guides the AI agent when generating unexpected variations and
-              analyzing your canvas.
-            </p>
-            <textarea
-              className="settings-textarea"
-              rows={4}
-              value={briefDraft}
-              onChange={(e) => setBriefDraft(e.target.value)}
-              placeholder="e.g. Explore futuristic running shoe designs with bold colors..."
-            />
-            <button
-              className="settings-save-btn"
-              onClick={handleSaveBrief}
-              disabled={briefDraft.trim() === (currentBrief || "")}
-            >
-              Save Brief
-            </button>
-          </div>
-
           {/* Generation Settings */}
           <div className="settings-section">
             <label className="settings-label">Generation</label>

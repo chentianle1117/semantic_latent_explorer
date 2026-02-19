@@ -84,6 +84,12 @@ export interface AppState {
 
   // Gemini-expanded concepts for axis labels (debug display)
   expandedConcepts?: { x_negative?: string[]; x_positive?: string[]; y_negative?: string[]; y_positive?: string[]; z_negative?: string[]; z_positive?: string[] };
+
+  // Design brief for AI agent guidance
+  designBrief: string | null;
+
+  // Inline axis suggestions (decoupled from agentInsight so DI dismiss doesn't kill them)
+  inlineAxisData: Array<{ x_axis: string; y_axis: string; reasoning: string }> | null;
 }
 
 export interface VisualSettings {
@@ -208,5 +214,7 @@ export interface GhostNode extends Omit<ImageData, 'base64_image'> {
   isGhost: true;
   suggestedPrompt: string;
   reasoning: string;
-  previewUrl?: string; // Optional preview image URL
+  previewUrl?: string;       // Optional preview image URL
+  previewBase64?: string;    // Optional preview image as base64 (shown at 25% opacity)
+  referenceIds?: number[];   // Nearby shoes to use as references in accept flow
 }

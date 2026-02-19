@@ -118,35 +118,53 @@ class FalClient {
   }
 
   /**
-   * Edit images using reference images with nano-banana/edit
+   * Edit images using reference images with nano-banana/edit.
+   * Generates each image individually with a unique diversity suffix,
+   * matching the approach of generateTextToImage for maximum variation.
    */
   async generateImageEdit(request: FalImageEditRequest): Promise<FalImageEditResponse> {
     try {
-      // Combine system prompt with user prompt
-      const fullPrompt = `${NANO_BANANA_SYSTEM_PROMPT}, ${request.prompt}`;
-      console.log("Full prompt for edit:", fullPrompt);
-
-      // Cap references and output count to avoid fal.ai ValidationError
+      const basePrompt = `${NANO_BANANA_SYSTEM_PROMPT}, ${request.prompt}`;
+      const numImages = Math.min(request.num_images || 1, 8);
+      // Cap reference images to 4 per fal.ai limits
       const cappedUrls = request.image_urls.slice(0, 4);
-      const cappedNum = Math.min(request.num_images || 1, 4);
 
-      const result = await fal.subscribe("fal-ai/nano-banana/edit", {
-        input: {
-          prompt: fullPrompt,
-          image_urls: cappedUrls,
-          num_images: cappedNum,
-          output_format: request.output_format || "jpeg",
-          aspect_ratio: request.aspect_ratio
-        },
-        logs: true,
-        onQueueUpdate: (update) => {
-          if (update.status === "IN_PROGRESS") {
-            update.logs.map((log) => log.message).forEach(console.log);
-          }
-        },
-      });
+      console.log(`Generating ${numImages} edit images individually for maximum diversity`);
 
-      return result.data as FalImageEditResponse;
+      const allImages: FalImageFile[] = [];
+
+      for (let i = 0; i < numImages; i++) {
+        const suffix = numImages > 1 ? DIVERSITY_SUFFIXES[i % DIVERSITY_SUFFIXES.length] : "";
+        const fullPrompt = suffix ? `${basePrompt}${suffix}` : basePrompt;
+        console.log(`📦 Edit ${i + 1}/${numImages}: Generating...`);
+
+        const result = await fal.subscribe("fal-ai/nano-banana/edit", {
+          input: {
+            prompt: fullPrompt,
+            image_urls: cappedUrls,
+            num_images: 1,
+            output_format: request.output_format || "jpeg",
+            aspect_ratio: request.aspect_ratio,
+          },
+          logs: true,
+          onQueueUpdate: (update) => {
+            if (update.status === "IN_PROGRESS") {
+              update.logs.map((log) => log.message).forEach(console.log);
+            }
+          },
+        });
+
+        const data = result.data as FalImageEditResponse;
+        allImages.push(...data.images);
+        console.log(`✓ Edit ${i + 1}/${numImages} complete`);
+      }
+
+      console.log(`✓ All ${allImages.length} edit images generated`);
+
+      return {
+        images: allImages,
+        description: `Generated ${allImages.length} variations`,
+      };
     } catch (error) {
       console.error("fal.ai image edit generation failed:", error);
       throw error;

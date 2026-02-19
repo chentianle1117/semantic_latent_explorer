@@ -12,13 +12,14 @@ import { useProgressStore } from "./store/progressStore";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
 import { StarterPromptsModal } from "./components/StarterPromptsModal/StarterPromptsModal";
-import { AxisSuggestionModal } from "./components/AxisSuggestionModal/AxisSuggestionModal";
 import { RegionPromptDialog } from "./components/RegionPromptDialog/RegionPromptDialog";
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
-import { AgentToast } from "./components/AgentToast/AgentToast";
-import { useAgentObserver } from "./hooks/useAgentObserver";
+import { DynamicIsland } from "./components/DynamicIsland/DynamicIsland";
+import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefOverlay";
+import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
+import { useAgentEventSystem } from "./hooks/useAgentEventSystem";
 import { useAppStore } from "./store/appStore";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
@@ -49,8 +50,9 @@ export const App: React.FC = () => {
     region: RegionHighlight;
   } | null>(null);
 
-  // Agent/AI state
-  const [currentBrief, setCurrentBrief] = useState<string | null>(null);
+  // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
+  const currentBrief = useAppStore((s) => s.designBrief);
+  const setCurrentBrief = useAppStore((s) => s.setDesignBrief);
   const [suggestedPrompts, setSuggestedPrompts] = useState<SuggestedPrompt[]>(
     []
   );
@@ -59,10 +61,7 @@ export const App: React.FC = () => {
   );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
-  const [showAxisSuggestionModal, setShowAxisSuggestionModal] = useState(false);
-  const [axisSuggestions, setAxisSuggestions] = useState<
-    Array<{ x_axis: string; y_axis: string; reasoning: string }>
-  >([]);
+  // AxisSuggestionModal removed — axes now shown via InlineAxisSuggestions + Dynamic Island
   const [isLoadingAxes, setIsLoadingAxes] = useState(false);
   const [unexpectedImagesCount, setUnexpectedImagesCount] = useState(2); // Number of additional unexpected images to generate (0-8)
   const [showLabels, setShowLabels] = useState(false);
@@ -87,8 +86,8 @@ export const App: React.FC = () => {
   const removeBackground = useAppStore((state) => state.removeBackground);
   const is3DMode = useAppStore((state) => state.is3DMode);
 
-  // Mount passive observer agent
-  useAgentObserver({ brief: currentBrief });
+  // Mount event-based agent trigger system
+  useAgentEventSystem();
 
   const setImages = useAppStore((state) => state.setImages);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
@@ -731,7 +730,7 @@ export const App: React.FC = () => {
       console.log("Setting parent IDs:", parentIds);
 
       useProgressStore.getState().updateProgress(70, "Computing embeddings...");
-      await apiClient.addExternalImages({
+      const addResult = await apiClient.addExternalImages({
         images: result.images.map((img) => ({ url: img.url })),
         prompt: prompt,
         generation_method: "reference",
@@ -748,6 +747,13 @@ export const App: React.FC = () => {
       const state = await apiClient.getState();
       setImages(state.images);
       setHistoryGroups(state.history_groups);
+
+      // Auto-select newly generated images
+      if (addResult?.images?.length > 0) {
+        useAppStore.getState().setSelectedImageIds(
+          addResult.images.map((img: any) => img.id)
+        );
+      }
 
       useProgressStore.getState().updateProgress(100);
 
@@ -812,8 +818,7 @@ export const App: React.FC = () => {
         }
       }
 
-      clearSelection();
-      // }
+      // Selection was already set to newly generated images above
     } catch (error) {
       console.error("Reference generation failed:", error);
       useProgressStore.getState().hideProgress();
@@ -981,31 +986,34 @@ export const App: React.FC = () => {
   };
 
   const handlePromptSuggestion = async () => {
-    const brief = currentBrief || "Explore shoe design variations";
-    try {
-      useProgressStore
-        .getState()
-        .showProgress("analyzing", "Generating prompt ideas...", true);
-      const result = await apiClient.getInitialPrompts(brief);
-      setSuggestedPrompts(result.prompts || []);
-      useProgressStore.getState().hideProgress();
-      if (!result.prompts?.length) {
-        alert("Could not generate prompts. Try adding a design brief in Settings.");
-      }
-    } catch (error) {
-      console.error("Failed to get prompt suggestions:", error);
-      useProgressStore.getState().hideProgress();
-      alert("Failed to generate prompt ideas. Ensure Gemini API is configured.");
-    }
+    // Open TextToImageDialog — it already has SuggestionsPanel with AI-generated prompts
+    useAppStore.getState().setAgentStatus("thinking");
+    setShowTextToImageDialog(true);
+    // Brief DI notification
+    useAppStore.getState().setAgentInsight({
+      id: `insight-prompt-${Date.now()}`,
+      type: "prompt",
+      message: "Prompt suggestions ready — see panel in the generation dialog",
+      data: { allRegions: [] },
+      isRead: false,
+      timestamp: Date.now(),
+    });
   };
 
   const suggestGhostNodes = async () => {
-    if (images.length < 5) {
-      alert("Please generate at least 5 images before suggesting ideas");
+    if (images.length < 3) {
+      useAppStore.getState().setAgentInsight({
+        id: `insight-ghost-warn-${Date.now()}`,
+        type: "gap",
+        message: "Need at least 3 images on canvas before suggesting ideas",
+        data: { allRegions: [] },
+        isRead: false,
+        timestamp: Date.now(),
+      });
       return;
     }
 
-    useProgressStore.getState().showProgress("analyzing", "AI suggesting ideas...", true);
+    useAppStore.getState().setAgentStatus("thinking");
     try {
       const result = await apiClient.suggestGhosts(currentBrief || "Explore shoe designs", 3);
 
@@ -1023,44 +1031,45 @@ export const App: React.FC = () => {
           prompt: ghost.suggested_prompt,
           timestamp: new Date().toISOString(),
           visible: true,
-          base64_image: '', // Ghost nodes don't have images yet
+          base64_image: '',
         } as any);
       });
 
-      useProgressStore.getState().hideProgress();
-      alert(`✨ ${result.ghosts.length} ideas suggested! Click the sparkles on canvas to accept.`);
+      useAppStore.getState().setAgentInsight({
+        id: `insight-ghost-${Date.now()}`,
+        type: "gap",
+        message: `${result.ghosts.length} unexplored design space${result.ghosts.length > 1 ? "s" : ""} — ghost nodes placed on canvas`,
+        data: { allRegions: [] },
+        isRead: false,
+        timestamp: Date.now(),
+      });
     } catch (error) {
       console.error("Failed to suggest ghost nodes:", error);
-      useProgressStore.getState().hideProgress();
-      alert("Failed to generate suggestions. Ensure Gemini API is configured.");
+      useAppStore.getState().setAgentStatus("idle");
     }
   };
 
   const analyzeCanvas = async () => {
-    if (images.length < 5) {
-      console.log("Skipping analysis: too few images (need at least 5)");
-      alert("Please generate at least 5 images before analyzing the canvas");
+    if (images.length < 3) {
+      useAppStore.getState().setAgentInsight({
+        id: `insight-analyze-warn-${Date.now()}`,
+        type: "gap",
+        message: "Need at least 3 images on canvas before analyzing",
+        data: { allRegions: [] },
+        isRead: false,
+        timestamp: Date.now(),
+      });
       return;
     }
 
     setIsAnalyzing(true);
-    useProgressStore
-      .getState()
-      .showProgress("analyzing", "AI analyzing canvas...", true);
+    useAppStore.getState().setAgentStatus("thinking");
     try {
-      console.log("🔍 Fetching canvas digest...");
-      useProgressStore
-        .getState()
-        .updateProgress(30, "Analyzing image clusters...");
       const digestResponse = await fetch(
         "http://localhost:8000/api/canvas-digest"
       );
       const digest = await digestResponse.json();
 
-      console.log("🤖 Analyzing canvas with agent...");
-      useProgressStore
-        .getState()
-        .updateProgress(60, "Finding exploration opportunities...");
       const analysisResponse = await fetch(
         "http://localhost:8000/api/agent/analyze-canvas",
         {
@@ -1074,19 +1083,24 @@ export const App: React.FC = () => {
       );
 
       const analysis = await analysisResponse.json();
-      setRegionHighlights(analysis.regions || []);
-      useProgressStore.getState().updateProgress(100, "Analysis complete");
-      console.log(
-        "✓ Canvas analysis complete:",
-        analysis.regions?.length,
-        "regions found"
-      );
+      const regions = analysis.regions || [];
+      setRegionHighlights(regions);
+
+      useAppStore.getState().setAgentInsight({
+        id: `insight-analyze-${Date.now()}`,
+        type: "gap",
+        message: regions.length > 0
+          ? `Found ${regions.length} exploration region${regions.length > 1 ? "s" : ""} on canvas`
+          : "Canvas looks well-covered — no obvious gaps found",
+        data: { allRegions: regions },
+        isRead: false,
+        timestamp: Date.now(),
+      });
     } catch (error) {
-      console.error("❌ Canvas analysis failed:", error);
-      useProgressStore.getState().hideProgress();
+      console.error("Canvas analysis failed:", error);
+      useAppStore.getState().setAgentStatus("idle");
     } finally {
       setIsAnalyzing(false);
-      useProgressStore.getState().hideProgress();
     }
   };
 
@@ -1286,19 +1300,13 @@ export const App: React.FC = () => {
 
   const handleSuggestAxes = async () => {
     // Prevent overlapping requests
-    if (isLoadingAxes || showAxisSuggestionModal) {
-      console.log("⚠️ Axis suggestion already in progress, skipping...");
-      return;
-    }
+    if (isLoadingAxes) return;
 
     const axisLabels = useAppStore.getState().axisLabels;
     setIsLoadingAxes(true);
-    useProgressStore
-      .getState()
-      .showProgress("analyzing", "Suggesting alternative axes...", true);
+    useAppStore.getState().setAgentStatus("thinking");
 
     try {
-      // Format axis labels as "negative - positive"
       const xLabel = `${axisLabels.x[0]} - ${axisLabels.x[1]}`;
       const yLabel = `${axisLabels.y[0]} - ${axisLabels.y[1]}`;
 
@@ -1307,13 +1315,27 @@ export const App: React.FC = () => {
         xLabel,
         yLabel
       );
-      setAxisSuggestions(result.suggestions);
-      setShowAxisSuggestionModal(true);
-      useProgressStore.getState().hideProgress();
+
+      const suggestions = result.suggestions || [];
+
+      if (suggestions.length > 0) {
+        // Store for InlineAxisSuggestions (persists independently of DI)
+        useAppStore.getState().setInlineAxisData(suggestions);
+
+        useAppStore.getState().setAgentInsight({
+          id: `insight-axis-${Date.now()}`,
+          type: "axis",
+          message: `${suggestions.length} new axis direction${suggestions.length > 1 ? "s" : ""} to explore`,
+          data: { axisSuggestions: suggestions },
+          isRead: false,
+          timestamp: Date.now(),
+        });
+      } else {
+        useAppStore.getState().setAgentStatus("idle");
+      }
     } catch (error) {
       console.error("Failed to suggest axes:", error);
-      useProgressStore.getState().hideProgress();
-      alert("Failed to generate axis suggestions");
+      useAppStore.getState().setAgentStatus("idle");
     } finally {
       setIsLoadingAxes(false);
     }
@@ -1367,7 +1389,6 @@ export const App: React.FC = () => {
       useProgressStore.getState().updateProgress(100);
       useProgressStore.getState().hideProgress();
 
-      setShowAxisSuggestionModal(false);
       console.log(
         `✓ Applied new axes: X=${xAxis}, Y=${yAxis} - Canvas reprojected with ${state.images.length} images`
       );
@@ -1447,12 +1468,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Agent Toast - floating notification */}
-      <AgentToast
-        onShowGap={(regions) => {
-          setRegionHighlights(regions);
-        }}
-      />
 
       <div className="app-layout">
         {/* Header Bar */}
@@ -1478,14 +1493,11 @@ export const App: React.FC = () => {
 
         {/* Center Canvas */}
         <div className="center-canvas">
-          {showAxisSuggestionModal && (
-            <AxisSuggestionModal
-              suggestions={axisSuggestions}
-              onApply={handleApplyAxes}
-              onClose={() => setShowAxisSuggestionModal(false)}
-              isLoading={isLoadingAxes}
-            />
-          )}
+          {/* Dynamic Island — agent notifications */}
+          <DynamicIsland onShowGap={(regions) => setRegionHighlights(regions)} />
+
+          {/* Inline axis suggestions — shown when agent suggests axes */}
+          <InlineAxisSuggestions onApply={handleApplyAxes} />
 
           <div
             className="canvas-container"
@@ -1497,6 +1509,8 @@ export const App: React.FC = () => {
               }
             }}
           >
+            {/* Design Brief floating overlay */}
+            <DesignBriefOverlay />
             {/* Conditionally render 2D or 3D canvas */}
             {is3DMode ? (
               <SemanticCanvas3D
@@ -1519,6 +1533,41 @@ export const App: React.FC = () => {
                 onAcceptPending={handleAcceptPending}
                 onDiscardPending={handleDiscardPending}
                 onGhostClick={setSelectedGhost}
+                onGhostAccept={async (ghost) => {
+                  useAppStore.getState().removeGhostNode(ghost.id);
+                  setShowTextToImageDialog(false);
+                  setIsGenerating(true);
+                  useProgressStore.getState().showProgress("generating", `Generating from ghost: ${ghost.suggestedPrompt.substring(0, 40)}…`, true);
+                  useProgressStore.getState().updateProgress(10, "Generating with fal.ai...");
+                  try {
+                    const result = await falClient.generateTextToImage({
+                      prompt: ghost.suggestedPrompt,
+                      num_images: 1,
+                      aspect_ratio: "1:1",
+                      output_format: "jpeg",
+                    });
+                    useProgressStore.getState().updateProgress(60, "Computing embeddings...");
+                    await apiClient.addExternalImages({
+                      images: result.images.map((img) => ({ url: img.url })),
+                      prompt: ghost.suggestedPrompt,
+                      generation_method: "batch",
+                      remove_background: removeBackground,
+                    });
+                    useProgressStore.getState().updateProgress(90, "Updating canvas...");
+                    const state = await apiClient.getState();
+                    setImages(state.images);
+                    setHistoryGroups(state.history_groups);
+                    useProgressStore.getState().updateProgress(100);
+                  } catch (err) {
+                    console.error("Ghost accept generation failed:", err);
+                  } finally {
+                    setIsGenerating(false);
+                    useProgressStore.getState().hideProgress();
+                  }
+                }}
+                onGhostDiscard={(ghostId) => {
+                  useAppStore.getState().removeGhostNode(ghostId);
+                }}
               />
             )}
 
@@ -1592,7 +1641,7 @@ export const App: React.FC = () => {
                     useProgressStore
                       .getState()
                       .updateProgress(60, "Computing embeddings...");
-                    await apiClient.addExternalImages({
+                    const addResult = await apiClient.addExternalImages({
                       images: result.images.map((img) => ({ url: img.url })),
                       prompt: prompt,
                       generation_method: "batch",
@@ -1605,6 +1654,13 @@ export const App: React.FC = () => {
                     const state = await apiClient.getState();
                     setImages(state.images);
                     setHistoryGroups(state.history_groups);
+
+                    // Auto-select newly generated images
+                    if (addResult?.images?.length > 0) {
+                      useAppStore.getState().setSelectedImageIds(
+                        addResult.images.map((img) => img.id)
+                      );
+                    }
 
                     useProgressStore.getState().updateProgress(100);
                   } catch (error) {
@@ -1665,8 +1721,6 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        currentBrief={currentBrief}
-        onBriefChange={setCurrentBrief}
         unexpectedImagesCount={unexpectedImagesCount}
         onUnexpectedImagesCountChange={setUnexpectedImagesCount}
         showLabels={showLabels}

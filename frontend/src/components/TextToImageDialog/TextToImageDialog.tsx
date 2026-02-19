@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
+import { SuggestionsPanel } from '../SuggestionsPanel/SuggestionsPanel';
 import './TextToImageDialog.css';
 
 interface TextToImageDialogProps {
@@ -25,7 +26,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
 
   return (
     <div className="text-to-image-overlay" onClick={onClose}>
-      <div className="text-to-image-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="text-to-image-dialog tti-wide" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
           <h3>🎨 Generate Images from Text</h3>
           <button className="close-button" onClick={onClose}>
@@ -33,25 +34,30 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
           </button>
         </div>
 
-        <div className="dialog-body">
-          <div className="prompt-section">
-            <label>Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the shoe design you want to generate... (e.g., 'minimalist white sneaker with futuristic details')"
-              rows={4}
-              autoFocus
-            />
+        <div className="dialog-body tti-columns">
+          {/* Left: prompt + count */}
+          <div className="tti-left">
+            <div className="prompt-section">
+              <label>Prompt</label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe the shoe design you want to generate… (e.g., 'minimalist white sneaker with futuristic details')"
+                rows={5}
+                autoFocus
+              />
+            </div>
+            <div className="count-section">
+              <ImageCountSlider
+                value={imageCount}
+                onChange={setImageCount}
+                label="Number of Images"
+              />
+            </div>
           </div>
 
-          <div className="count-section">
-            <ImageCountSlider
-              value={imageCount}
-              onChange={setImageCount}
-              label="Number of Images"
-            />
-          </div>
+          {/* Right: AI suggestions */}
+          <SuggestionsPanel onSelectPrompt={setPrompt} />
         </div>
 
         <div className="dialog-actions">
@@ -70,4 +76,3 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
     </div>
   );
 };
-

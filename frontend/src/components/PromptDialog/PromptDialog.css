@@ -219,3 +219,8 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Wide layout with suggestions panel */
+.prompt-dialog-wide {
+  max-width: 960px;
+}

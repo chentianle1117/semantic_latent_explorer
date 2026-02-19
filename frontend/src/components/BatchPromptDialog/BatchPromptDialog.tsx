@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ImageCountSlider } from "../ImageCountSlider/ImageCountSlider";
+import { SuggestionsPanel } from "../SuggestionsPanel/SuggestionsPanel";
 import "./BatchPromptDialog.css";
 
 interface BatchPromptDialogProps {
@@ -36,18 +37,34 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
         return;
       }
 
-      // Validate all items are strings
       const allStrings = parsed.every(item => typeof item === "string");
       if (!allStrings) {
         setError("All items in the array must be strings");
         return;
       }
 
-      // Success - pass the prompts and count to parent
       onGenerate(parsed, imagesPerPrompt);
     } catch (e) {
       setError(`Invalid JSON: ${e instanceof Error ? e.message : "Unknown error"}`);
     }
+  };
+
+  // Append a suggested prompt to the JSON array
+  const handleSuggestionSelect = (prompt: string) => {
+    const trimmed = jsonText.trim();
+    try {
+      const existing = trimmed ? JSON.parse(trimmed) : [];
+      if (Array.isArray(existing)) {
+        existing.push(prompt);
+        setJsonText(JSON.stringify(existing, null, 2));
+        setError(null);
+        return;
+      }
+    } catch {
+      // Not valid JSON yet
+    }
+    setJsonText(JSON.stringify([prompt], null, 2));
+    setError(null);
   };
 
   const sampleJSON = `[
@@ -58,62 +75,67 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
 
   return (
     <div className="batch-prompt-dialog-overlay" onClick={onClose}>
-      <div className="batch-prompt-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="batch-prompt-dialog batch-dialog-wide" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
-          <h2>📝 Batch Generate from JSON Prompts</h2>
+          <h2>Batch Generate from JSON Prompts</h2>
           <button className="close-button" onClick={onClose}>
             ×
           </button>
         </div>
 
-        <div className="dialog-content">
-          <p className="dialog-description">
-            Paste a JSON array of prompt strings. Each prompt will be generated one at a time.
-          </p>
+        <div className="dialog-content batch-dialog-columns">
+          <div className="batch-dialog-left">
+            <p className="dialog-description">
+              Paste a JSON array of prompt strings. Each prompt will be generated one at a time.
+            </p>
 
-          <div className="sample-section">
-            <strong>Example format:</strong>
-            <pre className="sample-json">{sampleJSON}</pre>
-          </div>
-
-          <textarea
-            className="json-input"
-            placeholder="Paste your JSON array here..."
-            value={jsonText}
-            onChange={(e) => {
-              setJsonText(e.target.value);
-              setError(null);
-            }}
-            rows={15}
-          />
-
-          {error && (
-            <div className="error-message">
-              ⚠️ {error}
+            <div className="sample-section">
+              <strong>Example format:</strong>
+              <pre className="sample-json">{sampleJSON}</pre>
             </div>
-          )}
 
-          <div className="batch-slider-section">
-            <ImageCountSlider
-              value={imagesPerPrompt}
-              onChange={setImagesPerPrompt}
-              label="Images per Prompt"
+            <textarea
+              className="json-input"
+              placeholder="Paste your JSON array here..."
+              value={jsonText}
+              onChange={(e) => {
+                setJsonText(e.target.value);
+                setError(null);
+              }}
+              rows={10}
             />
+
+            {error && (
+              <div className="error-message">
+                {error}
+              </div>
+            )}
+
+            <div className="batch-slider-section">
+              <ImageCountSlider
+                value={imagesPerPrompt}
+                onChange={setImagesPerPrompt}
+                label="Images per Prompt"
+              />
+            </div>
+
+            <div className="dialog-stats">
+              {jsonText.trim() && !error && (() => {
+                try {
+                  const parsed = JSON.parse(jsonText);
+                  if (Array.isArray(parsed)) {
+                    return <span>{parsed.length} prompts ready to generate</span>;
+                  }
+                } catch {
+                  // Ignore
+                }
+                return null;
+              })()}
+            </div>
           </div>
 
-          <div className="dialog-stats">
-            {jsonText.trim() && !error && (() => {
-              try {
-                const parsed = JSON.parse(jsonText);
-                if (Array.isArray(parsed)) {
-                  return <span>✓ {parsed.length} prompts ready to generate</span>;
-                }
-              } catch {
-                // Ignore parsing errors here, will show in error message
-              }
-              return null;
-            })()}
-          </div>
+          {/* AI Suggestions — click to append to JSON array */}
+          <SuggestionsPanel onSelectPrompt={handleSuggestionSelect} />
         </div>
 
         <div className="dialog-actions">
@@ -125,7 +147,7 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
             onClick={handleGenerate}
             disabled={!jsonText.trim()}
           >
-            🚀 Start Batch Generation
+            Start Batch Generation
           </button>
         </div>
       </div>

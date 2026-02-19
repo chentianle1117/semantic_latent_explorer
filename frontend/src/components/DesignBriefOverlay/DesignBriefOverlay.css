@@ -1,0 +1,106 @@
+.design-brief-overlay {
+  position: absolute;
+  top: 16px;
+  left: 84px;
+  z-index: 50;
+  max-width: 280px;
+  pointer-events: all;
+}
+
+.dbo-read {
+  background: rgba(13, 17, 23, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(48, 54, 61, 0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(200, 210, 220, 0.85);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.2s, border-color 0.2s;
+  max-height: 4.5em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.dbo-read:hover {
+  opacity: 0.95;
+  border-color: rgba(88, 166, 255, 0.4);
+}
+
+.dbo-empty {
+  color: rgba(180, 195, 210, 0.7);
+  font-style: italic;
+  border: 1px dashed rgba(88, 166, 255, 0.25);
+}
+
+.dbo-edit {
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dbo-textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(48, 54, 61, 0.6);
+  border-radius: 6px;
+  color: rgba(200, 210, 220, 0.9);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 6px 8px;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.dbo-textarea:focus {
+  border-color: rgba(88, 166, 255, 0.5);
+}
+
+.dbo-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.dbo-save {
+  background: rgba(88, 166, 255, 0.15);
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 5px;
+  color: #58a6ff;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dbo-save:hover {
+  background: rgba(88, 166, 255, 0.25);
+}
+
+.dbo-cancel {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: rgba(200, 210, 220, 0.5);
+  font-size: 13px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.dbo-cancel:hover {
+  color: rgba(200, 210, 220, 0.9);
+}

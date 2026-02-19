@@ -1,5 +1,4 @@
 import React from "react";
-import { useAppStore } from "../../store/appStore";
 import "./HeaderBar.css";
 
 interface HeaderBarProps {
@@ -16,52 +15,14 @@ interface HeaderBarProps {
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   imageCount,
   isInitialized,
-  isAnalyzing,
-  isLoadingAxes,
   is3DMode,
   onToggle3D,
   onOpenSettings,
-  onInsightClick,
 }) => {
-  const agentStoreStatus = useAppStore((s) => s.agentStatus);
-  const agentInsight = useAppStore((s) => s.agentInsight);
-
-  // Merge manual analysis states with passive observer status
-  const isManualActive = isAnalyzing || isLoadingAxes;
-  const displayStatus = isManualActive
-    ? isAnalyzing ? "Analyzing..." : "Loading Axes..."
-    : agentStoreStatus === "thinking"
-    ? "Observing..."
-    : agentStoreStatus === "insight-ready"
-    ? "Insight Ready"
-    : "Idle";
-
-  const pillClass = isManualActive || agentStoreStatus === "thinking"
-    ? "active"
-    : agentStoreStatus === "insight-ready"
-    ? "insight"
-    : "";
-
-  const pillIcon = agentStoreStatus === "insight-ready" && !isManualActive
-    ? "sparkle"
-    : isManualActive || agentStoreStatus === "thinking"
-    ? "pulse"
-    : "dot";
-
   return (
     <div className="header-bar">
       <div className="header-left">
         <span className="header-logo">Semantic Explorer</span>
-        <span
-          className={`agent-status-pill ${pillClass}`}
-          onClick={agentInsight ? onInsightClick : undefined}
-          style={agentInsight ? { cursor: "pointer" } : undefined}
-        >
-          {pillIcon === "pulse" && <span className="agent-pulse" />}
-          {pillIcon === "sparkle" && <span className="agent-sparkle" />}
-          {pillIcon === "dot" && <span className="agent-dot" />}
-          {displayStatus}
-        </span>
       </div>
       <div className="header-center">
         <span className="header-stat">{imageCount} images</span>

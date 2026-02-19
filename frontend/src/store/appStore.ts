@@ -69,6 +69,13 @@ interface AppStore extends AppState {
   // Gemini-expanded concepts (from backend)
   setExpandedConcepts: (c: { x_negative?: string[]; x_positive?: string[]; y_negative?: string[]; y_positive?: string[] } | undefined) => void;
 
+  // Design brief
+  setDesignBrief: (brief: string | null) => void;
+
+  // Inline axis suggestions (decoupled from agentInsight)
+  setInlineAxisData: (data: Array<{ x_axis: string; y_axis: string; reasoning: string }> | null) => void;
+  clearInlineAxisData: () => void;
+
   clearAll: () => void;
 }
 
@@ -127,6 +134,12 @@ const initialState: AppState = {
 
   // Gemini-expanded concepts
   expandedConcepts: undefined as { x_negative?: string[]; x_positive?: string[]; y_negative?: string[]; y_positive?: string[]; z_negative?: string[]; z_positive?: string[] } | undefined,
+
+  // Design brief
+  designBrief: null as string | null,
+
+  // Inline axis suggestions (decoupled from agentInsight so DynamicIsland dismiss doesn't kill them)
+  inlineAxisData: null as Array<{ x_axis: string; y_axis: string; reasoning: string }> | null,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -272,6 +285,13 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // Gemini-expanded concepts
   setExpandedConcepts: (c) => set({ expandedConcepts: c }),
+
+  // Design brief
+  setDesignBrief: (brief) => set({ designBrief: brief }),
+
+  // Inline axis suggestions (persists independently of agentInsight)
+  setInlineAxisData: (data: Array<{ x_axis: string; y_axis: string; reasoning: string }> | null) => set({ inlineAxisData: data }),
+  clearInlineAxisData: () => set({ inlineAxisData: null }),
 
   // Clear all
   clearAll: () =>

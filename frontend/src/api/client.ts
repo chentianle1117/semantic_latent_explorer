@@ -197,6 +197,14 @@ class APIClient {
     });
     return response.data;
   }
+
+  // Get AI-generated prompt suggestions based on current canvas context + brief
+  async getContextPrompts(brief: string): Promise<{
+    prompts: Array<{ prompt: string; reasoning: string }>;
+  }> {
+    const response = await axios.post(`${API_BASE}/agent/context-prompts`, { brief });
+    return response.data;
+  }
 }
 
 export const apiClient = new APIClient();

@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '../../store/appStore';
 import type { ImageData } from '../../types';
 import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
+import { SuggestionsPanel } from '../SuggestionsPanel/SuggestionsPanel';
 import './PromptDialog.css';
 
 interface PromptDialogProps {
@@ -22,7 +23,6 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
 }) => {
   const [prompt, setPrompt] = useState('');
   const [numImages, setNumImages] = useState(4);  // New: number of variations to generate
-  const generationMode = useAppStore((state) => state.generationMode);
   const isGenerating = useAppStore((state) => state.isGenerating);
 
   const handleGenerate = () => {
@@ -36,7 +36,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="dialog prompt-dialog-wide" onClick={(e) => e.stopPropagation()}>
         <h2>Generate from Reference{referenceImages.length > 1 ? 's' : ''}</h2>
 
         <div className="dialog-content">
@@ -84,6 +84,9 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
               label="Number of Variations"
             />
           </div>
+
+          {/* AI Suggestions */}
+          <SuggestionsPanel onSelectPrompt={setPrompt} />
         </div>
 
         <div className="dialog-actions">

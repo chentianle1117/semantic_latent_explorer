@@ -1326,6 +1326,83 @@ Return JSON ONLY (no markdown, no explanation):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class ContextPromptsRequest(BaseModel):
+    brief: str
+
+@app.post("/api/agent/context-prompts")
+async def get_context_prompts(request: ContextPromptsRequest):
+    """Generate prompt suggestions based on current canvas context and design brief"""
+    try:
+        if not gemini_api_key:
+            raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+        print(f"\n=== Context Prompts Request ===")
+        print(f"Brief: {request.brief}")
+
+        # Get canvas digest for context
+        digest = await get_canvas_digest()
+        count = digest.get("count", 0)
+        clusters = digest.get("clusters", [])
+        gaps = digest.get("gaps", [])
+        axis_info = f"X axis: {state.axis_labels.get('x', ['formal', 'sporty'])}, Y axis: {state.axis_labels.get('y', ['dark', 'colorful'])}"
+
+        canvas_context = ""
+        if count > 0:
+            cluster_summary = ", ".join([
+                f'"{c["sample_prompts"][0]}"' for c in clusters[:3] if c.get("sample_prompts")
+            ])
+            canvas_context = f"""
+CURRENT CANVAS:
+- {count} shoe designs already on canvas
+- Main clusters: {cluster_summary or "none yet"}
+- {len(gaps)} unexplored regions detected
+- {axis_info}
+"""
+        else:
+            canvas_context = f"\nCANVAS: Empty (no designs yet)\n- {axis_info}\n"
+
+        prompt = f"""You are a design exploration assistant helping with shoe design.
+
+DESIGN BRIEF:
+{request.brief}
+{canvas_context}
+TASK:
+Suggest 5 specific, actionable prompts to explore next. Given what's already on canvas, suggest prompts that:
+1. Explore underrepresented directions
+2. Are specific and detailed (not generic)
+3. Are diverse from each other
+4. Each under 20 words
+
+Return JSON ONLY (no markdown):
+{{
+  "prompts": [
+    {{"prompt": "minimal white leather sneaker with clean lines", "reasoning": "Unexplored minimalist direction"}},
+    {{"prompt": "chunky athletic shoe in bold neon colors", "reasoning": "Missing sporty/colorful quadrant"}}
+  ]
+}}"""
+
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+
+        json_match = re.search(r'\{[\s\S]*\}', response.text)
+        if json_match:
+            result = json.loads(json_match.group(0))
+            print(f"Generated {len(result.get('prompts', []))} context prompts")
+            return result
+
+        return {"prompts": [
+            {"prompt": "minimal athletic sneaker with clean design", "reasoning": "Starting point"},
+            {"prompt": "classic leather dress shoe", "reasoning": "Formal direction"},
+            {"prompt": "modern running shoe with bold colors", "reasoning": "Sporty direction"},
+        ]}
+
+    except Exception as e:
+        print(f"ERROR in context-prompts: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 class AnalyzeCanvasRequest(BaseModel):
     brief: str
 

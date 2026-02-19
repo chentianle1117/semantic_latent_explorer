@@ -172,3 +172,20 @@
   cursor: not-allowed;
 }
 
+/* Wide layout with suggestions panel */
+.tti-wide {
+  max-width: 880px;
+}
+
+.tti-columns {
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 16px !important;
+}
+
+.tti-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}

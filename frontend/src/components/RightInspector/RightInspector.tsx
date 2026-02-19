@@ -523,12 +523,11 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                     </linearGradient>
                   </defs>
                   {lineSegments.map((seg, i) => {
-                    // Quadratic bezier control point: slightly toward hero center
-                    const midX = (seg.from.x + seg.to.x) / 2;
-                    const midY = (seg.from.y + seg.to.y) / 2;
-                    const ctrlX = midX + (seg.to.x - midX) * 0.3;
-                    const ctrlY = midY + (seg.to.y - midY) * 0.3;
-                    const pathD = `M ${seg.from.x} ${seg.from.y} Q ${ctrlX} ${ctrlY} ${seg.to.x} ${seg.to.y}`;
+                    // Cubic bezier with vertical tangents at both ends — proper genealogy S-curve.
+                    // Leaves the ancestor/child going straight toward hero, arrives straight at hero.
+                    // Sign of halfDy handles both upward (ancestor→hero) and downward (child→hero) directions.
+                    const halfDy = (seg.to.y - seg.from.y) * 0.5;
+                    const pathD = `M ${seg.from.x} ${seg.from.y} C ${seg.from.x} ${seg.from.y + halfDy} ${seg.to.x} ${seg.to.y - halfDy} ${seg.to.x} ${seg.to.y}`;
 
                     return (
                       <path

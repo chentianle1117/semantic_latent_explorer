@@ -20,6 +20,8 @@ interface SemanticCanvasProps {
   onAcceptPending?: (pendingId: string) => void;
   onDiscardPending?: (pendingId: string) => void;
   onGhostClick?: (ghost: any) => void;
+  onGhostAccept?: (ghost: any) => void;
+  onGhostDiscard?: (ghostId: number) => void;
 }
 
 export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
@@ -30,6 +32,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   onAcceptPending,
   onDiscardPending,
   onGhostClick,
+  onGhostAccept,
+  onGhostDiscard,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomTransformRef = useRef<d3.ZoomTransform | null>(null);
@@ -195,9 +199,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const node = d3.select(this);
           node.select("rect")
             .attr("x", -newSize / 2)
-            .attr("y", -newSize / 2)
+            .attr("y", -newSize * 0.3)
             .attr("width", newSize)
-            .attr("height", newSize);
+            .attr("height", newSize * 0.6);
           node.select("image")
             .attr("x", -newSize / 2)
             .attr("y", -newSize / 2)
@@ -469,7 +473,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Group for genealogy lines (drawn in selection effect only for selected images)
     g.append("g").attr("class", "genealogy-lines");
 
-    // Group for ghost nodes (preview suggestions at 30% opacity)
+    // Group for ghost nodes (preview suggestions at low opacity)
     const ghostGroup = g.append("g").attr("class", "ghost-nodes");
 
     // Render ghost nodes (apply same stretch transform as images)
@@ -485,32 +489,111 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const [sx, sy] = toStretched(bx, by);
         return `translate(${xScale(sx)}, ${yScale(sy)})`;
       })
-      .attr("opacity", 0.3)
+      .attr("opacity", 0.28)
       .style("cursor", "pointer");
 
-    // Ghost node circle (pulsing indicator)
-    ghostNodeElements
-      .append("circle")
-      .attr("r", visualSettings.imageSize / 2)
-      .attr("fill", "none")
-      .attr("stroke", "#58a6ff")
-      .attr("stroke-width", 2)
-      .attr("stroke-dasharray", "5,5");
+    const ghostSize = visualSettings.imageSize;
 
-    // Ghost node icon (sparkle)
-    ghostNodeElements
-      .append("text")
-      .attr("text-anchor", "middle")
-      .attr("dy", "0.3em")
-      .attr("font-size", visualSettings.imageSize / 2)
-      .text("✨");
+    // Render: preview image if available, else circle + sparkle
+    ghostNodeElements.each(function(d: any) {
+      const el = d3.select(this);
+      if (d.previewBase64) {
+        // Actual preview image at low opacity
+        el.append("image")
+          .attr("x", -ghostSize / 2)
+          .attr("y", -ghostSize / 2)
+          .attr("width", ghostSize)
+          .attr("height", ghostSize)
+          .attr("href", `data:image/jpeg;base64,${d.previewBase64}`)
+          .attr("preserveAspectRatio", "xMidYMid meet");
+      } else {
+        // Fallback: dashed circle + sparkle
+        el.append("circle")
+          .attr("r", ghostSize / 2)
+          .attr("fill", "none")
+          .attr("stroke", "#58a6ff")
+          .attr("stroke-width", 2)
+          .attr("stroke-dasharray", "5,5");
+        el.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dy", "0.3em")
+          .attr("font-size", ghostSize / 2)
+          .text("✨");
+      }
+    });
 
-    // Ghost node click handler (show suggestion)
+    // Accept / Discard action group (shown on hover)
+    ghostNodeElements.each(function() {
+      const el = d3.select(this);
+      const actionGroup = el.append("g")
+        .attr("class", "ghost-actions")
+        .attr("display", "none");
+
+      // Accept button
+      const acceptBg = actionGroup.append("rect")
+        .attr("x", -ghostSize * 0.28)
+        .attr("y", ghostSize * 0.28)
+        .attr("width", ghostSize * 0.56)
+        .attr("height", 22)
+        .attr("rx", 11)
+        .attr("fill", "rgba(52,211,153,0.85)")
+        .style("cursor", "pointer");
+
+      actionGroup.append("text")
+        .attr("x", 0)
+        .attr("y", ghostSize * 0.28 + 15)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 11)
+        .attr("fill", "#0d1117")
+        .attr("font-weight", "bold")
+        .attr("pointer-events", "none")
+        .text("✓ Accept");
+
+      // Discard button (top-right X)
+      const discardBg = actionGroup.append("circle")
+        .attr("cx", ghostSize * 0.38)
+        .attr("cy", -ghostSize * 0.38)
+        .attr("r", 11)
+        .attr("fill", "rgba(248,81,73,0.85)")
+        .style("cursor", "pointer");
+
+      actionGroup.append("text")
+        .attr("x", ghostSize * 0.38)
+        .attr("y", -ghostSize * 0.38 + 5)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 13)
+        .attr("fill", "white")
+        .attr("pointer-events", "none")
+        .text("×");
+
+      acceptBg.on("click", function(event) {
+        event.stopPropagation();
+        const d = d3.select((this as any).parentNode!.parentNode!).datum() as any;
+        if (onGhostAccept) onGhostAccept(d);
+      });
+
+      discardBg.on("click", function(event) {
+        event.stopPropagation();
+        const d = d3.select((this as any).parentNode!.parentNode!).datum() as any;
+        if (onGhostDiscard) onGhostDiscard(d.id);
+      });
+    });
+
+    // Hover show/hide actions
+    ghostNodeElements
+      .on("mouseenter.ghost", function() {
+        d3.select(this).attr("opacity", 0.75);
+        d3.select(this).select(".ghost-actions").attr("display", null);
+      })
+      .on("mouseleave.ghost", function() {
+        d3.select(this).attr("opacity", 0.28);
+        d3.select(this).select(".ghost-actions").attr("display", "none");
+      });
+
+    // Click handler — also triggers accept for quick click
     ghostNodeElements.on("click", function(event, d) {
       event.stopPropagation();
-      if (onGhostClick) {
-        onGhostClick(d);
-      }
+      if (onGhostClick) onGhostClick(d);
     });
 
     // Group for images
@@ -534,13 +617,13 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     console.log("🎯 Attaching click handlers to", images.length, "image nodes");
 
-    // Add invisible click area (matches image size — no padding to avoid blocking neighbors)
+    // Add invisible click area: full width, 60% vertical center (shoes are side-view, wide but not tall)
     imageNodes
       .append("rect")
       .attr("x", -imageSize / 2)
-      .attr("y", -imageSize / 2)
+      .attr("y", -imageSize * 0.3)
       .attr("width", imageSize)
-      .attr("height", imageSize)
+      .attr("height", imageSize * 0.6)
       .attr("rx", 8)
       .attr("fill", "transparent")
       .attr("pointer-events", "all")

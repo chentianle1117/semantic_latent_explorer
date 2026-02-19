@@ -36,71 +36,79 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
-      <div className="dialog prompt-dialog-wide" onClick={(e) => e.stopPropagation()}>
-        <h2>Generate from Reference{referenceImages.length > 1 ? 's' : ''}</h2>
+      {/* Two-panel layout: form left, AI suggestions right (separate frame) */}
+      <div className="prompt-dialog-outer" onClick={(e) => e.stopPropagation()}>
 
-        <div className="dialog-content">
-          <div className="preview-section">
-            {referenceImages.length === 1 ? (
-              <>
-                <img
-                  src={`data:image/png;base64,${referenceImages[0].base64_image}`}
-                  alt={`Reference ${referenceImages[0].id}`}
-                  className="reference-preview"
-                />
-                <p className="reference-label">Reference Image #{referenceImages[0].id}</p>
-              </>
-            ) : (
-              <>
-                <div className="reference-grid">
-                  {referenceImages.map((img) => (
-                    <img
-                      key={img.id}
-                      src={`data:image/png;base64,${img.base64_image}`}
-                      alt={`Reference ${img.id}`}
-                      className="reference-thumb"
-                    />
-                  ))}
-                </div>
-                <p className="reference-label">{referenceImages.length} Reference Images</p>
-              </>
-            )}
+        {/* Left panel: generate form */}
+        <div className="dialog prompt-dialog-main">
+          <h2>Generate from Reference{referenceImages.length > 1 ? 's' : ''}</h2>
+
+          <div className="dialog-content">
+            <div className="preview-section">
+              {referenceImages.length === 1 ? (
+                <>
+                  <img
+                    src={`data:image/png;base64,${referenceImages[0].base64_image}`}
+                    alt={`Reference ${referenceImages[0].id}`}
+                    className="reference-preview"
+                  />
+                  <p className="reference-label">Reference Image #{referenceImages[0].id}</p>
+                </>
+              ) : (
+                <>
+                  <div className="reference-grid">
+                    {referenceImages.map((img) => (
+                      <img
+                        key={img.id}
+                        src={`data:image/png;base64,${img.base64_image}`}
+                        alt={`Reference ${img.id}`}
+                        className="reference-thumb"
+                      />
+                    ))}
+                  </div>
+                  <p className="reference-label">{referenceImages.length} Reference Images</p>
+                </>
+              )}
+            </div>
+
+            <div className="input-section">
+              <label>Additional prompt:</label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="e.g., more minimalist, brighter colors..."
+                rows={4}
+                disabled={isGenerating}
+                autoFocus
+              />
+
+              <ImageCountSlider
+                value={numImages}
+                onChange={setNumImages}
+                label="Number of Variations"
+              />
+            </div>
           </div>
 
-          <div className="input-section">
-            <label>Additional prompt:</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="e.g., more minimalist, brighter colors..."
-              rows={4}
-              disabled={isGenerating}
-              autoFocus
-            />
-
-            <ImageCountSlider
-              value={numImages}
-              onChange={setNumImages}
-              label="Number of Variations"
-            />
+          <div className="dialog-actions">
+            <button onClick={onClose} disabled={isGenerating}>
+              Cancel
+            </button>
+            <button
+              className="primary"
+              onClick={handleGenerate}
+              disabled={isGenerating || !prompt.trim()}
+            >
+              {isGenerating ? 'Generating...' : 'Generate'}
+            </button>
           </div>
+        </div>
 
-          {/* AI Suggestions */}
+        {/* Right panel: AI Suggestions — completely separate frame */}
+        <div className="dialog prompt-dialog-suggestions">
           <SuggestionsPanel onSelectPrompt={setPrompt} />
         </div>
 
-        <div className="dialog-actions">
-          <button onClick={onClose} disabled={isGenerating}>
-            Cancel
-          </button>
-          <button
-            className="primary"
-            onClick={handleGenerate}
-            disabled={isGenerating || !prompt.trim()}
-          >
-            {isGenerating ? 'Generating...' : 'Generate'}
-          </button>
-        </div>
       </div>
     </div>
   );

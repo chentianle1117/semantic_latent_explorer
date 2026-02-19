@@ -220,7 +220,40 @@
   cursor: not-allowed;
 }
 
-/* Wide layout with suggestions panel */
-.prompt-dialog-wide {
-  max-width: 960px;
+/* Two-panel wrapper: form + AI suggestions side by side */
+.prompt-dialog-outer {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  max-width: 1100px;
+  width: 95vw;
+}
+
+/* Left panel: original form, no max-width override needed */
+.prompt-dialog-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Right panel: AI suggestions in a separate matching frame */
+.prompt-dialog-suggestions {
+  width: 280px;
+  flex-shrink: 0;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 20px 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;   /* match height of left panel */
+}
+
+/* SuggestionsPanel inside the right panel fills full height */
+.prompt-dialog-suggestions .suggestions-panel {
+  width: 100%;
+  flex: 1;
+  border: none;
+  background: transparent;
+  border-radius: 0;
 }

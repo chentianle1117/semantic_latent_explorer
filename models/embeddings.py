@@ -1,451 +1,274 @@
 """
-FashionCLIP embedding extraction using the ssmemo55 Space.
-Target: https://ssmemo55-fashionclip-api.hf.space
+CLIP embedding extraction via Jina AI API.
+
+Primary:  jina-clip-v2 via https://api.jina.ai/v1/embeddings
+          True CLIP-style shared embedding space for text AND images.
+          Free tier: 10M tokens/key — get yours at https://jina.ai/
+
+Fallback: CLIPEmbedder falls back to zeros if the API is unreachable,
+          so the app degrades gracefully rather than crashing.
 """
 
 import os
-import time
 import base64
-import json
+import time
 import numpy as np
 import requests as http_requests
 from io import BytesIO
-from typing import List, Union, Any
+from typing import List, Union, Optional
 from PIL import Image
 from pathlib import Path
 import pickle
 import hashlib
-from tqdm import tqdm
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# CONFIGURATION
-SPACE_URL = "https://ssmemo55-fashionclip-api.hf.space"
-EMBEDDING_DIM = 512
+# ------------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------------
+EMBEDDING_DIM = 1024          # jina-clip-v2 native dimension
 EMBEDDINGS_CACHE = Path("cache/embeddings")
+JINA_API_URL = "https://api.jina.ai/v1/embeddings"
+JINA_MODEL = "jina-clip-v2"
 
-class CLIPEmbedder:
-    """Client for the ssmemo55/fashionclip-api Space."""
+
+class JinaCLIPEmbedder:
+    """
+    Embedder using Jina AI's jina-clip-v2 model.
+
+    Both text and image inputs are projected to the same 1024-dim
+    shared CLIP embedding space, so dot products between text axes
+    and image embeddings are meaningful cosine similarities.
+
+    Sign up at https://jina.ai/ to get a free API key (10M tokens).
+    Set it as JINA_API_KEY in backend/.env.
+    """
 
     def __init__(self):
-        self.api_key = os.getenv("HF_API_KEY")
-        self.auth_headers = {}
-        if self.api_key:
-            self.auth_headers["Authorization"] = f"Bearer {self.api_key}"
-
-        print(f"🔌 Connecting to FashionCLIP Space: {SPACE_URL}")
+        self.api_key = os.getenv("JINA_API_KEY", "")
+        if not self.api_key:
+            print("⚠️  JINA_API_KEY not set — embeddings will return zeros.")
+            print("    Get a free key at https://jina.ai/ and add it to backend/.env")
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
         EMBEDDINGS_CACHE.mkdir(parents=True, exist_ok=True)
+        print(f"🔌 Jina CLIP v2 embedder ready ({JINA_MODEL}, dim={EMBEDDING_DIM})")
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
 
     def _normalize(self, v: np.ndarray) -> np.ndarray:
-        """L2-normalize vectors so Dot Product == Cosine Similarity."""
-        # Ensure we are working with floats, not objects (dicts)
-        if v.dtype == object:
-            print("⚠️ Warning: Array contains objects/dicts, forcing float conversion failed.")
-            return np.zeros((v.shape[0], EMBEDDING_DIM))
-
+        """L2-normalize so dot product == cosine similarity."""
         if v.ndim == 1:
             norm = np.linalg.norm(v)
             return v / (norm + 1e-12)
-        else:
-            norm = np.linalg.norm(v, axis=1, keepdims=True)
-            return v / (norm + 1e-12)
+        norm = np.linalg.norm(v, axis=1, keepdims=True)
+        return v / (norm + 1e-12)
 
-    def _parse_response(self, data: Any) -> np.ndarray:
-        """Robustly extract embedding vector from API response."""
-        # Case 1: Direct list
-        if isinstance(data, list):
-            vector = np.array(data)
+    def _prepare_image_b64(self, path_or_img: Union[str, Image.Image]) -> str:
+        """Convert an image to a base64 data URI suitable for the Jina API."""
+        img = Image.open(path_or_img) if isinstance(path_or_img, str) else path_or_img
+        if img.mode == "RGBA":
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[3])
+            img = bg
+        elif img.mode != "RGB":
+            img = img.convert("RGB")
+        img = img.resize((512, 512), Image.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        # Return raw base64 (no data URI prefix) — Jina API expects {"image": "<raw b64>"}
+        return base64.b64encode(buf.getvalue()).decode()
 
-        # Case 2: Dictionary wrapper
-        elif isinstance(data, dict):
-            # Try common keys used by HF Spaces/FastAPI
-            vector = None
-            for key in ['embedding', 'embeddings', 'vector', 'features', 'data', 'output']:
-                if key in data:
-                    val = data[key]
-                    if isinstance(val, list):
-                        vector = np.array(val)
-                        break
+    def _post(self, payload: dict) -> Optional[dict]:
+        """POST to the Jina embeddings endpoint with retry on rate-limit."""
+        if not self.api_key:
+            return None
+        for attempt, delay in enumerate([5, 10, 20]):
+            try:
+                r = http_requests.post(
+                    JINA_API_URL,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=90,
+                )
+                if r.status_code == 429:
+                    print(f"⏳ Jina rate limit, waiting {delay}s… (attempt {attempt+1}/3)")
+                    time.sleep(delay)
+                    continue
+                if r.status_code != 200:
+                    print(f"⚠️ Jina API error {r.status_code}: {r.text[:300]}")
+                    return None
+                return r.json()
+            except http_requests.exceptions.Timeout:
+                print(f"⚠️ Jina request timed out (attempt {attempt+1}/3)")
+                if attempt < 2:
+                    time.sleep(delay)
+            except Exception as e:
+                print(f"⚠️ Jina request error: {e}")
+                if attempt < 2:
+                    time.sleep(delay)
+        return None
 
-            # Fallback: Return the first list value found
-            if vector is None:
-                print(f"⚠️ Unknown API Key structure. Received keys: {list(data.keys())}")
-                for val in data.values():
-                    if isinstance(val, list) and len(val) > 0 and isinstance(val[0], (float, int)):
-                        vector = np.array(val)
-                        break
-        else:
-            vector = None
-
-        # Validate dimension
-        if vector is None:
-            print("❌ Failed to parse embedding from response.")
-            return np.zeros(EMBEDDING_DIM)
-
-        if vector.shape != (EMBEDDING_DIM,):
-            print(f"❌ Dimension mismatch: expected {EMBEDDING_DIM}, got {vector.shape}")
-            return np.zeros(EMBEDDING_DIM)
-
-        return vector
+    def _extract_embeddings(self, resp: Optional[dict], count: int) -> np.ndarray:
+        """Parse the 'data' array from a Jina response into a numpy array."""
+        if resp is None or "data" not in resp:
+            return np.zeros((count, EMBEDDING_DIM), dtype=np.float32)
+        items = sorted(resp["data"], key=lambda x: x["index"])
+        rows = [np.array(item["embedding"], dtype=np.float32) for item in items]
+        if len(rows) < count:
+            rows += [np.zeros(EMBEDDING_DIM, dtype=np.float32)] * (count - len(rows))
+        return np.vstack(rows[:count])
 
     def create_cache_key(self, data: Union[str, List[str]], preserve_order: bool = False) -> str:
-        """Create cache key. For images, preserve order. For texts, sorting is fine."""
         if isinstance(data, str):
             content = data
         else:
             content = "|".join(data if preserve_order else sorted(data))
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.md5(f"{JINA_MODEL}|{content}".encode()).hexdigest()
 
-    def _prepare_image_file(self, path_or_img: Union[str, Image.Image]) -> dict:
-        """Prepare image file for upload, handling transparency."""
-        if isinstance(path_or_img, str):
-            img = Image.open(path_or_img)
-        else:
-            img = path_or_img
-
-        # Handle Transparency (RGBA -> RGB)
-        if img.mode == 'RGBA':
-            bg = Image.new('RGB', img.size, (255, 255, 255))
-            bg.paste(img, mask=img.split()[3])
-            img = bg
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        img_byte_arr = BytesIO()
-        img.save(img_byte_arr, format='JPEG')
-        img_byte_arr.seek(0)
-        
-        return {'file': ('image.jpg', img_byte_arr, 'image/jpeg')}
-
-    def extract_image_embeddings(self, image_paths: List[str], batch_size: int = 1, use_cache: bool = True) -> np.ndarray:
-        """Hit the POST /embed endpoint using File Upload."""
-
-        if use_cache:
-            cache_key = self.create_cache_key(image_paths, preserve_order=True)
-            cache_file = EMBEDDINGS_CACHE / f"images_{cache_key}.pkl"
-            if cache_file.exists():
-                print(f"✅ Loading cached embeddings for {len(image_paths)} images")
-                with open(cache_file, 'rb') as f: return pickle.load(f)
-
-        print(f"🚀 Sending {len(image_paths)} images to Space...")
-        all_embeddings = []
-
-        for path in tqdm(image_paths, desc="Processing Images"):
-            try:
-                files = self._prepare_image_file(path)
-
-                response = http_requests.post(
-                    f"{SPACE_URL}/embed",
-                    headers=self.auth_headers,
-                    files=files,
-                    timeout=30
-                )
-
-                if response.status_code != 200:
-                    print(f"⚠️ Skipping {path}: API error {response.status_code}")
-                    all_embeddings.append(np.zeros(EMBEDDING_DIM))
-                    continue
-
-                # Use parser here
-                vector = self._parse_response(response.json())
-                all_embeddings.append(vector)
-
-            except Exception as e:
-                print(f"⚠️ Error processing {path}: {e}")
-                all_embeddings.append(np.zeros(EMBEDDING_DIM))
-
-        if not all_embeddings:
-            return np.zeros((len(image_paths), EMBEDDING_DIM))
-
-        final_embeddings = np.vstack(all_embeddings)
-        final_embeddings = self._normalize(final_embeddings)
-
-        if use_cache:
-            with open(cache_file, 'wb') as f: pickle.dump(final_embeddings, f)
-
-        return final_embeddings
+    # ------------------------------------------------------------------
+    # Public API (same interface as the old CLIPEmbedder)
+    # ------------------------------------------------------------------
 
     def extract_text_embeddings(self, texts: List[str], use_cache: bool = True) -> np.ndarray:
-        """Hit the POST /embed-text endpoint (JSON)."""
+        """Embed a list of text strings into the shared CLIP space."""
+        if not texts:
+            return np.zeros((0, EMBEDDING_DIM), dtype=np.float32)
 
         if use_cache:
             cache_key = self.create_cache_key(texts, preserve_order=False)
-            cache_file = EMBEDDINGS_CACHE / f"texts_{cache_key}.pkl"
+            cache_file = EMBEDDINGS_CACHE / f"jina_texts_{cache_key}.pkl"
             if cache_file.exists():
-                with open(cache_file, 'rb') as f: return pickle.load(f)
+                with open(cache_file, "rb") as f:
+                    return pickle.load(f)
 
-        print(f"🚀 Sending {len(texts)} texts to Space...")
-        all_embeddings = []
-
-        headers = self.auth_headers.copy()
-        headers["Content-Type"] = "application/json"
-
-        for text in texts:
-            try:
-                payload = {"text": text}
-                response = http_requests.post(
-                    f"{SPACE_URL}/embed-text",
-                    headers=headers,
-                    json=payload,
-                    timeout=30
-                )
-
-                if response.status_code != 200:
-                    print(f"⚠️ Skipping '{text}': API error {response.status_code}")
-                    all_embeddings.append(np.zeros(EMBEDDING_DIM))
-                    continue
-
-                # Use parser here
-                vector = self._parse_response(response.json())
-                all_embeddings.append(vector)
-
-            except Exception as e:
-                print(f"⚠️ Error on '{text}': {e}")
-                all_embeddings.append(np.zeros(EMBEDDING_DIM))
-
-        if not all_embeddings:
-            return np.zeros((len(texts), EMBEDDING_DIM))
-
-        final_embeddings = np.vstack(all_embeddings)
-        final_embeddings = self._normalize(final_embeddings)
+        print(f"🚀 Jina CLIP: embedding {len(texts)} texts…")
+        payload = {
+            "model": JINA_MODEL,
+            "normalized": True,
+            "task": "retrieval.query",   # text axes are queries
+            "input": [{"text": t} for t in texts],
+        }
+        resp = self._post(payload)
+        arr = self._extract_embeddings(resp, len(texts))
+        result = self._normalize(arr)
 
         if use_cache:
-            with open(cache_file, 'wb') as f: pickle.dump(final_embeddings, f)
+            with open(cache_file, "wb") as f:
+                pickle.dump(result, f)
+        return result
 
-        return final_embeddings
+    def extract_image_embeddings(
+        self,
+        image_paths: List[str],
+        batch_size: int = 8,
+        use_cache: bool = True,
+    ) -> np.ndarray:
+        """Embed a list of image file paths into the shared CLIP space."""
+        if not image_paths:
+            return np.zeros((0, EMBEDDING_DIM), dtype=np.float32)
+
+        if use_cache:
+            cache_key = self.create_cache_key(image_paths, preserve_order=True)
+            cache_file = EMBEDDINGS_CACHE / f"jina_images_{cache_key}.pkl"
+            if cache_file.exists():
+                print(f"✅ Cached Jina embeddings for {len(image_paths)} images")
+                with open(cache_file, "rb") as f:
+                    return pickle.load(f)
+
+        print(f"🚀 Jina CLIP: embedding {len(image_paths)} images…")
+        all_embeddings: List[np.ndarray] = []
+
+        for i in range(0, len(image_paths), batch_size):
+            batch_paths = image_paths[i : i + batch_size]
+            inputs: List[Optional[dict]] = []
+            for p in batch_paths:
+                try:
+                    b64 = self._prepare_image_b64(p)
+                    inputs.append({"image": b64})
+                except Exception as e:
+                    print(f"⚠️ Image prep error for {p}: {e}")
+                    inputs.append(None)
+
+            valid = [inp for inp in inputs if inp is not None]
+            if not valid:
+                all_embeddings.extend([np.zeros(EMBEDDING_DIM)] * len(batch_paths))
+                continue
+
+            resp = self._post({"model": JINA_MODEL, "normalized": True, "task": "retrieval.query", "input": valid})
+            valid_rows = self._extract_embeddings(resp, len(valid))
+
+            vi = 0
+            for inp in inputs:
+                if inp is None:
+                    all_embeddings.append(np.zeros(EMBEDDING_DIM, dtype=np.float32))
+                else:
+                    all_embeddings.append(valid_rows[vi])
+                    vi += 1
+
+        result = self._normalize(np.vstack(all_embeddings))
+        if use_cache:
+            with open(cache_file, "wb") as f:
+                pickle.dump(result, f)
+        return result
 
     def extract_image_embeddings_from_pil(self, pil_images: List[Image.Image]) -> np.ndarray:
-        """Helper for in-memory images."""
+        """Embed in-memory PIL images into the shared CLIP space (no file caching)."""
         if not pil_images:
-            return np.zeros((0, EMBEDDING_DIM))
+            return np.zeros((0, EMBEDDING_DIM), dtype=np.float32)
 
-        all_embeddings = []
+        inputs: List[Optional[dict]] = []
         for img in pil_images:
             try:
-                files = self._prepare_image_file(img)
-
-                response = http_requests.post(
-                    f"{SPACE_URL}/embed",
-                    headers=self.auth_headers,
-                    files=files,
-                    timeout=30
-                )
-
-                if response.status_code == 200:
-                    # Use parser here
-                    vector = self._parse_response(response.json())
-                    all_embeddings.append(vector)
-                else:
-                    print(f"⚠️ Space Error (PIL): {response.text}")
-                    all_embeddings.append(np.zeros(EMBEDDING_DIM))
+                b64 = self._prepare_image_b64(img)
+                inputs.append({"image": b64})
             except Exception as e:
-                print(f"⚠️ API Error (PIL): {e}")
-                all_embeddings.append(np.zeros(EMBEDDING_DIM))
+                print(f"⚠️ PIL image prep error: {e}")
+                inputs.append(None)
 
-        if not all_embeddings:
-            return np.zeros((0, EMBEDDING_DIM))
+        valid = [inp for inp in inputs if inp is not None]
+        if not valid:
+            return np.zeros((len(pil_images), EMBEDDING_DIM), dtype=np.float32)
+
+        resp = self._post({"model": JINA_MODEL, "normalized": True, "task": "retrieval.query", "input": valid})
+        valid_rows = self._extract_embeddings(resp, len(valid))
+
+        all_embeddings: List[np.ndarray] = []
+        vi = 0
+        for inp in inputs:
+            if inp is None:
+                all_embeddings.append(np.zeros(EMBEDDING_DIM, dtype=np.float32))
+            else:
+                all_embeddings.append(valid_rows[vi])
+                vi += 1
+
         return self._normalize(np.vstack(all_embeddings))
 
 
-class HuggingFaceCLIPEmbedder:
+# ------------------------------------------------------------------
+# Backwards-compatibility aliases
+# ------------------------------------------------------------------
+
+class CLIPEmbedder(JinaCLIPEmbedder):
     """
-    Client for HuggingFace Inference API using sentence-transformers CLIP.
-    More reliable than Gradio Spaces, but less fashion-specialized.
+    Main embedder class (used by backend/api.py via initialize_embedder).
+    Delegates to JinaCLIPEmbedder (jina-clip-v2 API).
+    """
+    pass
+
+
+class HuggingFaceCLIPEmbedder(JinaCLIPEmbedder):
+    """
+    Kept for import compatibility (models/__init__.py exports it).
+    Now delegates to JinaCLIPEmbedder — the HF Inference API did not
+    support multimodal CLIP reliably (model not deployed on any provider).
     """
 
-    def __init__(self, model_id: str = "sentence-transformers/clip-ViT-B-32-multilingual-v1"):
-        self.model_id = model_id
-        self.api_key = os.getenv("HF_API_KEY")
-        self.api_url = f"https://api-inference.huggingface.co/models/{model_id}"
-        self.headers = {"Authorization": f"Bearer {self.api_key}"}
-
-        print(f"🔌 Connecting to HuggingFace CLIP: {model_id}")
-        EMBEDDINGS_CACHE.mkdir(parents=True, exist_ok=True)
-
-    def _normalize(self, v: np.ndarray) -> np.ndarray:
-        """L2-normalize vectors."""
-        if v.ndim == 1:
-            norm = np.linalg.norm(v)
-            return v / (norm + 1e-12)
-        else:
-            norm = np.linalg.norm(v, axis=1, keepdims=True)
-            return v / (norm + 1e-12)
-
-    def _parse_response(self, data: Any) -> np.ndarray:
-        """Parse HuggingFace API response (handles list or dict formats)."""
-        # Format 1: Direct list [0.1, 0.2, ...] or [[0.1, 0.2, ...]]
-        if isinstance(data, list):
-            arr = np.array(data)
-            # Unwrap if nested [[...]]
-            if arr.ndim == 2 and arr.shape[0] == 1:
-                arr = arr[0]
-            vector = arr
-
-        # Format 2: Dictionary {"embeddings": [...]} or {"data": [...]}
-        elif isinstance(data, dict):
-            vector = None
-            for key in ['embeddings', 'data', 'vector']:
-                if key in data:
-                    arr = np.array(data[key])
-                    if arr.ndim == 2 and arr.shape[0] == 1:
-                        arr = arr[0]
-                    vector = arr
-                    break
-
-            if vector is None:
-                print(f"⚠️ Unknown HF response format: {list(data.keys())}")
-                return np.zeros(EMBEDDING_DIM)
-        else:
-            vector = None
-
-        # Validate dimension
-        if vector is None or vector.shape != (EMBEDDING_DIM,):
-            print(f"❌ Dimension mismatch: expected {EMBEDDING_DIM}, got {vector.shape if vector is not None else 'None'}")
-            return np.zeros(EMBEDDING_DIM)
-
-        return vector
-
-    def _prepare_image_bytes(self, path_or_img: Union[str, Image.Image]) -> bytes:
-        """Convert image to JPEG bytes for API."""
-        if isinstance(path_or_img, str):
-            img = Image.open(path_or_img)
-        else:
-            img = path_or_img
-
-        # Handle transparency
-        if img.mode == 'RGBA':
-            bg = Image.new('RGB', img.size, (255, 255, 255))
-            bg.paste(img, mask=img.split()[3])
-            img = bg
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        buffered = BytesIO()
-        img.save(buffered, format='JPEG')
-        return buffered.getvalue()
-
-    def extract_image_embeddings(self, image_paths: List[str], batch_size: int = 1, use_cache: bool = True) -> np.ndarray:
-        """Extract embeddings via HuggingFace Inference API."""
-        # Use same cache key format for consistency
-        cache_key = hashlib.md5("|".join(image_paths).encode()).hexdigest()
-        cache_file = EMBEDDINGS_CACHE / f"hf_images_{cache_key}.pkl"
-
-        if use_cache and cache_file.exists():
-            print(f"✅ Loading cached HF embeddings for {len(image_paths)} images")
-            with open(cache_file, 'rb') as f:
-                return pickle.load(f)
-
-        print(f"🚀 Sending {len(image_paths)} images to HuggingFace...")
-        all_embeddings = []
-
-        for path in tqdm(image_paths, desc="HF Processing"):
-            try:
-                image_bytes = self._prepare_image_bytes(path)
-
-                response = http_requests.post(
-                    self.api_url,
-                    headers=self.headers,
-                    data=image_bytes,
-                    timeout=30
-                )
-
-                if response.status_code != 200:
-                    print(f"⚠️ Skipping {path}: API error {response.status_code}")
-                    all_embeddings.append(np.zeros(EMBEDDING_DIM))
-                    continue
-
-                vector = self._parse_response(response.json())
-                all_embeddings.append(vector)
-
-            except Exception as e:
-                print(f"⚠️ Error on {path}: {e}")
-                all_embeddings.append(np.zeros(EMBEDDING_DIM))
-
-        if not all_embeddings:
-            return np.zeros((len(image_paths), EMBEDDING_DIM))
-
-        final_embeddings = np.vstack(all_embeddings)
-        final_embeddings = self._normalize(final_embeddings)
-
-        if use_cache:
-            with open(cache_file, 'wb') as f:
-                pickle.dump(final_embeddings, f)
-
-        return final_embeddings
-
-    def extract_text_embeddings(self, texts: List[str], use_cache: bool = True) -> np.ndarray:
-        """Extract text embeddings via HuggingFace Inference API."""
-        cache_key = hashlib.md5("|".join(texts).encode()).hexdigest()
-        cache_file = EMBEDDINGS_CACHE / f"hf_texts_{cache_key}.pkl"
-
-        if use_cache and cache_file.exists():
-            with open(cache_file, 'rb') as f:
-                return pickle.load(f)
-
-        print(f"🚀 Sending {len(texts)} texts to HuggingFace...")
-        all_embeddings = []
-
-        for text in texts:
-            try:
-                payload = {"inputs": text}
-                response = http_requests.post(
-                    self.api_url,
-                    headers=self.headers,
-                    json=payload,
-                    timeout=30
-                )
-
-                if response.status_code != 200:
-                    print(f"⚠️ Skipping '{text}': API error {response.status_code}")
-                    all_embeddings.append(np.zeros(EMBEDDING_DIM))
-                    continue
-
-                vector = self._parse_response(response.json())
-                all_embeddings.append(vector)
-
-            except Exception as e:
-                print(f"⚠️ Error on '{text}': {e}")
-                all_embeddings.append(np.zeros(EMBEDDING_DIM))
-
-        if not all_embeddings:
-            return np.zeros((len(texts), EMBEDDING_DIM))
-
-        final_embeddings = np.vstack(all_embeddings)
-        final_embeddings = self._normalize(final_embeddings)
-
-        if use_cache:
-            with open(cache_file, 'wb') as f:
-                pickle.dump(final_embeddings, f)
-
-        return final_embeddings
-
-    def extract_image_embeddings_from_pil(self, pil_images: List[Image.Image]) -> np.ndarray:
-        """Helper for in-memory PIL images."""
-        if not pil_images:
-            return np.zeros((0, EMBEDDING_DIM))
-
-        all_embeddings = []
-        for img in pil_images:
-            try:
-                image_bytes = self._prepare_image_bytes(img)
-                response = http_requests.post(
-                    self.api_url,
-                    headers=self.headers,
-                    data=image_bytes,
-                    timeout=30
-                )
-
-                if response.status_code == 200:
-                    vector = self._parse_response(response.json())
-                    all_embeddings.append(vector)
-                else:
-                    print(f"⚠️ PIL image error: {response.status_code}")
-                    all_embeddings.append(np.zeros(EMBEDDING_DIM))
-            except Exception as e:
-                print(f"⚠️ PIL image error: {e}")
-                all_embeddings.append(np.zeros(EMBEDDING_DIM))
-
-        if not all_embeddings:
-            return np.zeros((0, EMBEDDING_DIM))
-        return self._normalize(np.vstack(all_embeddings))
+    def __init__(self, model_id: str = "jina-clip-v2"):
+        print(f"[HuggingFaceCLIPEmbedder] Redirecting to Jina CLIP v2 (HF API unavailable for CLIP)")
+        super().__init__()

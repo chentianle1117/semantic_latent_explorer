@@ -210,9 +210,14 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         });
 
         // Update ghost node circles and icons
-        svg.selectAll(".ghost-node").each(function() {
-          d3.select(this).select("circle").attr("r", newSize / 2);
-          d3.select(this).select("text").attr("font-size", newSize / 2);
+        svg.selectAll(".ghost-node").each(function(d: any) {
+          if (d.isHaze) {
+            d3.select(this).select(".haze-blob").attr("r", newSize * 1.6);
+            d3.select(this).select(".haze-label").attr("y", newSize * 1.6 + 14);
+          } else {
+            d3.select(this).select("circle").attr("r", newSize / 2);
+            d3.select(this).select("text").attr("font-size", newSize / 2);
+          }
         });
       }
 
@@ -321,6 +326,12 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     gapGrad.append("stop").attr("offset", "0%").attr("stop-color", "#ffa658").attr("stop-opacity", 0.2);
     gapGrad.append("stop").attr("offset", "35%").attr("stop-color", "#ffa658").attr("stop-opacity", 0.08);
     gapGrad.append("stop").attr("offset", "100%").attr("stop-color", "#ffa658").attr("stop-opacity", 0);
+
+    // Haze gradient for isHaze ghost nodes (purple/violet — distinct from clusters/gaps)
+    const hazeGrad = defs.append("radialGradient").attr("id", "haze-nebula");
+    hazeGrad.append("stop").attr("offset", "0%").attr("stop-color", "#c084fc").attr("stop-opacity", 0.4);
+    hazeGrad.append("stop").attr("offset", "55%").attr("stop-color", "#c084fc").attr("stop-opacity", 0.12);
+    hazeGrad.append("stop").attr("offset", "100%").attr("stop-color", "#c084fc").attr("stop-opacity", 0);
 
     // Blur filter for terrain blobs
     const terrainBlur = defs.append("filter").attr("id", "terrain-blur")
@@ -489,15 +500,33 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const [sx, sy] = toStretched(bx, by);
         return `translate(${xScale(sx)}, ${yScale(sy)})`;
       })
-      .attr("opacity", 0.28)
+      .attr("opacity", (d: any) => d.isHaze ? 1.0 : 0.28)
       .style("cursor", "pointer");
 
     const ghostSize = visualSettings.imageSize;
 
-    // Render: preview image if available, else circle + sparkle
+    // Render: haze blob for isHaze nodes; preview image if available, else circle + sparkle
     ghostNodeElements.each(function(d: any) {
       const el = d3.select(this);
-      if (d.previewBase64) {
+      if (d.isHaze) {
+        // Haze rendering: soft radial gradient blob + description label
+        const hazeR = ghostSize * 1.6;
+        el.append("circle")
+          .attr("class", "haze-blob")
+          .attr("r", hazeR)
+          .attr("fill", "url(#haze-nebula)")
+          .attr("pointer-events", "visibleFill");
+        const rawLabel = d.description || "Explore";
+        const label = rawLabel.length > 30 ? rawLabel.slice(0, 28) + "…" : rawLabel;
+        el.append("text")
+          .attr("class", "haze-label")
+          .attr("text-anchor", "middle")
+          .attr("y", hazeR + 14)
+          .attr("font-size", 10)
+          .attr("fill", "rgba(192, 132, 252, 0.6)")
+          .attr("pointer-events", "none")
+          .text(label);
+      } else if (d.previewBase64) {
         // Actual preview image at low opacity
         el.append("image")
           .attr("x", -ghostSize / 2)
@@ -522,8 +551,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       }
     });
 
-    // Accept / Discard action group (shown on hover)
-    ghostNodeElements.each(function() {
+    // Accept / Discard action group (shown on hover — non-haze nodes only)
+    ghostNodeElements.filter((d: any) => !d.isHaze).each(function() {
       const el = d3.select(this);
       const actionGroup = el.append("g")
         .attr("class", "ghost-actions")
@@ -579,15 +608,23 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       });
     });
 
-    // Hover show/hide actions
+    // Hover show/hide actions (haze: brighten label; non-haze: show action buttons)
     ghostNodeElements
-      .on("mouseenter.ghost", function() {
-        d3.select(this).attr("opacity", 0.75);
-        d3.select(this).select(".ghost-actions").attr("display", null);
+      .on("mouseenter.ghost", function(_event, d: any) {
+        if (d.isHaze) {
+          d3.select(this).select(".haze-label").attr("fill", "rgba(192, 132, 252, 0.9)");
+        } else {
+          d3.select(this).attr("opacity", 0.75);
+          d3.select(this).select(".ghost-actions").attr("display", null);
+        }
       })
-      .on("mouseleave.ghost", function() {
-        d3.select(this).attr("opacity", 0.28);
-        d3.select(this).select(".ghost-actions").attr("display", "none");
+      .on("mouseleave.ghost", function(_event, d: any) {
+        if (d.isHaze) {
+          d3.select(this).select(".haze-label").attr("fill", "rgba(192, 132, 252, 0.6)");
+        } else {
+          d3.select(this).attr("opacity", 0.28);
+          d3.select(this).select(".ghost-actions").attr("display", "none");
+        }
       });
 
     // Click handler — also triggers accept for quick click
@@ -1019,6 +1056,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     regionHighlights,
     terrainMode,
     pendingImages,
+    ghostNodes,
     // Note: Excluded selectedImageIds and hoveredGroupId to prevent full redraws on selection/hover changes
     // These are handled in a separate effect below
   ]);
@@ -1270,50 +1308,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         />
       </div>
 
-      {/* Y-Axis label: close to left edge (mirroring X-axis label near bottom edge) */}
+      {/* Y-Axis scale slider: same fixed-size pattern as right-edge size slider, mirrored to left */}
       <div style={{
         position: "absolute",
         left: 12,
-        top: "50%",
-        transform: "translateY(-50%)",
-        pointerEvents: "auto",
-      }}>
-        <AxisEditor
-          axis="y"
-          negativeLabel={axisLabels.y[0]}
-          positiveLabel={axisLabels.y[1]}
-          onUpdate={async (negative, positive) => {
-            try {
-              useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
-              useAppStore.getState().resetCanvasBounds();
-              await apiClient.updateAxes({
-                x_negative: axisLabels.x[0],
-                x_positive: axisLabels.x[1],
-                y_negative: negative,
-                y_positive: positive,
-              });
-              useProgressStore.getState().updateProgress(70, "Updating canvas...");
-              const state = await apiClient.getState();
-              useAppStore.setState({ axisLabels: { ...axisLabels, y: [negative, positive] as [string, string] } });
-              useAppStore.getState().setImages(state.images);
-              if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
-              useProgressStore.getState().updateProgress(100);
-              useProgressStore.getState().hideProgress();
-            } catch (error) {
-              useProgressStore.getState().hideProgress();
-              alert(`Failed to update Y-axis: ${error}`);
-            }
-          }}
-          expandedNegative={expandedConcepts?.y_negative}
-          expandedPositive={expandedConcepts?.y_positive}
-          style={{ transform: "rotate(-90deg)", transformOrigin: "center", whiteSpace: "nowrap" }}
-        />
-      </div>
-
-      {/* Y-Axis stretch slider: separate, after the label (further from edge) */}
-      <div style={{
-        position: "absolute",
-        left: 48,
         top: "50%",
         transform: "translateY(-50%)",
         display: "flex",
@@ -1329,6 +1327,53 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             value={visualSettings.axisScaleY ?? 1}
             onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleY: v })}
             compact
+          />
+        </div>
+      </div>
+
+      {/* Y-Axis label: independent container just right of the slider, same fixed-box rotation pattern */}
+      <div style={{
+        position: "absolute",
+        left: 44,
+        top: "50%",
+        transform: "translateY(-50%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 36,
+        height: 260,
+        overflow: "visible",
+        pointerEvents: "auto",
+      }}>
+        <div style={{ transform: "rotate(-90deg)", whiteSpace: "nowrap", flexShrink: 0 }}>
+          <AxisEditor
+            axis="y"
+            negativeLabel={axisLabels.y[0]}
+            positiveLabel={axisLabels.y[1]}
+            onUpdate={async (negative, positive) => {
+              try {
+                useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
+                useAppStore.getState().resetCanvasBounds();
+                await apiClient.updateAxes({
+                  x_negative: axisLabels.x[0],
+                  x_positive: axisLabels.x[1],
+                  y_negative: negative,
+                  y_positive: positive,
+                });
+                useProgressStore.getState().updateProgress(70, "Updating canvas...");
+                const state = await apiClient.getState();
+                useAppStore.setState({ axisLabels: { ...axisLabels, y: [negative, positive] as [string, string] } });
+                useAppStore.getState().setImages(state.images);
+                if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
+                useProgressStore.getState().updateProgress(100);
+                useProgressStore.getState().hideProgress();
+              } catch (error) {
+                useProgressStore.getState().hideProgress();
+                alert(`Failed to update Y-axis: ${error}`);
+              }
+            }}
+            expandedNegative={expandedConcepts?.y_negative}
+            expandedPositive={expandedConcepts?.y_positive}
           />
         </div>
       </div>

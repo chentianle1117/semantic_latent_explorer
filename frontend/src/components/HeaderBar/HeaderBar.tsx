@@ -27,16 +27,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       <div className="header-center">
         <span className="header-stat">{imageCount} images</span>
         <span className="header-stat-sep">&middot;</span>
-        <span className="header-stat">CLIP ViT-B/32</span>
+        <span className="header-stat">Jina CLIP v2</span>
         <span className="header-stat-sep">&middot;</span>
         <span className="header-stat">
           {isInitialized ? "Ready" : "Initializing..."}
         </span>
       </div>
       <div className="header-right">
-        <button className="header-icon-btn" onClick={onOpenSettings} title="Project Brief">
-          📄
-        </button>
         <button className="header-icon-btn" onClick={onOpenSettings} title="Settings">
           &#9881;
         </button>

@@ -2005,63 +2005,91 @@ async def suggest_ghost_nodes(request: Request):
         brief = body.get("brief", "Explore shoe design variations")
         num_suggestions = body.get("num_suggestions", 3)
 
-        # Get canvas digest for gap detection
+        # Get canvas digest for gap + cluster context
         digest_res = await get_canvas_digest()
-        if not digest_res or "gaps" not in digest_res:
+        gaps = (digest_res or {}).get("gaps", [])
+        clusters = (digest_res or {}).get("clusters", [])
+
+        # Need at least some content on canvas to make useful suggestions
+        if not gaps and not clusters and len(state.images) < 2:
             return {"ghosts": []}
 
-        gaps = digest_res["gaps"]
-        if len(gaps) == 0:
-            return {"ghosts": []}
-
-        # Take top N largest gaps (by size)
+        # Top gaps by size (or use all if fewer than requested)
         top_gaps = sorted(gaps, key=lambda g: g.get("size", 0), reverse=True)[:num_suggestions]
 
-        # Build prompt for Gemini
-        gap_descriptions = []
-        for i, gap in enumerate(top_gaps):
-            center = gap.get("center", [0, 0])
-            gap_descriptions.append(
-                f"Gap {i+1}: Located at ({center[0]:.2f}, {center[1]:.2f}) in semantic space. "
-                f"Size: {gap.get('size', 0):.2f}. Bounded by: {gap.get('bounding_clusters', [])}"
-            )
+        # If no gaps detected, synthesize positions at axis extremes to still give suggestions
+        if not top_gaps:
+            synthetic_positions = [
+                [0.75, 0.75], [-0.75, 0.75], [0.75, -0.75], [-0.75, -0.75]
+            ]
+            top_gaps = [{"center": pos, "size": 0} for pos in synthetic_positions[:num_suggestions]]
 
-        prompt = f"""You are helping explore a shoe design semantic space. The user's design brief is:
-"{brief}"
+        # Describe semantic context using axis labels (not raw coordinates)
+        x_neg, x_pos = state.axis_labels['x'][0], state.axis_labels['x'][1]
+        y_neg, y_pos = state.axis_labels['y'][0], state.axis_labels['y'][1]
 
-Current semantic axes:
-- X-axis: {state.axis_labels['x'][0]} (left) → {state.axis_labels['x'][1]} (right)
-- Y-axis: {state.axis_labels['y'][0]} (bottom) → {state.axis_labels['y'][1]} (top)
+        gap_context = ""
+        if top_gaps:
+            gap_lines = []
+            for i, gap in enumerate(top_gaps):
+                cx, cy = gap.get("center", [0, 0])
+                # Translate coordinates into semantic labels
+                x_desc = x_pos if cx > 0 else x_neg
+                y_desc = y_pos if cy > 0 else y_neg
+                gap_lines.append(f"  - Unexplored zone {i+1}: leans {x_desc} on X-axis and {y_desc} on Y-axis")
+            gap_context = "Unexplored semantic zones detected:\n" + "\n".join(gap_lines)
 
-We've detected {len(top_gaps)} unexplored gaps in the canvas:
-{chr(10).join(gap_descriptions)}
+        cluster_context = ""
+        if clusters:
+            cluster_names = [c.get("label", f"cluster {j+1}") for j, c in enumerate(clusters[:3])]
+            cluster_context = f"Existing clusters already explored: {', '.join(cluster_names)}"
 
-For each gap, suggest a shoe design prompt that would fit that semantic location. Return EXACTLY {num_suggestions} suggestions in JSON format:
+        prompt = f"""You are an AI design partner helping a shoe designer explore their creative space.
+
+Design brief: "{brief}"
+
+Current semantic canvas axes:
+- X-axis: {x_neg} (left) → {x_pos} (right)
+- Y-axis: {y_neg} (bottom) → {y_pos} (top)
+
+{gap_context}
+{cluster_context}
+
+Based on the design brief and the unexplored zones above, suggest {num_suggestions} SPECIFIC shoe designs the designer should create next. Each suggestion should:
+1. Be a concrete, visually descriptive shoe prompt (not vague — mention materials, style, color, silhouette)
+2. Target an area of the design space that isn't yet explored
+3. Push the design brief forward in an interesting direction
+4. Be directly generatable by an AI image model
+
+Return EXACTLY {num_suggestions} suggestions as JSON:
 
 {{
   "suggestions": [
     {{
-      "prompt": "specific shoe design prompt",
-      "reasoning": "why this fits the gap location",
+      "prompt": "A specific, vivid shoe design prompt ready for AI generation",
+      "reasoning": "One sentence: what gap this fills and why it's worth exploring",
       "gap_index": 0
-    }},
-    ...
+    }}
   ]
 }}
 
-Make prompts diverse, creative, and aligned with the design brief."""
+Be bold and specific. If no design brief is set, infer interesting directions from the axis labels."""
 
         # Call Gemini
         if not gemini_api_key:
-            # Fallback without Gemini
+            # Fallback without Gemini — axis-aware descriptions
+            x_neg2, x_pos2 = state.axis_labels['x'][0], state.axis_labels['x'][1]
+            y_neg2, y_pos2 = state.axis_labels['y'][0], state.axis_labels['y'][1]
             ghosts = []
             for i, gap in enumerate(top_gaps):
                 center = gap.get("center", [0, 0])
+                x_desc = x_pos2 if center[0] > 0 else x_neg2
+                y_desc = y_pos2 if center[1] > 0 else y_neg2
                 ghosts.append({
                     "id": state.next_id + i,
                     "coordinates": center,
-                    "suggested_prompt": f"Shoe design at ({center[0]:.1f}, {center[1]:.1f})",
-                    "reasoning": f"Fills gap {i+1} in the semantic space",
+                    "suggested_prompt": f"A shoe that is {x_desc} and {y_desc}",
+                    "reasoning": f"Fills the {x_desc}/{y_desc} corner of the design space",
                     "is_ghost": True
                 })
             return {"ghosts": ghosts}

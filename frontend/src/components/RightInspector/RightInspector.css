@@ -485,31 +485,24 @@
   gap: 8px;
   position: relative;
   z-index: 1;
-  padding: 16px 12px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
-}
-
-.hero-card::-webkit-scrollbar {
-  width: 4px;
-}
-
-.hero-card::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 2px;
+  padding: 12px;
+  overflow: hidden; /* no scroll — image scales to fit */
+  min-height: 0;
 }
 
 .hero-image-wrapper {
   position: relative;
   width: 100%;
   max-width: 240px;
+  /* Height driven by container: fill the hero-card minus space for metadata (~56px) */
+  max-height: calc(100% - 56px);
   aspect-ratio: 1;
   border-radius: 16px;
   overflow: hidden;
   border: 3px solid rgba(255, 255, 255, 0.2);
   transition: all 0.3s;
-  flex-shrink: 0;
+  flex-shrink: 1;   /* allow shrinking when window is small */
+  min-height: 64px; /* never collapse below thumbnail size */
 }
 
 .hero-image-wrapper.selected {

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useAppStore } from "../../store/appStore";
+import { ConfirmDialog } from "../ConfirmDialog/ConfirmDialog";
 import "./LayersPanel.css";
 
 export const LayersPanel: React.FC = () => {
@@ -17,6 +18,7 @@ export const LayersPanel: React.FC = () => {
 
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [layerConfirm, setLayerConfirm] = useState<{ message: string; onConfirm: () => void } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   // Drag-to-reorder state
@@ -55,12 +57,14 @@ export const LayersPanel: React.FC = () => {
   const handleDelete = (layer: { id: string; name: string }) => {
     const layerImageIds = getLayerImageIds(layer.id);
     if (layerImageIds.length > 0) {
-      const confirmed = window.confirm(
-        `"${layer.name}" has ${layerImageIds.length} image${layerImageIds.length > 1 ? "s" : ""}.\n\nDeleting this layer will move them to "${layers.find(l => l.id === "default")?.name ?? "Shoes"}".\n\nProceed?`
-      );
-      if (!confirmed) return;
+      const defaultName = layers.find(l => l.id === "default")?.name ?? "Shoes";
+      setLayerConfirm({
+        message: `"${layer.name}" has ${layerImageIds.length} image${layerImageIds.length > 1 ? "s" : ""}.\n\nDeleting this layer will move them to "${defaultName}". Proceed?`,
+        onConfirm: () => removeLayer(layer.id),
+      });
+    } else {
+      removeLayer(layer.id);
     }
-    removeLayer(layer.id);
   };
 
   const handleSelectAll = (layerId: string) => {
@@ -81,14 +85,13 @@ export const LayersPanel: React.FC = () => {
     setDragIndex(index);
     setDropIndex(index);
 
-    // Create a ghost pill that follows the cursor
     const ghost = document.createElement("div");
     ghost.className = "lp-drag-ghost";
     ghost.textContent = layers[index].name;
     ghost.style.cssText = `
       position: fixed; pointer-events: none; z-index: 9999;
       background: rgba(88,166,255,0.18); border: 1px solid rgba(88,166,255,0.55);
-      border-radius: 6px; padding: 5px 12px; font-size: 12px;
+      border-radius: 6px; padding: 6px 14px; font-size: 13px;
       color: rgba(200,215,230,0.95); white-space: nowrap;
       box-shadow: 0 4px 14px rgba(0,0,0,0.5);
       transform: translate(-50%, -50%);
@@ -102,7 +105,6 @@ export const LayersPanel: React.FC = () => {
         dragGhostRef.current.style.left = `${ev.clientX}px`;
         dragGhostRef.current.style.top = `${ev.clientY}px`;
       }
-      // Determine new drop index from cursor position
       if (dragLayerRef.current) {
         const listEl = dragLayerRef.current.closest(".lp-list") as HTMLElement;
         if (!listEl) return;
@@ -160,7 +162,7 @@ export const LayersPanel: React.FC = () => {
               ref={isDragging ? (el) => { dragLayerRef.current = el; } : undefined}
               className={`lp-row ${!layer.visible ? "lp-row--hidden" : ""} ${isDragging ? "lp-row--dragging" : ""} ${isDropTarget ? "lp-row--drop-target" : ""}`}
             >
-              {/* Drag handle — left mouse drag to reorder */}
+              {/* Drag handle */}
               <span
                 className="lp-drag-handle"
                 onMouseDown={(e) => handleDragHandleMouseDown(e, index)}
@@ -172,82 +174,94 @@ export const LayersPanel: React.FC = () => {
               {/* Color dot — click to toggle visibility */}
               <span
                 className="lp-dot"
-                style={{ background: layer.color }}
+                style={{ background: layer.color, boxShadow: `0 0 8px ${layer.color}88` }}
                 onClick={() => toggleLayerVisibility(layer.id)}
                 title={layer.visible ? "Hide layer" : "Show layer"}
               />
 
-              {/* Name — click = toggle visibility, double-click = rename */}
-              {isEditing ? (
-                <input
-                  ref={editInputRef}
-                  className="lp-name-input"
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onBlur={commitRename}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitRename();
-                    if (e.key === "Escape") setEditingLayerId(null);
-                    e.stopPropagation();
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  autoFocus
-                />
-              ) : (
-                <span
-                  className="lp-name"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleLayerVisibility(layer.id);
-                  }}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation();
-                    handleDoubleClick(layer);
-                  }}
-                  title={layer.visible ? "Click to hide · Double-click to rename" : "Click to show · Double-click to rename"}
-                >
-                  {layer.name}
-                </span>
-              )}
+              {/* Name + count — click = toggle visibility, double-click = rename */}
+              <div className="lp-name-group">
+                {isEditing ? (
+                  <input
+                    ref={editInputRef}
+                    className="lp-name-input"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename();
+                      if (e.key === "Escape") setEditingLayerId(null);
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className="lp-name"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleLayerVisibility(layer.id);
+                    }}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      handleDoubleClick(layer);
+                    }}
+                    title={layer.visible ? "Click to hide · Double-click to rename" : "Click to show · Double-click to rename"}
+                  >
+                    {layer.name}
+                  </span>
+                )}
+                <span className="lp-count">{count}</span>
+              </div>
 
-              {/* Count badge */}
-              <span className="lp-count">{count}</span>
+              {/* Right-side actions */}
+              <div className="lp-actions">
+                {/* Assign selected — shown when selection exists */}
+                {selectedImageIds.length > 0 && (
+                  <button
+                    className="lp-assign-btn"
+                    onClick={() => handleAssignSelected(layer.id)}
+                    title={`Move ${selectedImageIds.length} selected here`}
+                  >
+                    ← Move here
+                  </button>
+                )}
 
-              {/* Select-all button */}
-              <button
-                className="lp-icon-btn lp-select-btn"
-                onClick={() => handleSelectAll(layer.id)}
-                title={`Select all ${count} images in ${layer.name}`}
-                disabled={count === 0}
-              >
-                ◈
-              </button>
-
-              {/* Delete (non-default layers only) */}
-              {layer.id !== "default" && (
+                {/* Select all */}
                 <button
-                  className="lp-icon-btn lp-trash-btn"
-                  onClick={() => handleDelete(layer)}
-                  title="Delete layer"
+                  className="lp-select-all-btn"
+                  onClick={() => handleSelectAll(layer.id)}
+                  title={`Select all ${count} images in ${layer.name}`}
+                  disabled={count === 0}
                 >
-                  ✕
+                  Select all
                 </button>
-              )}
 
-              {/* Assign selected — shown when selection exists */}
-              {selectedImageIds.length > 0 && (
-                <button
-                  className="lp-icon-btn lp-assign-icon-btn"
-                  onClick={() => handleAssignSelected(layer.id)}
-                  title={`Move selected here`}
-                >
-                  ←
-                </button>
-              )}
+                {/* Delete (non-default layers only) */}
+                {layer.id !== "default" && (
+                  <button
+                    className="lp-icon-btn lp-trash-btn"
+                    onClick={() => handleDelete(layer)}
+                    title="Delete layer"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
+
+      <ConfirmDialog
+        isOpen={layerConfirm !== null}
+        message={layerConfirm?.message ?? ""}
+        confirmLabel="Delete Layer"
+        danger
+        onConfirm={() => { layerConfirm?.onConfirm(); setLayerConfirm(null); }}
+        onCancel={() => setLayerConfirm(null)}
+      />
     </div>
   );
 };

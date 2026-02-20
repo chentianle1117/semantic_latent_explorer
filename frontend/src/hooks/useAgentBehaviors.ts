@@ -38,6 +38,7 @@ export function useAgentBehaviors() {
     addToExplorationCounter,
     resetAxisSuggestionCounter,
     setInlineAxisData,
+    setIsAgentUsingBrief,
   } = useAppStore();
 
   const imagesRef = useRef(images);
@@ -85,12 +86,18 @@ export function useAgentBehaviors() {
       setIsAgentWorking(true);
       setAgentStatus('thinking');
 
-      // Get alternative prompt from Gemini
-      const { prompt: altPrompt, reasoning } = await apiClient.getConcurrentPrompt(
-        userPrompt,
-        brief,
-        refUrls
-      );
+      // Get alternative prompt from Gemini — glow the brief while it's being used
+      if (brief) setIsAgentUsingBrief(true);
+      let altPrompt = '';
+      let reasoning = '';
+      try {
+        const result = await apiClient.getConcurrentPrompt(userPrompt, brief, refUrls);
+        altPrompt = result.prompt;
+        reasoning = result.reasoning;
+      } finally {
+        setIsAgentUsingBrief(false);
+      }
+      if (!altPrompt) return;
 
       console.log('[Agent B] Alt prompt:', altPrompt);
 
@@ -170,8 +177,15 @@ export function useAgentBehaviors() {
       setIsAgentWorking(true);
       setAgentStatus('thinking');
 
-      // Get gap-fill suggestions from backend
-      const { ghosts: suggestions } = await apiClient.suggestGhosts(brief ?? '', 2);
+      // Get gap-fill suggestions from backend (Gemini uses brief for context)
+      if (brief) setIsAgentUsingBrief(true);
+      let suggestions: any[] = [];
+      try {
+        const result = await apiClient.suggestGhosts(brief ?? '', 2);
+        suggestions = result.ghosts;
+      } finally {
+        setIsAgentUsingBrief(false);
+      }
 
       if (!suggestions.length) {
         console.log('[Agent C] No gap suggestions returned');
@@ -259,7 +273,15 @@ export function useAgentBehaviors() {
       const currentX = useAppStore.getState().axisLabels.x.join(' - ');
       const currentY = useAppStore.getState().axisLabels.y.join(' - ');
 
-      const { suggestions } = await apiClient.suggestAxes(brief ?? '', currentX, currentY);
+      if (brief) setIsAgentUsingBrief(true);
+      let axisResult: { suggestions: any[] } | null = null;
+      try {
+        axisResult = await apiClient.suggestAxes(brief ?? '', currentX, currentY);
+      } finally {
+        setIsAgentUsingBrief(false);
+      }
+      if (!axisResult) return;
+      const { suggestions } = axisResult;
 
       if (suggestions && suggestions.length > 0) {
         setInlineAxisData(suggestions.map(s => ({

@@ -1,10 +1,28 @@
 .design-brief-overlay {
   position: absolute;
-  top: 52px;
+  top: 12px;
   left: 12px;
   z-index: 50;
   max-width: 380px;
   pointer-events: all;
+  border-radius: 4px;
+  transition: box-shadow 0.4s ease;
+}
+
+/* Active glow: pulses when Gemini is using the brief */
+.dbo-agent-active {
+  animation: dbo-glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dbo-glow-pulse {
+  0%, 100% {
+    box-shadow: none;
+  }
+  50% {
+    box-shadow:
+      -6px 0 24px rgba(0, 210, 255, 0.35),
+      0 0 32px rgba(0, 210, 255, 0.15);
+  }
 }
 
 .dbo-read {
@@ -20,14 +38,26 @@
 }
 
 .dbo-read:hover {
-  border-left-color: rgba(0, 210, 255, 0.7);
+  border-left-color: rgba(0, 210, 255, 0.85);
+}
+
+.dbo-agent-active .dbo-read {
+  border-left-color: rgba(0, 210, 255, 0.9);
+  border-left-width: 3px;
+}
+
+/* Label row: label + "Using now" indicator */
+.dbo-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .dbo-label {
   display: block;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(0, 210, 255, 0.78);
   line-height: 1;
@@ -35,7 +65,46 @@
 }
 
 .dbo-read:hover .dbo-label {
+  color: rgba(0, 210, 255, 0.95);
+}
+
+/* "Using now" pill */
+.dbo-active-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(0, 210, 255, 0.1);
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  border-radius: 20px;
+  padding: 1px 6px 1px 4px;
+  animation: dbo-indicator-fade-in 0.3s ease;
+}
+
+@keyframes dbo-indicator-fade-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.dbo-active-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #00d2ff;
+  animation: dbo-dot-pulse 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes dbo-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.7); }
+}
+
+.dbo-active-text {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   color: rgba(0, 210, 255, 0.85);
+  white-space: nowrap;
 }
 
 .dbo-text {
@@ -64,10 +133,10 @@
 }
 
 .dbo-edit {
-  background: rgba(13, 17, 23, 0.82);
+  background: rgba(13, 17, 23, 0.88);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(88, 166, 255, 0.25);
+  border: 1px solid rgba(0, 210, 255, 0.3);
   border-radius: 8px;
   padding: 8px;
   display: flex;
@@ -93,7 +162,7 @@
 }
 
 .dbo-textarea:focus {
-  border-color: rgba(88, 166, 255, 0.5);
+  border-color: rgba(0, 210, 255, 0.5);
 }
 
 .dbo-actions {
@@ -103,10 +172,10 @@
 }
 
 .dbo-save {
-  background: rgba(88, 166, 255, 0.15);
-  border: 1px solid rgba(88, 166, 255, 0.4);
+  background: rgba(0, 210, 255, 0.1);
+  border: 1px solid rgba(0, 210, 255, 0.4);
   border-radius: 5px;
-  color: #58a6ff;
+  color: #00d2ff;
   font-size: 11px;
   padding: 3px 10px;
   cursor: pointer;
@@ -114,7 +183,7 @@
 }
 
 .dbo-save:hover {
-  background: rgba(88, 166, 255, 0.25);
+  background: rgba(0, 210, 255, 0.2);
 }
 
 .dbo-cancel {

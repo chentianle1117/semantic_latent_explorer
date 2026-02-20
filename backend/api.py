@@ -21,6 +21,18 @@ from rembg import remove
 import zipfile
 import json
 import tempfile
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    """Fallback encoder that converts numpy scalars/arrays to native Python types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 from fastapi.responses import FileResponse, StreamingResponse
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -208,7 +220,7 @@ def _serialize_canvas() -> dict:
             "group_id": img.group_id,
             "base64_image": b64,
             "embedding": img.embedding.tolist(),
-            "coordinates": list(img.coordinates),
+            "coordinates": [float(x) for x in img.coordinates],
             "parents": img.parents,
             "children": img.children,
             "reference_ids": img.reference_ids,
@@ -254,7 +266,7 @@ def _save_canvas_to_disk() -> Path:
     data = _serialize_canvas()
     path = _session_path(state.participant_id, state.current_canvas_id)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
+        json.dump(data, f, ensure_ascii=False, cls=_NumpyEncoder)
     return path
 
 
@@ -1136,6 +1148,19 @@ async def delete_image(image_id: int):
         raise HTTPException(status_code=404, detail="Image not found")
 
     img.visible = False
+    await broadcast_state_update()
+
+    return {"status": "success"}
+
+
+@app.post("/api/images/{image_id}/restore")
+async def restore_image(image_id: int):
+    """Restore a soft-deleted image back to the canvas."""
+    img = next((img for img in state.images_metadata if img.id == image_id), None)
+    if not img:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    img.visible = True
     await broadcast_state_update()
 
     return {"status": "success"}

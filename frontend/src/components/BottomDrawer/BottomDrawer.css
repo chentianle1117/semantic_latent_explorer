@@ -215,3 +215,60 @@
   width: 100%;
   height: 100%;
 }
+
+/* Deleted thumbnail wrappers (collapsed bar chips) */
+.drawer-thumb-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.drawer-thumb--deleted {
+  opacity: 0.45;
+  filter: saturate(0.2);
+}
+
+.drawer-thumb-cross {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.drawer-thumb-cross::before,
+.drawer-thumb-cross::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 70%;
+  height: 1.5px;
+  background: rgba(240, 80, 80, 0.8);
+}
+
+.drawer-thumb-cross::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.drawer-thumb-cross::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+/* Deleted state for expanded history cards */
+.group-thumb-bg--deleted {
+  opacity: 0.45;
+  filter: saturate(0.2);
+}
+
+.group-deleted-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(220, 40, 40, 0.1);
+  border: 1px solid rgba(220, 60, 60, 0.22);
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.group-deleted-overlay--all {
+  background: rgba(180, 30, 30, 0.2);
+  border-color: rgba(220, 60, 60, 0.4);
+}

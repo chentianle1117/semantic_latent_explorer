@@ -1,6 +1,8 @@
 /**
  * Design Brief Overlay — always-visible translucent brief on the canvas.
+ * Labeled "AI Agent Context" — Gemini uses this as guidance.
  * Click to edit inline. Saves to backend + Zustand store.
+ * Glows when the AI agent is actively referencing it.
  */
 
 import React, { useState, useEffect, useRef } from "react";
@@ -11,6 +13,7 @@ import "./DesignBriefOverlay.css";
 export const DesignBriefOverlay: React.FC = () => {
   const designBrief = useAppStore((s) => s.designBrief);
   const setDesignBrief = useAppStore((s) => s.setDesignBrief);
+  const isAgentUsingBrief = useAppStore((s) => s.isAgentUsingBrief);
 
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(designBrief || "");
@@ -49,7 +52,7 @@ export const DesignBriefOverlay: React.FC = () => {
   };
 
   return (
-    <div className="design-brief-overlay">
+    <div className={`design-brief-overlay ${isAgentUsingBrief ? "dbo-agent-active" : ""}`}>
       {isEditing ? (
         <div className="dbo-edit">
           <textarea
@@ -58,7 +61,7 @@ export const DesignBriefOverlay: React.FC = () => {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe your design brief… (Ctrl+Enter to save)"
+            placeholder="Describe your design context… (Ctrl+Enter to save)"
             rows={3}
           />
           <div className="dbo-actions">
@@ -70,11 +73,19 @@ export const DesignBriefOverlay: React.FC = () => {
         <div
           className={`dbo-read ${!designBrief ? "dbo-empty" : ""}`}
           onClick={() => setIsEditing(true)}
-          title="Click to edit design brief"
+          title="Click to edit — Gemini AI uses this as context for all suggestions"
         >
-          <span className="dbo-label">Brief</span>
+          <div className="dbo-label-row">
+            <span className="dbo-label">AI Agent Context</span>
+            {isAgentUsingBrief && (
+              <span className="dbo-active-indicator" title="Gemini is using this context right now">
+                <span className="dbo-active-dot" />
+                <span className="dbo-active-text">Using now</span>
+              </span>
+            )}
+          </div>
           <span className="dbo-text">
-            {designBrief || "Add a design brief…"}
+            {designBrief || "Add context for the AI agent…"}
           </span>
         </div>
       )}

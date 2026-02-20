@@ -5,7 +5,13 @@ import "./BottomDrawer.css";
 export const BottomDrawer: React.FC = () => {
   const isExpanded = useAppStore((s) => s.isDrawerExpanded);
   const setIsExpanded = useAppStore((s) => s.setIsDrawerExpanded);
-  const images = useAppStore((s) => s.images.filter((img) => img.visible));
+  // Include invisible images so deleted items show in history with strikethrough
+  const allImages = useAppStore((s) => s.images);
+  const images = allImages.filter((img) => img.visible);
+  const deletedIds = React.useMemo(
+    () => new Set(allImages.filter((img) => !img.visible).map((img) => img.id)),
+    [allImages]
+  );
   const historyGroups = useAppStore((s) => s.historyGroups);
   const setSelectedImageIds = useAppStore((s) => s.setSelectedImageIds);
   const setHoveredGroupId = useAppStore((s) => s.setHoveredGroupId);
@@ -22,27 +28,36 @@ export const BottomDrawer: React.FC = () => {
         </span>
         <div className="drawer-thumbs">
           {historyGroups.slice(-8).map((group) => {
+            // Use allImages so deleted thumbnail still shows (dimmed)
             const thumbnailImage =
               group.thumbnail_id !== null
-                ? images.find((img) => img.id === group.thumbnail_id)
+                ? allImages.find((img) => img.id === group.thumbnail_id)
                 : null;
+            const thumbDeleted = thumbnailImage ? deletedIds.has(thumbnailImage.id) : false;
+            const deletedCount = group.image_ids.filter((id) => deletedIds.has(id)).length;
             return (
               <div
                 key={group.id}
                 className="drawer-batch-chip"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedImageIds(group.image_ids);
+                  setSelectedImageIds(group.image_ids.filter((id) => !deletedIds.has(id)));
                 }}
               >
                 {thumbnailImage && (
-                  <img
-                    className="drawer-thumb"
-                    src={`data:image/png;base64,${thumbnailImage.base64_image}`}
-                    alt=""
-                  />
+                  <div className="drawer-thumb-wrap">
+                    <img
+                      className={`drawer-thumb${thumbDeleted ? " drawer-thumb--deleted" : ""}`}
+                      src={`data:image/png;base64,${thumbnailImage.base64_image}`}
+                      alt=""
+                    />
+                    {thumbDeleted && <div className="drawer-thumb-cross" />}
+                  </div>
                 )}
-                <span className="batch-count-badge">{group.image_ids.length}</span>
+                <span className="batch-count-badge">
+                  {group.image_ids.length}
+                  {deletedCount > 0 ? ` (−${deletedCount})` : ""}
+                </span>
               </div>
             );
           })}
@@ -55,8 +70,10 @@ export const BottomDrawer: React.FC = () => {
             {historyGroups.map((group) => {
               const thumbnailImage =
                 group.thumbnail_id !== null
-                  ? images.find((img) => img.id === group.thumbnail_id)
+                  ? allImages.find((img) => img.id === group.thumbnail_id)
                   : null;
+              const allDeleted = group.image_ids.every((id) => deletedIds.has(id));
+              const someDeleted = group.image_ids.some((id) => deletedIds.has(id));
               const timestamp = new Date(group.timestamp).toLocaleTimeString(
                 [],
                 { hour: "2-digit", minute: "2-digit" }
@@ -74,13 +91,16 @@ export const BottomDrawer: React.FC = () => {
                   {/* Background image fills the entire card */}
                   {thumbnailImage ? (
                     <img
-                      className="group-thumb-bg"
+                      className={`group-thumb-bg${allDeleted ? " group-thumb-bg--deleted" : ""}`}
                       src={`data:image/png;base64,${thumbnailImage.base64_image}`}
                       alt={group.type}
                     />
                   ) : (
                     <div className="group-thumb-placeholder" />
                   )}
+
+                  {/* Red deleted overlay */}
+                  {someDeleted && <div className={`group-deleted-overlay${allDeleted ? " group-deleted-overlay--all" : ""}`} />}
 
                   {/* Overlay: text floats on top */}
                   <div className="group-overlay">

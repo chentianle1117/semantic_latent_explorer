@@ -15,11 +15,25 @@ interface ExplorationTreeModalProps {
   onClose: () => void;
 }
 
-const NODE_R = 24;
-const SVG_PAD = 20;
+const NODE_R = 36;
+const SVG_PAD = 40;
 // Layout extent: [breadth, depth] — for left-to-right swap, depth→x (width), breadth→y (height)
-const TREE_BREADTH = 520;  // vertical extent (sibling spread) — larger for less cramped spacing
-const TREE_DEPTH = 700;    // horizontal extent (generations left-to-right)
+const TREE_BREADTH = 900;  // vertical extent (sibling spread)
+const TREE_DEPTH = 960;    // horizontal extent (generations left-to-right)
+
+// Distinct palette for lineage branches
+const LINEAGE_PALETTE = [
+  '#58a6ff', // blue
+  '#a855f7', // purple
+  '#14b8a6', // teal
+  '#f97316', // orange
+  '#ec4899', // pink
+  '#22c55e', // green
+  '#eab308', // amber
+  '#ef4444', // red
+  '#06b6d4', // cyan
+  '#8b5cf6', // violet
+];
 
 interface GraphNode {
   id: number;
@@ -50,7 +64,7 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
   const setSelectedImageIds = useAppStore((s) => s.setSelectedImageIds);
   const setFlyToImageId = useAppStore((s) => s.setFlyToImageId);
 
-  const { nodes, links, posMap, treeWidth, treeHeight } = useMemo(() => {
+  const { nodes, links, posMap, lineageColors, treeWidth, treeHeight } = useMemo(() => {
     const imageMap = new Map<number, ImageData>();
     images.forEach((img) => imageMap.set(img.id, img));
 
@@ -187,10 +201,28 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
       });
     });
 
+    // Compute lineage colors: BFS from each root, assign one palette color per lineage branch
+    const lineageColors = new Map<number, string>();
+    roots.forEach((rootId, idx) => {
+      const color = LINEAGE_PALETTE[idx % LINEAGE_PALETTE.length];
+      const bfsQueue = [rootId];
+      while (bfsQueue.length > 0) {
+        const id = bfsQueue.shift()!;
+        if (lineageColors.has(id)) continue;
+        lineageColors.set(id, color);
+        (childrenByParent.get(id) || []).forEach((cid) => bfsQueue.push(cid));
+      }
+    });
+    // Orphans and unassigned nodes get neutral gray
+    images.forEach((img) => {
+      if (!lineageColors.has(img.id)) lineageColors.set(img.id, '#8b949e');
+    });
+
     return {
       nodes: Array.from(nodeMap.values()),
       links: chosenLinks,
       posMap: shiftedPosMap,
+      lineageColors,
       treeWidth,
       treeHeight,
     };
@@ -207,32 +239,27 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
     g.selectAll("*").remove();
 
     const defs = g.append("defs");
-    defs
-      .append("marker")
-      .attr("id", "tree-arrow-parent")
-      .attr("markerWidth", 10)
-      .attr("markerHeight", 10)
-      .attr("refX", 9)
-      .attr("refY", 5)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M 0 0 L 10 5 L 0 10 Z")
-      .attr("fill", "#3fb950");
-    defs
-      .append("marker")
-      .attr("id", "tree-arrow-child")
-      .attr("markerWidth", 10)
-      .attr("markerHeight", 10)
-      .attr("refX", 9)
-      .attr("refY", 5)
-      .attr("orient", "auto")
-      .append("path")
-      .attr("d", "M 0 0 L 10 5 L 0 10 Z")
-      .attr("fill", "#d29922");
+
+    // Per-lineage arrow markers for directed edges
+    const usedColors = new Set<string>(lineageColors.values());
+    usedColors.forEach((color) => {
+      const markerId = `arr-${color.slice(1)}`;
+      defs
+        .append("marker")
+        .attr("id", markerId)
+        .attr("markerWidth", 8)
+        .attr("markerHeight", 8)
+        .attr("refX", 7)
+        .attr("refY", 4)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M 0 0 L 8 4 L 0 8 Z")
+        .attr("fill", color);
+    });
 
     const zoom = d3
       .zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.2, 4])
+      .scaleExtent([0.15, 5])
       .on("zoom", (event) => {
         g.select("g.zoom-group").attr("transform", event.transform);
       });
@@ -240,28 +267,30 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
 
     const zoomGroup = g.append("g").attr("class", "zoom-group");
 
-    // Links — left-to-right: smooth horizontal curve, arrow points right (parent→child)
+    // Links — smooth horizontal bezier, colored by source node's lineage
     links.forEach((link) => {
       const s = posMap.get(link.source);
       const t = posMap.get(link.target);
       if (!s || !t) return;
+      const color = lineageColors.get(link.source) || '#8b949e';
+      const markerId = `arr-${color.slice(1)}`;
       const midX = (s.x + t.x) / 2;
       const pathD = `M ${s.x} ${s.y} C ${midX} ${s.y}, ${midX} ${t.y}, ${t.x} ${t.y}`;
-      const isParent = link.type === "parent";
       zoomGroup
         .append("path")
         .attr("d", pathD)
         .attr("fill", "none")
-        .attr("stroke", isParent ? "#3fb950" : "#d29922")
-        .attr("stroke-opacity", 0.8)
-        .attr("stroke-width", 1.5)
-        .attr("marker-end", isParent ? "url(#tree-arrow-parent)" : "url(#tree-arrow-child)");
+        .attr("stroke", color)
+        .attr("stroke-opacity", 0.5)
+        .attr("stroke-width", 2)
+        .attr("marker-end", `url(#${markerId})`);
     });
 
     // Nodes
     nodes.forEach((d) => {
       const pos = posMap.get(d.id);
       if (!pos) return;
+      const lineageColor = lineageColors.get(d.id) || '#8b949e';
 
       const nodeG = zoomGroup
         .append("g")
@@ -283,27 +312,54 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
           .attr("width", NODE_R * 2)
           .attr("height", NODE_R * 2)
           .attr("preserveAspectRatio", "xMidYMid meet");
+      } else {
+        // Fallback placeholder with lineage tint
+        nodeG
+          .append("rect")
+          .attr("x", -NODE_R)
+          .attr("y", -NODE_R)
+          .attr("width", NODE_R * 2)
+          .attr("height", NODE_R * 2)
+          .attr("rx", 6)
+          .attr("fill", `${lineageColor}1a`);
       }
-      const isSelected = selectedImageIds.includes(d.id);
+
+      // Base lineage-colored border (always visible)
       nodeG
         .append("rect")
-        .attr("class", "node-ring")
+        .attr("class", "node-base-ring")
         .attr("x", -NODE_R - 2)
         .attr("y", -NODE_R - 2)
         .attr("width", NODE_R * 2 + 4)
         .attr("height", NODE_R * 2 + 4)
-        .attr("rx", 6)
+        .attr("rx", 8)
         .attr("fill", "none")
-        .attr("stroke", isSelected ? "#58a6ff" : "transparent")
-        .attr("stroke-width", isSelected ? 2 : 0)
+        .attr("stroke", lineageColor)
+        .attr("stroke-width", 1.5)
+        .attr("stroke-opacity", 0.6);
+
+      const isSelected = selectedImageIds.includes(d.id);
+      // Selection ring (cyan, sits above lineage ring)
+      nodeG
+        .append("rect")
+        .attr("class", "node-ring")
+        .attr("x", -NODE_R - 4)
+        .attr("y", -NODE_R - 4)
+        .attr("width", NODE_R * 2 + 8)
+        .attr("height", NODE_R * 2 + 8)
+        .attr("rx", 10)
+        .attr("fill", "none")
+        .attr("stroke", "#58a6ff")
+        .attr("stroke-width", isSelected ? 2.5 : 0)
         .attr("opacity", isSelected ? 1 : 0);
 
       nodeG
         .append("text")
-        .attr("y", NODE_R + 12)
+        .attr("y", NODE_R + 15)
         .attr("text-anchor", "middle")
-        .attr("font-size", "10px")
-        .attr("fill", "#8b949e")
+        .attr("font-size", "11px")
+        .attr("fill", lineageColor)
+        .attr("fill-opacity", 0.75)
         .text(`#${d.id}`);
 
       nodeG.on("click", () => {
@@ -316,8 +372,7 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
         const nodeId = d.id;
         const isSelected = selectedImageIdsRef.current.includes(nodeId);
         const ring = d3.select(this).select(".node-ring");
-        ring.attr("stroke", "#58a6ff").attr("stroke-width", 2);
-        // Keep selected nodes at full opacity — don't dim on hover to avoid "disappearing" flash
+        ring.attr("stroke", "#58a6ff").attr("stroke-width", 2.5);
         ring.attr("opacity", isSelected ? 1 : 0.6);
       });
       nodeG.on("mouseleave", function () {
@@ -326,17 +381,17 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
         d3.select(this)
           .select(".node-ring")
           .attr("stroke", isSelected ? "#58a6ff" : "transparent")
-          .attr("stroke-width", isSelected ? 2 : 0)
+          .attr("stroke-width", isSelected ? 2.5 : 0)
           .attr("opacity", isSelected ? 1 : 0);
       });
     });
 
-    // Fit tree to viewport: scale to fill extent (no artificial zoom-out cap)
+    // Fit tree to viewport: scale to fill extent
     const scale = Math.min(width / treeWidth, height / treeHeight);
     const tx = (width - treeWidth * scale) / 2;
     const ty = (height - treeHeight * scale) / 2;
     g.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
-  }, [isOpen, nodes, links, posMap, treeWidth, treeHeight, setSelectedImageIds, setFlyToImageId, onClose, selectedImageIds]);
+  }, [isOpen, nodes, links, posMap, lineageColors, treeWidth, treeHeight, setSelectedImageIds, setFlyToImageId, onClose, selectedImageIds]);
 
   // Sync selection highlights whenever selectedImageIds changes (e.g. from canvas or inspector)
   useEffect(() => {
@@ -348,7 +403,7 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
       const ring = el.querySelector(".node-ring");
       if (ring instanceof SVGElement) {
         ring.setAttribute("stroke", isSelected ? "#58a6ff" : "transparent");
-        ring.setAttribute("stroke-width", String(isSelected ? 2 : 0));
+        ring.setAttribute("stroke-width", String(isSelected ? 2.5 : 0));
         ring.setAttribute("opacity", String(isSelected ? 1 : 0));
       }
     });
@@ -356,15 +411,12 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
 
   if (!isOpen) return null;
 
-  const hasParentLinks = links.some((l) => l.type === "parent");
-  const hasChildLinks = links.some((l) => l.type === "child");
-
   return (
     <div className="exploration-tree-overlay" onClick={onClose}>
       <div
         className="exploration-tree-modal"
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "70vw", height: "70vh" }}
+        style={{ width: "85vw", height: "82vh" }}
       >
         <div className="exploration-tree-header">
           <span className="exploration-tree-title">Exploration Tree</span>
@@ -372,10 +424,9 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
             ✕
           </button>
         </div>
-        {(hasParentLinks || hasChildLinks) && (
+        {links.length > 0 && (
           <div className="exploration-tree-legend">
-            {hasParentLinks && <span className="legend-item parent">← parent</span>}
-            {hasChildLinks && <span className="legend-item child">→ child</span>}
+            <span className="legend-item">Colors = generation lineage</span>
             <span className="legend-item selected">● selected</span>
           </div>
         )}

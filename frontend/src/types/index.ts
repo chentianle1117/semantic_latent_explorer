@@ -111,12 +111,29 @@ export interface AppState {
   layers: CanvasLayer[];
   imageLayerMap: Record<number, string>; // imageId → layerId
 
+  // Isolate mode: when set, only these image IDs are shown at full opacity
+  isolatedImageIds: number[] | null;
+
+  // Star ratings: imageId → 1-5 (0 or absent = unrated)
+  imageRatings: Record<number, number>;
+  // Star filter: null = show all, 1-5 = show only images with rating >= this
+  starFilter: number | null;
+
+  // Design brief glow: true when Gemini is actively referencing the brief
+  isAgentUsingBrief: boolean;
+
   // Session / Multi-Canvas
   currentCanvasId: string | null;
   canvasName: string;
   participantId: string;
   canvasList: CanvasMeta[];
   eventLog: EventLogEntry[];
+
+  // Deletion undo stack (soft-deleted images, most recent first)
+  deletedImageStack: ImageData[];
+
+  // Axis suggestion accumulator
+  imagesSinceLastAxisSuggestion: number;
 }
 
 export interface VisualSettings {

@@ -18,6 +18,7 @@ import { ExplorationTreeModal } from "./components/ExplorationTreeModal/Explorat
 import { DynamicIsland } from "./components/DynamicIsland/DynamicIsland";
 import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefOverlay";
 import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
+import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { useAppStore } from "./store/appStore";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
 import { useAutoSave } from "./hooks/useAutoSave";
@@ -48,6 +49,19 @@ export const App: React.FC = () => {
   const [showRadialDial, setShowRadialDial] = useState(false);
   const [radialDialPos, setRadialDialPos] = useState({ x: 0, y: 0 });
   const [showExplorationTreeModal, setShowExplorationTreeModal] = useState(false);
+
+  // Native confirm dialog (replaces window.confirm)
+  const [confirmState, setConfirmState] = useState<{
+    message: string;
+    confirmLabel?: string;
+    danger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+  const showConfirm = (
+    message: string,
+    onConfirm: () => void,
+    opts?: { confirmLabel?: string; danger?: boolean }
+  ) => setConfirmState({ message, onConfirm, ...opts });
   const lastMousePosRef = useRef({
     x: typeof window !== "undefined" ? window.innerWidth / 2 : 400,
     y: typeof window !== "undefined" ? window.innerHeight / 2 : 300,
@@ -161,22 +175,23 @@ export const App: React.FC = () => {
       });
   }, [setImages, setHistoryGroups, setIsInitialized]);
 
-  const handleClearCanvas = async () => {
-    if (!window.confirm("Clear ALL images from canvas? This cannot be undone."))
-      return;
-
-    try {
-      await apiClient.clearCanvas();
-      // Force refresh state after clear
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-      clearSelection();
-      // floatingPanelPos removed
-    } catch (error) {
-      console.error("Clear failed:", error);
-      alert("Failed to clear canvas. Check console for details.");
-    }
+  const handleClearCanvas = () => {
+    showConfirm(
+      "Clear ALL images from canvas? This cannot be undone.",
+      async () => {
+        try {
+          await apiClient.clearCanvas();
+          const state = await apiClient.getState();
+          setImages(state.images);
+          setHistoryGroups(state.history_groups);
+          clearSelection();
+          useAppStore.getState().clearDeletedStack();
+        } catch (error) {
+          console.error("Clear failed:", error);
+        }
+      },
+      { confirmLabel: "Clear All", danger: true }
+    );
   };
 
   const handleExportZip = async (exportIds?: number[]) => {
@@ -312,10 +327,14 @@ export const App: React.FC = () => {
           remove_background: removeBackground,
         });
 
-        // Assign generated images to shoes layer
+        // Assign generated images to shoes layer + auto-add to isolate set
         if (batchResult?.images?.length > 0) {
           const newIds = batchResult.images.map((img: any) => img.id);
           useAppStore.getState().setImagesLayer(newIds, 'default');
+          const curIsolated = useAppStore.getState().isolatedImageIds;
+          if (curIsolated !== null) {
+            useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
+          }
         }
 
         console.log(`✓ Added to canvas (${i + 1}/${totalPrompts})`);
@@ -338,21 +357,7 @@ export const App: React.FC = () => {
         console.error(`✗ Failed prompt ${i + 1}:`, error);
         failCount++;
 
-        // Ask user if they want to continue
-        if (i < prompts.length - 1) {
-          const shouldContinue = window.confirm(
-            `Failed to generate image ${
-              i + 1
-            }/${totalPrompts}:\n"${prompt.substring(0, 50)}..."\n\nError: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }\n\nContinue with remaining ${totalPrompts - i - 1} prompts?`
-          );
-
-          if (!shouldContinue) {
-            console.log("🛑 User cancelled batch generation");
-            break;
-          }
-        }
+        // Auto-continue on individual prompt failure; summary shown at end
       }
     }
 
@@ -378,16 +383,22 @@ export const App: React.FC = () => {
     console.log(`📥 Loading ${shoes.length} shoes + ${references.length} references...`);
     setShowExternalImageLoader(false);
     setIsGenerating(true);
-    useProgressStore
-      .getState()
-      .showProgress("loading", `Loading ${total} image${total > 1 ? "s" : ""}...`, true);
-    useProgressStore.getState().updateProgress(0);
+    const ps = useProgressStore.getState();
+    ps.showProgress("loading", `Loading ${total} image${total > 1 ? "s" : ""}...`, true);
+    ps.updateProgress(0);
+
+    const stepList = [];
+    if (shoes.length > 0) stepList.push({ id: 'shoes', label: `Load ${shoes.length} shoe image${shoes.length > 1 ? 's' : ''} (bg removal)`, status: 'active' as const });
+    if (references.length > 0) stepList.push({ id: 'refs', label: `Load ${references.length} reference image${references.length > 1 ? 's' : ''}`, status: shoes.length > 0 ? 'pending' as const : 'active' as const });
+    stepList.push({ id: 'project', label: 'Embed with CLIP & project to canvas', status: 'pending' as const });
+    ps.setSteps(stepList);
+    ps.addLogLine(`Loading ${total} image${total > 1 ? 's' : ''} (${shoes.length} shoes, ${references.length} refs)`);
 
     const allNewIds: number[] = [];
     try {
       // Load shoes (background removal ON → default/Shoes layer)
       if (shoes.length > 0) {
-        useProgressStore.getState().updateProgress(10, `Loading ${shoes.length} shoe image${shoes.length > 1 ? "s" : ""}...`);
+        ps.addLogLine(`Uploading ${shoes.length} shoe image${shoes.length > 1 ? 's' : ''} for bg removal + CLIP embed...`);
         const shoeResult = await apiClient.addExternalImages({
           images: shoes.map((url) => ({ url })),
           prompt: "Shoe images",
@@ -397,13 +408,18 @@ export const App: React.FC = () => {
         if (shoeResult.images?.length) {
           const ids = shoeResult.images.map((img: any) => img.id);
           allNewIds.push(...ids);
-          useAppStore.getState().setImagesLayer(ids, "default"); // Shoes layer
+          useAppStore.getState().setImagesLayer(ids, "default");
+          ps.addLogLine(`✓ ${ids.length} shoe image${ids.length > 1 ? 's' : ''} embedded (ids: ${ids.slice(0,4).join(', ')}${ids.length > 4 ? '…' : ''})`);
         }
+        ps.updateProgress(40);
+        ps.updateStepStatus('shoes', 'done');
+        if (references.length > 0) ps.updateStepStatus('refs', 'active');
+        else ps.updateStepStatus('project', 'active');
       }
 
       // Load references (background removal OFF → references layer)
       if (references.length > 0) {
-        useProgressStore.getState().updateProgress(50, `Loading ${references.length} reference image${references.length > 1 ? "s" : ""}...`);
+        ps.addLogLine(`Uploading ${references.length} reference image${references.length > 1 ? 's' : ''} (no bg removal)...`);
         const refResult = await apiClient.addExternalImages({
           images: references.map((url) => ({ url })),
           prompt: "Reference images",
@@ -413,11 +429,15 @@ export const App: React.FC = () => {
         if (refResult.images?.length) {
           const ids = refResult.images.map((img: any) => img.id);
           allNewIds.push(...ids);
-          useAppStore.getState().setImagesLayer(ids, "references"); // References layer
+          useAppStore.getState().setImagesLayer(ids, "references");
+          ps.addLogLine(`✓ ${ids.length} reference image${ids.length > 1 ? 's' : ''} embedded`);
         }
+        ps.updateProgress(75);
+        ps.updateStepStatus('refs', 'done');
+        ps.updateStepStatus('project', 'active');
       }
 
-      useProgressStore.getState().updateProgress(85, "Updating canvas...");
+      ps.addLogLine('Projecting all embeddings to semantic axes...');
       const state = await apiClient.getState();
       setImages(state.images);
       setHistoryGroups(state.history_groups);
@@ -425,10 +445,15 @@ export const App: React.FC = () => {
       resetCanvasBounds();
       if (allNewIds.length > 0) {
         useAppStore.getState().setSelectedImageIds(allNewIds);
+        const curIsolated = useAppStore.getState().isolatedImageIds;
+        if (curIsolated !== null) {
+          useAppStore.getState().setIsolatedImageIds([...curIsolated, ...allNewIds]);
+        }
       }
 
-      console.log(`✓ All ${total} images loaded successfully`);
-      useProgressStore.getState().updateProgress(100, "Complete");
+      ps.addLogLine(`✓ All ${total} image${total > 1 ? 's' : ''} placed on canvas`);
+      ps.updateStepStatus('project', 'done');
+      ps.updateProgress(100);
     } catch (error) {
       console.error("Failed to load external images:", error);
       useProgressStore.getState().hideProgress();
@@ -477,16 +502,17 @@ export const App: React.FC = () => {
     setPromptDialogImageId(null);
     setShowPromptDialog(false);
     setIsGenerating(true);
-    useProgressStore
-      .getState()
-      .showProgress(
-        "generating",
-        `Generating ${numImages} image${
-          numImages > 1 ? "s" : ""
-        } from reference...`,
-        true
-      );
-    useProgressStore.getState().updateProgress(0);
+    const ps = useProgressStore.getState();
+    ps.showProgress("generating", `Generating ${numImages} image${numImages > 1 ? "s" : ""} from reference...`, true);
+    ps.updateProgress(0);
+    ps.setSteps([
+      { id: 'upload',  label: `Upload ${referenceIds.length} reference image${referenceIds.length > 1 ? 's' : ''}`, status: 'active' },
+      { id: 'gen',     label: `Generate ${numImages} variation${numImages > 1 ? 's' : ''} via fal.ai`, status: 'pending' },
+      { id: 'embed',   label: 'Embed with Jina CLIP v2', status: 'pending' },
+      { id: 'project', label: 'Project to semantic canvas', status: 'pending' },
+    ]);
+    ps.addLogLine(`Prompt: "${prompt.substring(0, 60)}${prompt.length > 60 ? '…' : ''}"`);
+    ps.addLogLine(`Using ${referenceIds.length} reference image${referenceIds.length > 1 ? 's' : ''} as conditioning`);
 
     try {
       const selectedImages = images.filter((img) =>
@@ -497,51 +523,38 @@ export const App: React.FC = () => {
         throw new Error("No reference images found");
       }
 
-      console.log(
-        `Using ${selectedImages.length} reference images to generate ${numImages} variations`
-      );
-
-      // Convert base64 images to URLs that fal.ai can use
-      useProgressStore
-        .getState()
-        .updateProgress(10, "Uploading reference images...");
+      // Convert base64 images to fal.ai URLs
       const imageUrls: string[] = [];
-
-      for (const img of selectedImages) {
-        // Create a blob from base64
+      for (let i = 0; i < selectedImages.length; i++) {
+        const img = selectedImages[i];
+        ps.addLogLine(`Uploading reference ${i + 1}/${selectedImages.length} (id=${img.id})...`);
         const base64Data = img.base64_image;
-        const blob = await (
-          await fetch(`data:image/png;base64,${base64Data}`)
-        ).blob();
-        const file = new File([blob], `reference-${img.id}.png`, {
-          type: "image/png",
-        });
-
-        // Upload to fal.ai storage
+        const blob = await (await fetch(`data:image/png;base64,${base64Data}`)).blob();
+        const file = new File([blob], `reference-${img.id}.png`, { type: "image/png" });
         const url = await falClient.uploadFile(file);
         imageUrls.push(url);
+        ps.addLogLine(`✓ Uploaded reference ${i + 1}/${selectedImages.length}`);
       }
+      ps.updateProgress(20);
+      ps.updateStepStatus('upload', 'done');
+      ps.updateStepStatus('gen', 'active');
 
-      // Use image edit endpoint with reference images
-      useProgressStore
-        .getState()
-        .updateProgress(30, "Generating variations...");
+      ps.addLogLine(`Generating ${numImages} variation${numImages > 1 ? 's' : ''} via fal.ai...`);
       const result = await falClient.generateImageEdit({
         prompt,
         image_urls: imageUrls,
-        num_images: numImages, // Changed from hardcoded 1
+        num_images: numImages,
         aspect_ratio: "1:1",
         output_format: "jpeg",
       });
+      ps.addLogLine(`✓ fal.ai returned ${result.images.length} image${result.images.length > 1 ? 's' : ''}`);
+      ps.updateProgress(50);
+      ps.updateStepStatus('gen', 'done');
+      ps.updateStepStatus('embed', 'active');
 
-      console.log("fal.ai image edit result:", result);
-
-      // Send images to backend for CLIP embedding extraction
-      // Include parent IDs for genealogy tracking
       const parentIds = selectedImages.map((img) => img.id);
-      console.log("Setting parent IDs:", parentIds);
-
-      useProgressStore.getState().updateProgress(70, "Computing embeddings...");
+      ps.addLogLine(`Embedding ${result.images.length} image${result.images.length > 1 ? 's' : ''} with Jina CLIP v2...`);
+      if (removeBackground) ps.addLogLine('Background removal enabled — processing...');
       const addResult = await apiClient.addExternalImages({
         images: result.images.map((img) => ({ url: img.url })),
         prompt: prompt,
@@ -549,28 +562,32 @@ export const App: React.FC = () => {
         remove_background: removeBackground,
         parent_ids: parentIds,
       });
+      ps.addLogLine(`✓ CLIP embeddings computed (1024-dim), genealogy tracked`);
+      ps.updateProgress(80);
+      ps.updateStepStatus('embed', 'done');
+      ps.updateStepStatus('project', 'active');
 
-      console.log(
-        `✓ Added ${result.images.length} fal.ai edited image(s) to canvas with ${parentIds.length} parent(s)`
-      );
       addToExplorationCounter(numImages);
       addToAxisSuggestionCounter(numImages);
       triggerConcurrentGhosts(prompt, parentIds, imageUrls).catch(console.error);
 
-      // Fetch updated state since we're not using WebSocket
-      useProgressStore.getState().updateProgress(90, "Updating canvas...");
+      ps.addLogLine('Projecting embeddings to semantic axes...');
       const state = await apiClient.getState();
       setImages(state.images);
       setHistoryGroups(state.history_groups);
 
-      // Auto-select newly generated images + assign to shoes layer
       if (addResult?.images?.length > 0) {
         const newIds = addResult.images.map((img: any) => img.id);
         useAppStore.getState().setSelectedImageIds(newIds);
         useAppStore.getState().setImagesLayer(newIds, 'default');
+        const curIsolated = useAppStore.getState().isolatedImageIds;
+        if (curIsolated !== null) {
+          useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
+        }
+        ps.addLogLine(`✓ ${newIds.length} image${newIds.length > 1 ? 's' : ''} placed on canvas (parents: [${parentIds.join(', ')}])`);
       }
-
-      useProgressStore.getState().updateProgress(100);
+      ps.updateStepStatus('project', 'done');
+      ps.updateProgress(100);
     } catch (error) {
       console.error("Reference generation failed:", error);
       useProgressStore.getState().hideProgress();
@@ -790,14 +807,15 @@ export const App: React.FC = () => {
                 onGenerate={async (prompt, count) => {
                   setShowTextToImageDialog(false);
                   setIsGenerating(true);
-                  useProgressStore
-                    .getState()
-                    .showProgress(
-                      "generating",
-                      `Generating ${count} image${count > 1 ? "s" : ""}...`,
-                      true
-                    );
-                  useProgressStore.getState().updateProgress(0);
+                  const ps = useProgressStore.getState();
+                  ps.showProgress("generating", `Generating ${count} image${count > 1 ? "s" : ""}...`, true);
+                  ps.updateProgress(0);
+                  ps.setSteps([
+                    { id: 'gen',     label: `Generate ${count} image${count > 1 ? 's' : ''} via fal.ai`, status: 'active' },
+                    { id: 'embed',   label: `Embed with Jina CLIP v2`, status: 'pending' },
+                    { id: 'project', label: 'Project to semantic canvas', status: 'pending' },
+                  ]);
+                  ps.addLogLine(`Prompt: "${prompt.substring(0, 60)}${prompt.length > 60 ? '…' : ''}"`);
 
                   try {
                     if (!falClient.isConfigured()) {
@@ -809,29 +827,32 @@ export const App: React.FC = () => {
                       return;
                     }
 
-                    useProgressStore
-                      .getState()
-                      .updateProgress(10, "Generating with fal.ai...");
+                    ps.addLogLine(`Requesting ${count} image${count > 1 ? 's' : ''} from fal.ai nano-banana...`);
                     const result = await falClient.generateTextToImage({
                       prompt,
                       num_images: count,
                       aspect_ratio: "1:1",
                       output_format: "jpeg",
                     });
+                    ps.addLogLine(`✓ fal.ai returned ${result.images.length} image${result.images.length > 1 ? 's' : ''}`);
+                    ps.updateProgress(40);
+                    ps.updateStepStatus('gen', 'done');
+                    ps.updateStepStatus('embed', 'active');
 
-                    useProgressStore
-                      .getState()
-                      .updateProgress(60, "Computing embeddings...");
+                    ps.addLogLine(`Embedding ${result.images.length} image${result.images.length > 1 ? 's' : ''} with Jina CLIP v2...`);
+                    if (removeBackground) ps.addLogLine('Background removal enabled — processing...');
                     const addResult = await apiClient.addExternalImages({
                       images: result.images.map((img) => ({ url: img.url })),
                       prompt: prompt,
                       generation_method: "batch",
                       remove_background: removeBackground,
                     });
+                    ps.addLogLine(`✓ CLIP embeddings computed (1024-dim)`);
+                    ps.updateProgress(75);
+                    ps.updateStepStatus('embed', 'done');
+                    ps.updateStepStatus('project', 'active');
 
-                    useProgressStore
-                      .getState()
-                      .updateProgress(90, "Updating canvas...");
+                    ps.addLogLine('Projecting embeddings to semantic axes...');
                     const state = await apiClient.getState();
                     setImages(state.images);
                     setHistoryGroups(state.history_groups);
@@ -841,13 +862,19 @@ export const App: React.FC = () => {
                       const newIds = addResult.images.map((img: any) => img.id);
                       useAppStore.getState().setSelectedImageIds(newIds);
                       useAppStore.getState().setImagesLayer(newIds, 'default');
+                      const curIsolated = useAppStore.getState().isolatedImageIds;
+                      if (curIsolated !== null) {
+                        useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
+                      }
+                      ps.addLogLine(`✓ ${newIds.length} image${newIds.length > 1 ? 's' : ''} placed on canvas`);
                     }
+                    ps.updateStepStatus('project', 'done');
 
                     addToExplorationCounter(count);
                     addToAxisSuggestionCounter(count);
                     triggerConcurrentGhosts(prompt, [], []).catch(console.error);
 
-                    useProgressStore.getState().updateProgress(100);
+                    ps.updateProgress(100);
                   } catch (error) {
                     console.error("Generation failed:", error);
                     useProgressStore.getState().hideProgress();
@@ -881,10 +908,18 @@ export const App: React.FC = () => {
             handleGenerateFromReferenceClick();
           }}
           onRemoveSelected={() => {
-            selectedImageIds.forEach((id) => {
-              useAppStore.getState().removeImage(id);
-            });
-            clearSelection();
+            const ids = [...selectedImageIds];
+            showConfirm(
+              `Remove ${ids.length} selected image${ids.length !== 1 ? "s" : ""} from canvas?`,
+              () => {
+                ids.forEach((id) => {
+                  useAppStore.getState().removeImage(id);
+                  apiClient.deleteImage(id).catch(() => {});
+                });
+                clearSelection();
+              },
+              { confirmLabel: "Remove", danger: true }
+            );
           }}
         />
 
@@ -966,6 +1001,27 @@ export const App: React.FC = () => {
             onClick: () => setShowExplorationTreeModal(true),
           },
           {
+            id: "isolate",
+            icon: "◎",
+            label: selectedImageIds.length > 0
+              ? (useAppStore.getState().isolatedImageIds !== null ? "Unhide All" : `Isolate ${selectedImageIds.length}`)
+              : (useAppStore.getState().isolatedImageIds !== null ? "Unhide All" : "Isolate"),
+            description: useAppStore.getState().isolatedImageIds !== null
+              ? "Exit isolate mode — show all images"
+              : selectedImageIds.length > 0
+                ? `Show only ${selectedImageIds.length} selected image(s)`
+                : "Select shoes first to isolate them",
+            category: "global",
+            onClick: () => {
+              const store = useAppStore.getState();
+              if (store.isolatedImageIds !== null) {
+                store.setIsolatedImageIds(null);
+              } else if (selectedImageIds.length > 0) {
+                store.setIsolatedImageIds([...selectedImageIds]);
+              }
+            },
+          },
+          {
             id: "delete",
             icon: "🗑️",
             label: "Delete",
@@ -976,22 +1032,20 @@ export const App: React.FC = () => {
             category: "global",
             onClick: () => {
               if (selectedImageIds.length > 0) {
-                if (
-                  window.confirm(
-                    `Remove ${selectedImageIds.length} selected image(s) from the canvas?`
-                  )
-                ) {
-                  selectedImageIds.forEach((id) => {
-                    useAppStore.getState().removeImage(id);
-                  });
-                  clearSelection();
-                }
+                const ids = [...selectedImageIds];
+                showConfirm(
+                  `Remove ${ids.length} selected image${ids.length !== 1 ? "s" : ""} from canvas?`,
+                  () => {
+                    ids.forEach((id) => {
+                      useAppStore.getState().removeImage(id);
+                      apiClient.deleteImage(id).catch(() => {});
+                    });
+                    clearSelection();
+                  },
+                  { confirmLabel: "Remove", danger: true }
+                );
               } else {
-                if (
-                  window.confirm("Clear all images from the canvas?")
-                ) {
-                  handleClearCanvas();
-                }
+                handleClearCanvas();
               }
             },
           },
@@ -1004,6 +1058,19 @@ export const App: React.FC = () => {
             onClick: () => setShowSettingsModal(true),
           },
         ]}
+      />
+
+      {/* Native confirm dialog — replaces window.confirm() */}
+      <ConfirmDialog
+        isOpen={confirmState !== null}
+        message={confirmState?.message ?? ""}
+        confirmLabel={confirmState?.confirmLabel}
+        danger={confirmState?.danger}
+        onConfirm={() => {
+          confirmState?.onConfirm();
+          setConfirmState(null);
+        }}
+        onCancel={() => setConfirmState(null)}
       />
     </>
   );

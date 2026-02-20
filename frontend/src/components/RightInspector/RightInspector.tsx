@@ -177,6 +177,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   const imageLayerMap = useAppStore((s) => s.imageLayerMap);
   const setImageLayer = useAppStore((s) => s.setImageLayer);
   const setImagesLayer = useAppStore((s) => s.setImagesLayer);
+  const isolatedImageIds = useAppStore((s) => s.isolatedImageIds);
+  const setIsolatedImageIds = useAppStore((s) => s.setIsolatedImageIds);
+  const imageRatings = useAppStore((s) => s.imageRatings);
+  const setImageRating = useAppStore((s) => s.setImageRating);
 
   // Split-state: inspectedImageId can diverge from selectedImageIds
   const [inspectedImageId, setInspectedImageId] = useState<number | null>(null);
@@ -652,14 +656,42 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
             )}
           </div>
 
-          {/* Action Bar - High Contrast */}
+          {/* Action Bar */}
           <div className="action-bar">
-            {onGenerateFromReference && (
-              <button className="action-primary" onClick={onGenerateFromReference}>
-                Generate Variations
-              </button>
-            )}
-            {/* Layer assignment row — always visible */}
+            {/* ① Star Rating */}
+            <div className="action-star-row">
+              <span className="action-star-label">Rate</span>
+              <div className="star-rating">
+                {[1, 2, 3, 4, 5].map((n) => {
+                  const currentRating = imageRatings[inspectedImage.id] ?? 0;
+                  const filled = n <= currentRating;
+                  return (
+                    <button
+                      key={n}
+                      className={`star-btn ${filled ? "star-filled" : "star-empty"}`}
+                      onClick={() => {
+                        // Click same star = clear rating; otherwise set
+                        const newRating = currentRating === n ? 0 : n;
+                        // If multiple selected, rate all
+                        if (selectedImageIds.length > 1) {
+                          selectedImageIds.forEach((id) => setImageRating(id, newRating));
+                        } else {
+                          setImageRating(inspectedImage.id, newRating);
+                        }
+                      }}
+                      title={`Rate ${n} star${n > 1 ? "s" : ""}`}
+                    >
+                      {filled ? "★" : "☆"}
+                    </button>
+                  );
+                })}
+                {(imageRatings[inspectedImage.id] ?? 0) > 0 && (
+                  <span className="star-value">{imageRatings[inspectedImage.id]}/5</span>
+                )}
+              </div>
+            </div>
+
+            {/* ② Layer assignment row */}
             {(() => {
               const lid = imageLayerMap[inspectedImage.id] ?? "default";
               const layer = layers.find((l) => l.id === lid) ?? layers[0];
@@ -686,6 +718,30 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 </div>
               );
             })()}
+
+            {/* ③ Isolate / Unhide toggle */}
+            <button
+              className={isolatedImageIds !== null ? "action-unhide" : "action-isolate"}
+              onClick={() => {
+                if (isolatedImageIds !== null) {
+                  setIsolatedImageIds(null);
+                } else {
+                  setIsolatedImageIds([...selectedImageIds]);
+                }
+              }}
+              title={isolatedImageIds !== null ? "Exit isolate mode" : `Isolate ${selectedImageIds.length} selected image(s)`}
+            >
+              {isolatedImageIds !== null ? "⊙ Unhide All" : "◎ Isolate"}
+            </button>
+
+            {/* ④ Generate Variations */}
+            {onGenerateFromReference && (
+              <button className="action-primary" onClick={onGenerateFromReference}>
+                Generate Variations
+              </button>
+            )}
+
+            {/* ⑤ Remove + Deselect */}
             <div className="action-row">
               {onRemoveSelected && (
                 <button className="action-danger" onClick={onRemoveSelected}>

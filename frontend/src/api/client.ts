@@ -47,9 +47,15 @@ class APIClient {
     return response.data;
   }
 
-  // Delete image
+  // Delete image (soft-delete: sets visible=false on backend)
   async deleteImage(imageId: number): Promise<{ status: string }> {
     const response = await axios.delete(`${API_BASE}/images/${imageId}`);
+    return response.data;
+  }
+
+  // Restore soft-deleted image
+  async restoreImage(imageId: number): Promise<{ status: string }> {
+    const response = await axios.post(`${API_BASE}/images/${imageId}/restore`);
     return response.data;
   }
 

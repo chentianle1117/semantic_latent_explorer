@@ -162,10 +162,8 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
           <button
             className="flyout-action-btn danger"
             onClick={() => {
-              if (window.confirm("Clear all images from the canvas?")) {
-                onClearAll();
-                closeFlyout();
-              }
+              onClearAll();
+              closeFlyout();
             }}
           >
             🗑 Clear All

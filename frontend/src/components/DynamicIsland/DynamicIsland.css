@@ -1,6 +1,6 @@
 .dynamic-island {
   position: absolute;
-  top: 52px;
+  top: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 900;

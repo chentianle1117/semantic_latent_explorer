@@ -67,14 +67,6 @@
   flex-shrink: 0;
 }
 
-.exploration-tree-legend .legend-item.parent {
-  color: #3fb950;
-}
-
-.exploration-tree-legend .legend-item.child {
-  color: #d29922;
-}
-
 .exploration-tree-legend .legend-item.selected {
   color: var(--primary-blue, #58a6ff);
 }

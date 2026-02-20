@@ -8,27 +8,27 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 2px 8px;
+  padding: 0 4px 10px;
   flex-shrink: 0;
 }
 
 .lp-title {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  color: rgba(0, 210, 255, 0.5);
+  letter-spacing: 0.14em;
+  color: rgba(0, 210, 255, 0.6);
   text-transform: uppercase;
 }
 
 .lp-add-btn {
   background: none;
-  border: 1px solid rgba(88, 166, 255, 0.35);
-  border-radius: 4px;
-  color: rgba(88, 166, 255, 0.8);
-  font-size: 16px;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+  border-radius: 5px;
+  color: rgba(88, 166, 255, 0.85);
+  font-size: 18px;
   line-height: 1;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -40,31 +40,33 @@
 .lp-add-btn:hover {
   background: rgba(88, 166, 255, 0.15);
   color: #58a6ff;
+  border-color: rgba(88, 166, 255, 0.65);
 }
 
 .lp-list {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   overflow-y: auto;
   flex: 1;
 }
 
+/* ── Layer Row ──────────────────────────────────────────────────── */
 .lp-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 4px;
-  border-radius: 6px;
-  border: 1px solid transparent;
+  gap: 8px;
+  padding: 10px 8px 10px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.025);
   transition: background 0.12s, border-color 0.12s;
-  flex-wrap: wrap;
-  min-height: 34px;
+  min-height: 54px;
 }
 
 .lp-row:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .lp-row--hidden {
@@ -83,27 +85,28 @@
   box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.4);
 }
 
-/* Drag handle */
+/* ── Drag handle ─────────────────────────────────────────────────── */
 .lp-drag-handle {
-  color: rgba(150, 165, 180, 0.35);
-  font-size: 13px;
+  color: rgba(150, 165, 180, 0.3);
+  font-size: 15px;
   cursor: grab;
   flex-shrink: 0;
-  padding: 0 2px;
+  padding: 0 1px;
   user-select: none;
   line-height: 1;
   transition: color 0.12s;
 }
 .lp-drag-handle:hover {
-  color: rgba(150, 165, 180, 0.75);
+  color: rgba(150, 165, 180, 0.7);
 }
 .lp-drag-handle:active {
   cursor: grabbing;
 }
 
+/* ── Color dot ───────────────────────────────────────────────────── */
 .lp-dot {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   flex-shrink: 0;
   cursor: pointer;
@@ -111,90 +114,127 @@
 }
 .lp-dot:hover {
   opacity: 0.7;
-  transform: scale(1.25);
+  transform: scale(1.2);
+}
+
+/* ── Name + count group ──────────────────────────────────────────── */
+.lp-name-group {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
 }
 
 .lp-name {
-  flex: 1;
-  font-size: 12px;
-  color: rgba(200, 215, 230, 0.85);
-  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(210, 225, 240, 0.92);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
+  flex-shrink: 1;
+  min-width: 0;
 }
 .lp-name:hover {
-  color: rgba(200, 215, 230, 1);
+  color: rgba(225, 235, 245, 1);
 }
 
 .lp-name-input {
   flex: 1;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(88, 166, 255, 0.45);
-  border-radius: 3px;
+  border-radius: 4px;
   color: rgba(200, 215, 230, 0.95);
-  font-size: 12px;
+  font-size: 14px;
   font-family: inherit;
-  padding: 2px 5px;
+  padding: 3px 6px;
   outline: none;
   min-width: 0;
 }
 
 .lp-count {
-  font-size: 10px;
-  color: rgba(150, 165, 180, 0.5);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(150, 165, 180, 0.55);
   flex-shrink: 0;
-  min-width: 14px;
-  text-align: right;
+  white-space: nowrap;
 }
 
-/* Icon buttons — unified style, bigger than before */
+/* ── Right-side action group ─────────────────────────────────────── */
+.lp-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* "Select all" text button */
+.lp-select-all-btn {
+  background: rgba(88, 166, 255, 0.08);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  border-radius: 5px;
+  color: rgba(88, 166, 255, 0.8);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.lp-select-all-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.lp-select-all-btn:not(:disabled):hover {
+  background: rgba(88, 166, 255, 0.2);
+  color: #58a6ff;
+  border-color: rgba(88, 166, 255, 0.6);
+}
+
+/* "Move here" assign button */
+.lp-assign-btn {
+  background: rgba(48, 185, 80, 0.1);
+  border: 1px solid rgba(48, 185, 80, 0.35);
+  border-radius: 5px;
+  color: rgba(63, 185, 80, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s;
+}
+
+.lp-assign-btn:hover {
+  background: rgba(48, 185, 80, 0.2);
+  color: rgb(63, 185, 80);
+}
+
+/* Icon buttons — delete etc. */
 .lp-icon-btn {
   background: none;
   border: none;
-  color: rgba(150, 165, 180, 0.55);
+  color: rgba(150, 165, 180, 0.4);
   font-size: 14px;
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 4px;
+  padding: 4px 5px;
+  border-radius: 5px;
   flex-shrink: 0;
   transition: color 0.12s, background 0.12s;
   line-height: 1;
-  min-width: 22px;
+  min-width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.lp-icon-btn:disabled {
-  opacity: 0.2;
-  cursor: default;
-}
-
-.lp-select-btn:not(:disabled):hover {
-  color: rgba(88, 166, 255, 0.9);
-  background: rgba(88, 166, 255, 0.1);
-}
-
-.lp-eye-btn:hover {
-  color: rgba(0, 210, 255, 0.9);
-  background: rgba(0, 210, 255, 0.08);
-}
-
-.lp-move-btn:not(:disabled):hover {
-  color: rgba(200, 215, 230, 0.9);
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .lp-trash-btn:hover {
   color: rgba(255, 100, 100, 0.9);
   background: rgba(255, 100, 100, 0.1);
-}
-
-/* Assign-selected icon button (← arrow, shown inline when selection exists) */
-.lp-assign-icon-btn:hover {
-  color: rgba(88, 166, 255, 0.9);
-  background: rgba(88, 166, 255, 0.12);
 }

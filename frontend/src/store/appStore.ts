@@ -12,6 +12,8 @@ interface AppStore extends AppState {
   addImages: (images: ImageData[]) => void;
   updateImage: (id: number, updates: Partial<ImageData>) => void;
   removeImage: (id: number) => void;
+  restoreImageLocally: (id: number) => void;
+  clearDeletedStack: () => void;
 
   setHistoryGroups: (groups: HistoryGroup[]) => void;
   addHistoryGroup: (group: HistoryGroup) => void;
@@ -106,6 +108,16 @@ interface AppStore extends AppState {
 
   clearAll: () => void;
 
+  // Isolate mode
+  setIsolatedImageIds: (ids: number[] | null) => void;
+
+  // Star ratings
+  setImageRating: (imageId: number, rating: number) => void;
+  setStarFilter: (n: number | null) => void;
+
+  // Design brief glow
+  setIsAgentUsingBrief: (v: boolean) => void;
+
   // Session / Multi-Canvas
   setCurrentCanvasId: (id: string | null) => void;
   setCanvasName: (name: string) => void;
@@ -189,6 +201,17 @@ const initialState: AppState = {
     { id: 'references', name: 'References', visible: true, color: '#ff7b72' },
   ] as CanvasLayer[],
   imageLayerMap: {} as Record<number, string>,
+  isolatedImageIds: null,
+
+  // Star ratings
+  imageRatings: {} as Record<number, number>,
+  starFilter: null as number | null,
+
+  // Design brief glow
+  isAgentUsingBrief: false,
+
+  // Deletion undo stack
+  deletedImageStack: [] as ImageData[],
 
   // Session / Multi-Canvas
   currentCanvasId: null as string | null,
@@ -217,12 +240,29 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
 
   removeImage: (id) =>
+    set((state) => {
+      const target = state.images.find((img) => img.id === id);
+      return {
+        images: state.images.map((img) =>
+          img.id === id ? { ...img, visible: false } : img
+        ),
+        selectedImageIds: state.selectedImageIds.filter((sid) => sid !== id),
+        // Push a snapshot to the undo stack (before it becomes invisible)
+        deletedImageStack: target
+          ? [{ ...target, visible: false }, ...state.deletedImageStack]
+          : state.deletedImageStack,
+      };
+    }),
+
+  restoreImageLocally: (id) =>
     set((state) => ({
       images: state.images.map((img) =>
-        img.id === id ? { ...img, visible: false } : img
+        img.id === id ? { ...img, visible: true } : img
       ),
-      selectedImageIds: state.selectedImageIds.filter((sid) => sid !== id),
+      deletedImageStack: state.deletedImageStack.filter((img) => img.id !== id),
     })),
+
+  clearDeletedStack: () => set({ deletedImageStack: [] }),
 
   // History group actions
   setHistoryGroups: (groups) => set({ historyGroups: groups }),
@@ -452,6 +492,17 @@ export const useAppStore = create<AppStore>((set) => ({
       hoveredImageId: null,
       hoveredGroupId: null,
     }),
+
+  // Isolate mode
+  setIsolatedImageIds: (ids) => set({ isolatedImageIds: ids }),
+
+  // Star ratings
+  setImageRating: (imageId, rating) =>
+    set((state) => ({ imageRatings: { ...state.imageRatings, [imageId]: rating } })),
+  setStarFilter: (n) => set({ starFilter: n }),
+
+  // Design brief glow
+  setIsAgentUsingBrief: (v) => set({ isAgentUsingBrief: v }),
 
   // Session / Multi-Canvas actions
   setCurrentCanvasId: (id) => set({ currentCanvasId: id }),

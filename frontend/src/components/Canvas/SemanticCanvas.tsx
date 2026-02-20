@@ -9,6 +9,7 @@ import { useAppStore } from "../../store/appStore";
 import { useProgressStore } from "../../store/progressStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
 import { AxisScaleSlider } from "../AxisScaleSlider/AxisScaleSlider";
+import { DeletedImagesPanel } from "../DeletedImagesPanel/DeletedImagesPanel";
 import { apiClient } from "../../api/client";
 interface SemanticCanvasProps {
   onSelectionChange: (x: number, y: number, count: number) => void;
@@ -44,6 +45,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const ghostNodes = useAppStore((state) => state.ghostNodes);
   const layers = useAppStore((state) => state.layers);
   const imageLayerMap = useAppStore((state) => state.imageLayerMap);
+  const isolatedImageIds = useAppStore((state) => state.isolatedImageIds);
+  const starFilter = useAppStore((state) => state.starFilter);
+  const imageRatings = useAppStore((state) => state.imageRatings);
   const imageSizeOverrides = useAppStore((state) => state.imageSizeOverrides);
   const imageOpacityOverrides = useAppStore((state) => state.imageOpacityOverrides);
   // Always-current refs so render closures never see stale overrides
@@ -171,11 +175,15 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const state = useAppStore.getState();
         const layerVisMap: Record<string, boolean> = {};
         state.layers.forEach((l) => { layerVisMap[l.id] = l.visible; });
+        const isolateSet = state.isolatedImageIds !== null ? new Set(state.isolatedImageIds) : null;
         const visibleIdSet = new Set<number>();
         state.images.forEach((img) => {
           if (!img.visible) return;
           const lid = state.imageLayerMap[img.id] ?? "default";
-          if (layerVisMap[lid] ?? true) visibleIdSet.add(img.id);
+          if (!(layerVisMap[lid] ?? true)) return;
+          // In isolate mode, only isolated images are selectable via brush
+          if (isolateSet !== null && !isolateSet.has(img.id)) return;
+          visibleIdSet.add(img.id);
         });
 
         const inside: number[] = [];
@@ -353,15 +361,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             .attr("height", newSize);
         });
 
-        // Update ghost node circles and icons
-        svg.selectAll(".ghost-node").each(function(d: any) {
-          if (d.isHaze) {
-            d3.select(this).select(".haze-blob").attr("r", newSize * 1.6);
-            d3.select(this).select(".haze-label").attr("y", newSize * 1.6 + 14);
-          } else {
-            d3.select(this).select("circle").attr("r", newSize / 2);
-            d3.select(this).select("text").attr("font-size", newSize / 2);
-          }
+        // Resize ghost node images and hit areas
+        svg.selectAll(".ghost-node").each(function() {
+          const node = d3.select(this);
+          node.select(".ghost-hit")
+            .attr("x", -newSize / 2).attr("y", -newSize / 2)
+            .attr("width", newSize).attr("height", newSize + 56);
+          node.select("image")
+            .attr("x", -newSize / 2).attr("y", -newSize / 2)
+            .attr("width", newSize).attr("height", newSize);
+          node.select("circle")
+            .attr("cx", newSize / 2 - 6).attr("cy", -newSize / 2 + 6);
         });
       }
 
@@ -637,10 +647,13 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Group for genealogy lines (drawn in selection effect only for selected images)
     g.append("g").attr("class", "genealogy-lines");
 
+    // Ghost parent-connection lines (behind ghost images)
+    const ghostParentLinesGroup = g.append("g").attr("class", "ghost-parent-lines");
+
     // Group for ghost nodes (preview suggestions at low opacity)
     const ghostGroup = g.append("g").attr("class", "ghost-nodes");
 
-    // Render ghost nodes (apply same stretch transform as images)
+    // Render ghost nodes
     const ghostNodeElements = ghostGroup
       .selectAll(".ghost-node")
       .data(ghostNodes, (d: any) => d.id)
@@ -658,138 +671,230 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     const ghostSize = visualSettings.imageSize;
 
-    // Ghost rendering: halo glow + shoe image + action buttons (all in one .each for datum access)
+    // Ghost rendering: CSS drop-shadow glow + labels + tooltip + parent lines
     ghostNodeElements.each(function(d: any) {
       const el = d3.select(this);
       const haloColor = d.source === 'concurrent' ? '#a855f7' : '#14b8a6';
+      const glowNormal = `drop-shadow(0 0 2px ${haloColor}99) drop-shadow(0 0 10px ${haloColor}88)`;
+      const glowHover  = `drop-shadow(0 0 3px #fff5) drop-shadow(0 0 16px ${haloColor}) drop-shadow(0 0 30px ${haloColor}77)`;
+      el.style("filter", glowNormal);
 
-      // Extended hit area covers image + button zone below
-      const hitExtraY = 56; // extra space below image for buttons + reasoning
+      const hasParents = d.parents && d.parents.length > 0;
+      const labelY = ghostSize / 2 + 4;
+      const labelH = 16;
+      const parentStripH = hasParents ? 16 : 0;
+      const parentStripBottom = labelY + labelH + 2 + parentStripH;
+      const btnH = 22, btnW = 56, gap = 6;
+      const btnY = parentStripBottom + 4;
+
+      // ── Pre-calculate tooltip so hit rect can cover it ──
+      const reasoningText = d.reasoning || d.prompt || '';
+      const ttLineH = 13, ttPad = 10;
+      const ttLines: string[] = [];
+      if (reasoningText) {
+        const words = reasoningText.split(/\s+/);
+        let cur = '';
+        for (const w of words) {
+          const cand = cur ? `${cur} ${w}` : w;
+          if (cand.length > 34 && cur) { ttLines.push(cur); cur = w; }
+          else cur = cand;
+        }
+        if (cur) ttLines.push(cur);
+        ttLines.splice(5); // max 5 lines
+      }
+      const ttW = Math.max(ghostSize + 24, 200);
+      const ttH = ttLines.length > 0 ? ttLines.length * ttLineH + ttPad * 2 + 2 : 0;
+      const ttY = ttH > 0 ? -ghostSize / 2 - ttH - 10 : -ghostSize / 2;
+
+      // ── Single large hit rect: from above tooltip all the way to below buttons ──
+      // This prevents mouseLeave firing when moving from image toward tooltip or buttons
+      const hitTop = ttH > 0 ? ttY - 8 : -ghostSize / 2;
+      const hitBottom = btnY + btnH + 8;
+      const hitWidth = Math.max(ghostSize + 16, btnW * 2 + gap + 20);
       el.append("rect")
         .attr("class", "ghost-hit")
-        .attr("x", -ghostSize / 2)
-        .attr("y", -ghostSize / 2)
-        .attr("width", ghostSize)
-        .attr("height", ghostSize + hitExtraY)
-        .attr("rx", 8)
-        .attr("fill", "transparent")
+        .attr("x", -hitWidth / 2).attr("y", hitTop)
+        .attr("width", hitWidth).attr("height", hitBottom - hitTop)
+        .attr("rx", 8).attr("fill", "transparent")
         .attr("pointer-events", "all");
 
-      // Halo glow circle (blurred, behind image)
-      el.append("circle")
-        .attr("cx", 0).attr("cy", 0)
-        .attr("r", ghostSize * 0.52)
-        .attr("fill", haloColor)
-        .attr("opacity", 0.28)
-        .attr("filter", "url(#ghost-halo)")
-        .style("pointer-events", "none");
+      // ── Short prompt label (always visible, below image) ──
+      const shortLabel = (() => {
+        const words = (d.prompt || 'AI suggestion').trim().split(/\s+/);
+        let result = '';
+        for (const w of words) {
+          const candidate = result ? `${result} ${w}` : w;
+          if (candidate.length > 28 && result) break;
+          result = candidate;
+        }
+        return result.charAt(0).toUpperCase() + result.slice(1);
+      })();
 
-      // Shoe image (full opacity — ghost effect is via halo, not image opacity)
+      el.append("rect")
+        .attr("x", -ghostSize / 2).attr("y", labelY)
+        .attr("width", ghostSize).attr("height", labelH)
+        .attr("rx", labelH / 2)
+        .attr("fill", "rgba(13,17,23,0.88)")
+        .style("pointer-events", "none");
+      el.append("text")
+        .attr("x", 0).attr("y", labelY + 11)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 9)
+        .attr("fill", "rgba(200,210,220,0.95)")
+        .style("pointer-events", "none")
+        .text(shortLabel);
+
+      // ── Parent info strip (always visible, if derived from another image) ──
+      if (hasParents) {
+        const parentLabel = `← ref ${d.parents.map((id: number) => `#${id}`).join(', ')}`;
+        const parentH = 14;
+        const parentY = labelY + labelH + 2;
+        el.append("rect")
+          .attr("x", -ghostSize / 2).attr("y", parentY)
+          .attr("width", ghostSize).attr("height", parentH)
+          .attr("rx", parentH / 2)
+          .attr("fill", `${haloColor}1a`)
+          .attr("stroke", `${haloColor}55`).attr("stroke-width", 0.8)
+          .style("pointer-events", "none");
+        el.append("text")
+          .attr("x", 0).attr("y", parentY + 10)
+          .attr("text-anchor", "middle")
+          .attr("font-size", 8)
+          .attr("fill", haloColor)
+          .style("pointer-events", "none")
+          .text(parentLabel);
+
+        // ── Parent bezier lines ──
+        const gbx = (d.coordinates[0] + coordOffset[0]) * coordScale;
+        const gby = (d.coordinates[1] + coordOffset[1]) * coordScale;
+        const [gsx, gsy] = toStretched(gbx, gby);
+        const gx = xScale(gsx);
+        const gy = yScale(gsy);
+
+        d.parents.forEach((parentId: number) => {
+          const parentImg = images.find((img: any) => img.id === parentId);
+          if (!parentImg?.coordinates) return;
+          const pbx = (parentImg.coordinates[0] + coordOffset[0]) * coordScale;
+          const pby = (parentImg.coordinates[1] + coordOffset[1]) * coordScale;
+          const [psx, psy] = toStretched(pbx, pby);
+          const px = xScale(psx);
+          const py = yScale(psy);
+          const cmx = (gx + px) / 2;
+          const cmy = (gy + py) / 2 - Math.abs(gy - py) * 0.25 - 15;
+          ghostParentLinesGroup.append("path")
+            .attr("d", `M ${gx},${gy} Q ${cmx},${cmy} ${px},${py}`)
+            .attr("fill", "none")
+            .attr("stroke", haloColor)
+            .attr("stroke-width", 1.5)
+            .attr("stroke-dasharray", "5,4")
+            .attr("opacity", 0.5)
+            .style("pointer-events", "none");
+        });
+      }
+
+      // Shoe image (55% opacity ghost effect)
       el.append("image")
         .attr("x", -ghostSize / 2).attr("y", -ghostSize / 2)
         .attr("width", ghostSize).attr("height", ghostSize)
         .attr("href", d.base64_image)
         .attr("preserveAspectRatio", "xMidYMid meet")
+        .attr("opacity", 0.55)
         .style("pointer-events", "none");
 
       // ── Action group (shown on hover) ──
-      const actionGroup = el.append("g")
-        .attr("class", "ghost-actions")
-        .attr("display", "none");
+      const actionGroup = el.append("g").attr("class", "ghost-actions").attr("display", "none");
 
-      // Reasoning label (truncated, above buttons)
-      const reasoning = (d.reasoning || '').substring(0, 55) + ((d.reasoning || '').length > 55 ? '…' : '');
-      actionGroup.append("rect")
-        .attr("x", -ghostSize / 2).attr("y", ghostSize / 2 + 2)
-        .attr("width", ghostSize).attr("height", 16)
-        .attr("rx", 4)
-        .attr("fill", "rgba(13,17,23,0.82)")
-        .style("pointer-events", "none");
-      actionGroup.append("text")
-        .attr("x", 0).attr("y", ghostSize / 2 + 13)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 9)
-        .attr("fill", "rgba(180,195,210,0.92)")
-        .style("pointer-events", "none")
-        .text(reasoning);
+      // Full reasoning tooltip above the image (multi-line, pre-calculated above)
+      if (ttLines.length > 0) {
+        actionGroup.append("rect")
+          .attr("x", -ttW / 2).attr("y", ttY)
+          .attr("width", ttW).attr("height", ttH)
+          .attr("rx", 8)
+          .attr("fill", "rgba(13,17,23,0.95)")
+          .attr("stroke", `${haloColor}44`).attr("stroke-width", 1)
+          .style("pointer-events", "none");
+        ttLines.forEach((line, i) => {
+          actionGroup.append("text")
+            .attr("x", -ttW / 2 + ttPad + 2).attr("y", ttY + ttPad + (i + 1) * ttLineH - 1)
+            .attr("font-size", 11).attr("fill", "rgba(195,212,230,0.93)")
+            .style("pointer-events", "none").text(line);
+        });
+      }
 
-      // Buttons below reasoning label
-      const btnY = ghostSize / 2 + 22;
-      const btnH = 22;
-      const btnW = 52;
-      const gap = 5;
-      const keepX = -(btnW + gap / 2);
-      const skipX = gap / 2;
+      // Keep / Skip buttons
+      const keepX = -(btnW + gap / 2), skipX = gap / 2;
 
-      // Keep button
       const acceptBg = actionGroup.append("rect")
-        .attr("x", keepX).attr("y", btnY)
-        .attr("width", btnW).attr("height", btnH)
-        .attr("rx", 11)
-        .attr("fill", "rgba(34,197,94,0.95)")
-        .style("cursor", "pointer");
+        .attr("x", keepX).attr("y", btnY).attr("width", btnW).attr("height", btnH)
+        .attr("rx", 11).attr("fill", "rgba(34,197,94,0.95)").style("cursor", "pointer");
       actionGroup.append("text")
         .attr("x", keepX + btnW / 2).attr("y", btnY + 15)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 11).attr("font-weight", "700")
-        .attr("fill", "#0d1117")
-        .style("pointer-events", "none")
-        .text("✓ Keep");
+        .attr("text-anchor", "middle").attr("font-size", 11).attr("font-weight", "700")
+        .attr("fill", "#0d1117").style("pointer-events", "none").text("✓ Keep");
 
-      // Skip button
       const discardBg = actionGroup.append("rect")
-        .attr("x", skipX).attr("y", btnY)
-        .attr("width", btnW).attr("height", btnH)
-        .attr("rx", 11)
-        .attr("fill", "rgba(239,68,68,0.95)")
-        .style("cursor", "pointer");
+        .attr("x", skipX).attr("y", btnY).attr("width", btnW).attr("height", btnH)
+        .attr("rx", 11).attr("fill", "rgba(239,68,68,0.95)").style("cursor", "pointer");
       actionGroup.append("text")
         .attr("x", skipX + btnW / 2).attr("y", btnY + 15)
-        .attr("text-anchor", "middle")
-        .attr("font-size", 11).attr("font-weight", "700")
-        .attr("fill", "white")
-        .style("pointer-events", "none")
-        .text("✕ Skip");
+        .attr("text-anchor", "middle").attr("font-size", 11).attr("font-weight", "700")
+        .attr("fill", "white").style("pointer-events", "none").text("✕ Skip");
 
-      // Keep: call backend to register image as real shoe on canvas
+      // Keep: fetch state first, then batch-update store (no flicker between ghost removal and image appearance)
       acceptBg.on("click", async function(event: any) {
         event.stopPropagation();
-        useAppStore.getState().removeGhostNode(d.id); // immediate visual removal
+        el.style("pointer-events", "none");
+        useProgressStore.getState().showProgress("loading", "Adding shoe to canvas…");
         try {
           const result = await apiClient.addExternalImages({
             images: [{ url: d.base64_image }],
             prompt: d.prompt || 'AI suggested shoe',
             generation_method: 'agent',
-            remove_background: false,
+            remove_background: true,
             parent_ids: d.parents || [],
           });
           if (result?.images?.length > 0) {
-            const newIds = result.images.map((img: any) => img.id);
-            useAppStore.getState().setImagesLayer(newIds, 'default');
+            // Fetch updated state while ghost is still on canvas
             const updatedState = await apiClient.getState();
+            const newIds = result.images.map((img: any) => img.id);
+            // Batch all store updates → React renders once with ghost gone + new image present
+            useAppStore.getState().removeGhostNode(d.id);
             useAppStore.getState().setImages(updatedState.images);
             useAppStore.getState().setHistoryGroups(updatedState.history_groups);
+            useAppStore.getState().setImagesLayer(newIds, 'default');
+            const curIsolated = useAppStore.getState().isolatedImageIds;
+            if (curIsolated !== null) {
+              useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
+            }
+          } else {
+            useAppStore.getState().removeGhostNode(d.id);
           }
         } catch (err) {
           console.error('[Ghost accept] Failed to add image:', err);
+          el.style("pointer-events", "all");
+        } finally {
+          useProgressStore.getState().hideProgress();
         }
       });
 
-      // Skip: just remove ghost
+      // Skip: remove ghost
       discardBg.on("click", function(event: any) {
         event.stopPropagation();
         useAppStore.getState().removeGhostNode(d.id);
       });
+
+      (this as any).__glowNormal = glowNormal;
+      (this as any).__glowHover = glowHover;
     });
 
-    // Hover: show action buttons (mouseleave only fires when truly leaving the <g>)
+    // Hover: intensify glow + reveal action group
     ghostNodeElements
       .on("mouseenter.ghost", function() {
-        d3.select(this).select(".ghost-hit").attr("fill", "rgba(255,255,255,0.04)");
+        d3.select(this).style("filter", (this as any).__glowHover);
         d3.select(this).select(".ghost-actions").attr("display", null);
       })
       .on("mouseleave.ghost", function() {
-        d3.select(this).select(".ghost-hit").attr("fill", "transparent");
+        d3.select(this).style("filter", (this as any).__glowNormal);
         d3.select(this).select(".ghost-actions").attr("display", "none");
       });
 
@@ -852,6 +957,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         });
 
         event.stopPropagation();
+
+        // Block selection of non-isolated images when in isolate mode
+        const curIsolated = useAppStore.getState().isolatedImageIds;
+        if (curIsolated !== null && !curIsolated.includes(d.id)) return;
 
         const wasSelected = useAppStore.getState().selectedImageIds.includes(d.id);
         const currentCount = useAppStore.getState().selectedImageIds.length;
@@ -967,9 +1076,13 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       }
     });
 
+    // Ghost nodes always on top of regular images (raise to last child = highest z-order)
+    ghostGroup.raise();
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     images,
+    imageLayerMap,   // Needed so click-area shape (full vs cropped) updates when layer changes
     visualSettings,
     axisLabels,
     canvasBounds,
@@ -997,11 +1110,15 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       imagesGroup.select(`#image-${id}`).classed("selected-glow", true);
     });
 
-    // Opacity cascade: fade unrelated shoes when selection exists
-    if (selectedImageIds.length > 0) {
-      // Build set of direct parents/children (depth-1 only)
-      const relatedSet = new Set<number>(selectedImageIds);
+    // Opacity cascade — compound: star filter + isolate + selection
+    const storeSnap = useAppStore.getState();
+    const starFilterVal = storeSnap.starFilter;
+    const imageRatingsVal = storeSnap.imageRatings;
+    const isolateSet = isolatedImageIds !== null ? new Set(isolatedImageIds) : null;
 
+    // Build selection-related set (depth-1) for selection cascade
+    const relatedSet = new Set<number>(selectedImageIds);
+    if (selectedImageIds.length > 0) {
       selectedImageIds.forEach(id => {
         const img = images.find(i => i.id === id);
         if (img) {
@@ -1009,20 +1126,28 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           img.children.forEach(childId => relatedSet.add(childId));
         }
       });
+    }
 
-      // Apply opacity: 1.0 (selected), 0.8 (direct parents/children), 0.3 (unrelated)
-      imagesGroup.selectAll(".image-node").each(function(d: any) {
+    imagesGroup.selectAll(".image-node").each(function(d: any) {
+      const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) >= starFilterVal;
+      const isolatePasses = isolateSet === null || isolateSet.has(d.id);
+
+      // Compound: if fails any active filter, dim to near-invisible
+      if (!starPasses || !isolatePasses) {
+        d3.select(this).transition().duration(250).attr("opacity", 0.05);
+        return;
+      }
+
+      // Both filters pass — apply selection cascade
+      if (selectedImageIds.length > 0) {
         const isSelected = selectedImageIds.includes(d.id);
         const isRelated = relatedSet.has(d.id);
         const opacity = isSelected ? 1.0 : (isRelated ? 0.8 : 0.3);
         d3.select(this).transition().duration(200).attr("opacity", opacity);
-      });
-    } else {
-      // No selection: restore all to default opacity
-      imagesGroup.selectAll(".image-node")
-        .transition().duration(200)
-        .attr("opacity", visualSettings.imageOpacity);
-    }
+      } else {
+        d3.select(this).transition().duration(200).attr("opacity", visualSettings.imageOpacity);
+      }
+    });
 
     // Highlight images in hovered group (silver glow filter)
     if (hoveredGroupId) {
@@ -1061,6 +1186,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
         // Parent → Selection: Cyan (#00E5FF) — input flow
         selectedImg.parents.forEach((parentId) => {
+          // Skip genealogy lines to/from non-isolated images
+          if (isolateSet !== null && !isolateSet.has(parentId)) return;
           const key = `${parentId}->${selectedId}`;
           if (drawnLinks.has(key)) return;
           drawnLinks.add(key);
@@ -1090,6 +1217,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
         // Selection → Child: Amber (#FFAA00) — output flow
         selectedImg.children.forEach((childId) => {
+          // Skip genealogy lines to/from non-isolated images
+          if (isolateSet !== null && !isolateSet.has(childId)) return;
           const key = `${selectedId}->${childId}`;
           if (drawnLinks.has(key)) return;
           drawnLinks.add(key);
@@ -1118,7 +1247,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         });
       });
     }
-  }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, visualSettings]);
+  }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, visualSettings, isolatedImageIds, starFilter, imageRatings]);
 
   // FlyTo effect: smoothly pan/zoom to a specific image
   const flyToImageId = useAppStore((state) => state.flyToImageId);
@@ -1171,7 +1300,14 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   }, [flyToImageId, images, visualSettings]);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div style={{
+      position: "relative", width: "100%", height: "100%",
+      ...(isolatedImageIds !== null ? {
+        outline: "2px solid rgba(239,68,68,0.75)",
+        outlineOffset: "-2px",
+        boxShadow: "inset 0 0 0 2px rgba(239,68,68,0.4), 0 0 24px rgba(239,68,68,0.15)",
+      } : {}),
+    }}>
       <svg
         ref={svgRef}
         style={{ width: "100%", height: "100%", background: "#0d1117" }}
@@ -1189,6 +1325,72 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           />
         </svg>
       )}
+
+      {/* Star Filter — top-right corner */}
+      <div style={{
+        position: "absolute",
+        top: 12,
+        right: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px",
+        background: "rgba(13, 17, 23, 0.82)",
+        backdropFilter: "blur(8px)",
+        border: `1px solid ${starFilter !== null ? "rgba(240,192,64,0.55)" : "rgba(48,54,61,0.5)"}`,
+        borderRadius: 8,
+        pointerEvents: "auto",
+        transition: "border-color 0.2s",
+      }}>
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(150,165,180,0.55)", textTransform: "uppercase", flexShrink: 0 }}>
+          Filter
+        </span>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            onClick={() => useAppStore.getState().setStarFilter(starFilter === n ? null : n)}
+            title={starFilter === n ? "Clear filter" : `Show ≥ ${n} star${n > 1 ? "s" : ""}`}
+            style={{
+              background: "none",
+              border: "none",
+              padding: "0 1px",
+              cursor: "pointer",
+              fontSize: 18,
+              lineHeight: 1,
+              color: starFilter !== null && n <= starFilter ? "#f0c040" : "rgba(150,165,180,0.3)",
+              textShadow: starFilter !== null && n <= starFilter ? "0 0 8px rgba(240,192,64,0.6)" : "none",
+              transition: "color 0.15s, transform 0.1s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.color = "#f0c040"; }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+              e.currentTarget.style.color = starFilter !== null && n <= starFilter ? "#f0c040" : "rgba(150,165,180,0.3)";
+            }}
+          >
+            {starFilter !== null && n <= starFilter ? "★" : "☆"}
+          </button>
+        ))}
+        {starFilter !== null && (
+          <button
+            onClick={() => useAppStore.getState().setStarFilter(null)}
+            title="Clear star filter"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "rgba(150,165,180,0.55)",
+              fontSize: 13,
+              padding: "0 2px",
+              lineHeight: 1,
+              transition: "color 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#fca5a5"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(150,165,180,0.55)"; }}
+          >
+            ✕
+          </button>
+        )}
+      </div>
 
       {/* X-Axis: label centred at bottom edge, slider directly below */}
       <div style={{
@@ -1388,15 +1590,40 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         </div>
       </div>
 
-      {/* Bottom-right buttons: Visual Reset + Recenter */}
+      {/* Bottom-right buttons: Unhide (isolate) + Visual Reset + Recenter */}
       <div style={{
         position: "absolute",
-        bottom: 60,
-        right: 16,
+        bottom: 12,
+        right: 12,
         display: "flex",
         gap: 8,
         pointerEvents: "auto",
       }}>
+        {/* Unhide — only shown in isolate mode */}
+        {isolatedImageIds !== null && (
+          <button
+            style={{
+              background: "rgba(239,68,68,0.18)",
+              backdropFilter: "blur(6px)",
+              border: "1px solid rgba(239,68,68,0.7)",
+              borderRadius: 6,
+              color: "#fca5a5",
+              fontSize: 12,
+              padding: "6px 12px",
+              cursor: "pointer",
+              fontWeight: 600,
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.35)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.18)"; }}
+            onClick={() => useAppStore.getState().setIsolatedImageIds(null)}
+            title="Exit isolate mode — show all images"
+          >
+            ⊙ Unhide All
+          </button>
+        )}
+        {/* Deleted Images undo panel — shows restore button when items are soft-deleted */}
+        <DeletedImagesPanel />
         {/* Visual Reset: clear per-image size/opacity overrides */}
         <button
           style={{

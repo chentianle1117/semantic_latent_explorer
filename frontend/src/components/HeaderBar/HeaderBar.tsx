@@ -1,5 +1,6 @@
 import React from "react";
 import "./HeaderBar.css";
+import { CanvasSwitcher } from "../CanvasSwitcher/CanvasSwitcher";
 
 interface HeaderBarProps {
   imageCount: number;
@@ -13,8 +14,6 @@ interface HeaderBarProps {
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
-  imageCount,
-  isInitialized,
   is3DMode,
   onToggle3D,
   onOpenSettings,
@@ -22,17 +21,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   return (
     <div className="header-bar">
       <div className="header-left">
-        <span className="header-logo">Semantic Explorer</span>
+        <CanvasSwitcher />
       </div>
-      <div className="header-center">
-        <span className="header-stat">{imageCount} images</span>
-        <span className="header-stat-sep">&middot;</span>
-        <span className="header-stat">Jina CLIP v2</span>
-        <span className="header-stat-sep">&middot;</span>
-        <span className="header-stat">
-          {isInitialized ? "Ready" : "Initializing..."}
-        </span>
-      </div>
+      <div className="header-center" />
       <div className="header-right">
         <button className="header-icon-btn" onClick={onOpenSettings} title="Settings">
           &#9881;

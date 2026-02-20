@@ -12,21 +12,18 @@ import { SettingsModal } from "./components/SettingsModal/SettingsModal";
 import { useProgressStore } from "./store/progressStore";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
-import { StarterPromptsModal } from "./components/StarterPromptsModal/StarterPromptsModal";
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
 import { DynamicIsland } from "./components/DynamicIsland/DynamicIsland";
 import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefOverlay";
 import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
-import { useAgentEventSystem } from "./hooks/useAgentEventSystem";
 import { useAppStore } from "./store/appStore";
+import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
+import { useAutoSave } from "./hooks/useAutoSave";
+import { useEventLog } from "./hooks/useEventLog";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
-import type {
-  SuggestedPrompt,
-  PendingImage,
-} from "./types";
 import "./styles/app.css";
 
 export const App: React.FC = () => {
@@ -39,30 +36,18 @@ export const App: React.FC = () => {
   const [showBatchPromptDialog, setShowBatchPromptDialog] = useState(false);
   const [showExternalImageLoader, setShowExternalImageLoader] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [batchProgress, setBatchProgress] = useState<{
-    current: number;
-    total: number;
-    currentPrompt: string;
-  } | null>(null);
-
   // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
-  const currentBrief = useAppStore((s) => s.designBrief);
   const setCurrentBrief = useAppStore((s) => s.setDesignBrief);
-  const [suggestedPrompts, setSuggestedPrompts] = useState<SuggestedPrompt[]>(
-    []
-  );
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   // AxisSuggestionModal removed — axes now shown via InlineAxisSuggestions + Dynamic Island
-  const [isLoadingAxes, setIsLoadingAxes] = useState(false);
-  const [unexpectedImagesCount, setUnexpectedImagesCount] = useState(2); // Number of additional unexpected images to generate (0-8)
+  const isLoadingAxes = false; // kept for HeaderBar prop, always false (agent handles axis suggestions)
   const [showLabels, setShowLabels] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const [showClusters, setShowClusters] = useState(false);
   const [backgroundColor, setBackgroundColor] = useState("#0d1117");
+  const [ghostCount, setGhostCount] = useState(1);
   const [showRadialDial, setShowRadialDial] = useState(false);
   const [radialDialPos, setRadialDialPos] = useState({ x: 0, y: 0 });
   const [showExplorationTreeModal, setShowExplorationTreeModal] = useState(false);
-  const [selectedGhost, setSelectedGhost] = useState<any>(null);
   const lastMousePosRef = useRef({
     x: typeof window !== "undefined" ? window.innerWidth / 2 : 400,
     y: typeof window !== "undefined" ? window.innerHeight / 2 : 300,
@@ -73,12 +58,8 @@ export const App: React.FC = () => {
   );
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
   const isInitialized = useAppStore((state) => state.isInitialized);
-  const isGenerating = useAppStore((state) => state.isGenerating);
   const removeBackground = useAppStore((state) => state.removeBackground);
   const is3DMode = useAppStore((state) => state.is3DMode);
-
-  // Mount event-based agent trigger system
-  useAgentEventSystem();
 
   const setImages = useAppStore((state) => state.setImages);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
@@ -88,8 +69,22 @@ export const App: React.FC = () => {
   const setGenerationProgress = useAppStore(
     (state) => state.setGenerationProgress
   );
-  const setGenerationCount = useAppStore((state) => state.setGenerationCount);
   const clearSelection = useAppStore((state) => state.clearSelection);
+  const addToExplorationCounter = useAppStore((state) => state.addToExplorationCounter);
+  const addToAxisSuggestionCounter = useAppStore((state) => state.addToAxisSuggestionCounter);
+
+  const { triggerConcurrentGhosts, triggerExplorationGhosts, triggerAxisSuggestions } = useAgentBehaviors();
+  useAutoSave();
+  useEventLog();
+
+  // Auto-sync layer state to backend whenever layers or imageLayerMap change
+  // This ensures the export ZIP always has up-to-date layer info
+  const layers = useAppStore((s) => s.layers);
+  const imageLayerMap = useAppStore((s) => s.imageLayerMap);
+  useEffect(() => {
+    const layerDefs = layers.map(l => ({ id: l.id, name: l.name, color: l.color, visible: l.visible }));
+    apiClient.syncLayers(imageLayerMap, layerDefs);
+  }, [layers, imageLayerMap]);
 
   useEffect(() => {
     // Initialize CLIP on mount
@@ -143,6 +138,16 @@ export const App: React.FC = () => {
           );
         }
         useProgressStore.getState().hideProgress();
+        // Load canvas session metadata
+        return Promise.all([
+          apiClient.getCurrentSession(),
+          apiClient.listSessions(),
+        ]).then(([session, { sessions }]) => {
+          useAppStore.getState().setCurrentCanvasId(session.canvasId);
+          useAppStore.getState().setCanvasName(session.canvasName);
+          useAppStore.getState().setParticipantId(session.participantId);
+          useAppStore.getState().setCanvasList(sessions);
+        }).catch(() => {/* session endpoints optional */});
       })
       .catch((error) => {
         console.error("Failed to initialize CLIP:", error);
@@ -155,152 +160,6 @@ export const App: React.FC = () => {
         );
       });
   }, [setImages, setHistoryGroups, setIsInitialized]);
-
-  const handleGenerate = async () => {
-    const prompt = window.prompt("Enter prompt for image generation:");
-    if (!prompt) return;
-
-    const count = window.prompt("How many images? (1-20)", "8");
-    const nImages = parseInt(count || "8", 10);
-
-    if (isNaN(nImages) || nImages < 1 || nImages > 20) {
-      alert("Invalid count. Please enter a number between 1 and 20.");
-      return;
-    }
-
-    // Check if fal.ai is configured
-    if (!falClient.isConfigured()) {
-      alert(
-        "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
-      );
-      return;
-    }
-
-    // Inform user about batching for fal.ai
-    if (nImages > 4) {
-      const numBatches = Math.ceil(nImages / 4);
-      console.log(
-        `ℹ️ Generating ${nImages} images in ${numBatches} batches (fal.ai limit: 4 per request)`
-      );
-    }
-
-    setIsGenerating(true);
-    useProgressStore
-      .getState()
-      .showProgress(
-        "generating",
-        `Generating ${nImages} image${nImages > 1 ? "s" : ""}...`,
-        true
-      );
-    useProgressStore.getState().updateProgress(0);
-
-    try {
-      useProgressStore
-        .getState()
-        .updateProgress(10, "Generating with fal.ai...");
-      const result = await falClient.generateTextToImage({
-        prompt,
-        num_images: nImages,
-        aspect_ratio: "1:1",
-        output_format: "jpeg",
-      });
-
-      console.log("fal.ai generation result:", result);
-
-      // Send images to backend for CLIP embedding extraction
-      useProgressStore.getState().updateProgress(60, "Computing embeddings...");
-      const addResult = await apiClient.addExternalImages({
-        images: result.images.map((img) => ({ url: img.url })),
-        prompt: prompt,
-        generation_method: "batch",
-        remove_background: removeBackground,
-      });
-
-      console.log(`✓ Added ${result.images.length} fal.ai images to canvas`);
-
-      // Fetch updated state since we're not using WebSocket
-      useProgressStore.getState().updateProgress(90, "Updating canvas...");
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-
-      // Auto-recenter canvas and select the newly generated images
-      resetCanvasBounds();
-      if (addResult.images && addResult.images.length > 0) {
-        useAppStore.getState().setSelectedImageIds(addResult.images.map((img) => img.id));
-      }
-
-      useProgressStore.getState().updateProgress(100);
-
-      // Auto-generate variations if brief is set
-      if (currentBrief && unexpectedImagesCount > 0) {
-        console.log(
-          `🎨 Generating ${unexpectedImagesCount} variations in background...`
-        );
-        useProgressStore
-          .getState()
-          .updateProgress(100, "Generating variations...");
-        try {
-          const variationResponse = await apiClient.generateVariation(
-            prompt,
-            currentBrief,
-            unexpectedImagesCount
-          );
-          console.log("Generated variations:", variationResponse.variations);
-
-          // Generate images for each variation in background
-          for (const variation of variationResponse.variations) {
-            const varResult = await falClient.generateTextToImage({
-              prompt: variation.prompt,
-              num_images: 1,
-              aspect_ratio: "1:1",
-              output_format: "jpeg",
-            });
-
-            // Add to backend to get embeddings
-            await apiClient.addExternalImages({
-              images: varResult.images.map((img) => ({ url: img.url })),
-              prompt: variation.prompt,
-              generation_method: "variation",
-              remove_background: removeBackground,
-            });
-
-            // Get the newly added image from state
-            const updatedState = await apiClient.getState();
-            const newImage =
-              updatedState.images[updatedState.images.length - 1];
-
-            // Add to pending images list
-            setPendingImages((prev) => [
-              ...prev,
-              {
-                id: `pending-${Date.now()}-${Math.random()}`,
-                imageData: newImage,
-                originalPrompt: prompt,
-                variation: variation,
-                isPending: true,
-              },
-            ]);
-          }
-
-          console.log("✓ Variations generated in background");
-        } catch (error) {
-          console.error("Failed to generate variations:", error);
-        }
-      }
-    } catch (error) {
-      console.error("Prompt generation failed:", error);
-      useProgressStore.getState().hideProgress();
-      alert(
-        `Generation failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsGenerating(false);
-      useProgressStore.getState().hideProgress();
-    }
-  };
 
   const handleClearCanvas = async () => {
     if (!window.confirm("Clear ALL images from canvas? This cannot be undone."))
@@ -446,15 +305,24 @@ export const App: React.FC = () => {
         );
 
         // Send to backend for CLIP embedding
-        await apiClient.addExternalImages({
+        const batchResult = await apiClient.addExternalImages({
           images: result.images.map((img) => ({ url: img.url })),
           prompt: prompt,
           generation_method: "batch",
           remove_background: removeBackground,
         });
 
+        // Assign generated images to shoes layer
+        if (batchResult?.images?.length > 0) {
+          const newIds = batchResult.images.map((img: any) => img.id);
+          useAppStore.getState().setImagesLayer(newIds, 'default');
+        }
+
         console.log(`✓ Added to canvas (${i + 1}/${totalPrompts})`);
         successCount++;
+        addToExplorationCounter(countPerPrompt);
+        addToAxisSuggestionCounter(countPerPrompt);
+        triggerConcurrentGhosts(prompt, [], []).catch(console.error);
 
         // Fetch updated state after EACH prompt to update UI
         useProgressStore
@@ -489,7 +357,6 @@ export const App: React.FC = () => {
     }
 
     useProgressStore.getState().updateProgress(100, "Batch complete!");
-    setBatchProgress(null);
     setIsGenerating(false);
 
     setTimeout(() => {
@@ -503,118 +370,69 @@ export const App: React.FC = () => {
     console.log(
       `\n🎉 Batch complete - Success: ${successCount}/${totalPrompts}`
     );
-
-    // Auto-generate variations for first few prompts if brief is set
-    if (currentBrief && successCount > 0 && unexpectedImagesCount > 0) {
-      console.log(
-        `🎨 Generating ${unexpectedImagesCount} auto-variations per prompt...`
-      );
-      const promptsToVary = prompts.slice(0, Math.min(3, prompts.length)); // Only first 3 to avoid spam
-
-      for (const prompt of promptsToVary) {
-        try {
-          const variations = await apiClient.generateVariation(
-            prompt,
-            currentBrief,
-            unexpectedImagesCount
-          );
-          console.log(
-            `Generated ${
-              variations.variations.length
-            } variations for: "${prompt.substring(0, 30)}..."`
-          );
-
-          for (const variation of variations.variations) {
-            try {
-              const result = await falClient.generateTextToImage({
-                prompt: variation.prompt,
-                num_images: 1,
-                aspect_ratio: "1:1",
-                output_format: "jpeg",
-              });
-
-              const imageData = await apiClient.addExternalImages({
-                images: result.images.map((img) => ({ url: img.url })),
-                prompt: variation.prompt,
-                generation_method: "auto-variation",
-                remove_background: removeBackground,
-              });
-
-              // Add to pending images with accept/discard controls
-              setPendingImages((prev) => [
-                ...prev,
-                {
-                  id: `pending-${Date.now()}-${Math.random()}`,
-                  imageData: imageData.images[0],
-                  originalPrompt: prompt,
-                  variation: variation,
-                  isPending: true,
-                },
-              ]);
-            } catch (error) {
-              console.error("Failed to generate variation image:", error);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to generate variations:", error);
-        }
-      }
-
-      // Note: Canvas analysis is now manual-only (triggered via button)
-      // Auto-generation of unexpected images remains active
-    }
   };
 
-  const handleLoadExternalImages = async (urls: string[]) => {
-    console.log(`📥 Loading ${urls.length} external images...`);
+  const handleLoadExternalImages = async (shoes: string[], references: string[]) => {
+    const total = shoes.length + references.length;
+    if (total === 0) return;
+    console.log(`📥 Loading ${shoes.length} shoes + ${references.length} references...`);
     setShowExternalImageLoader(false);
     setIsGenerating(true);
     useProgressStore
       .getState()
-      .showProgress(
-        "loading",
-        `Loading ${urls.length} image${urls.length > 1 ? "s" : ""}...`,
-        true
-      );
+      .showProgress("loading", `Loading ${total} image${total > 1 ? "s" : ""}...`, true);
     useProgressStore.getState().updateProgress(0);
 
+    const allNewIds: number[] = [];
     try {
-      // Send all images in a single request so they form one history group/batch
-      console.log(`📦 Sending all ${urls.length} images as one batch...`);
-      const importResult = await apiClient.addExternalImages({
-        images: urls.map((url) => ({ url })),
-        prompt: "Reference images",
-        generation_method: "external",
-        remove_background: false,  // never strip backgrounds from reference images
-      });
+      // Load shoes (background removal ON → default/Shoes layer)
+      if (shoes.length > 0) {
+        useProgressStore.getState().updateProgress(10, `Loading ${shoes.length} shoe image${shoes.length > 1 ? "s" : ""}...`);
+        const shoeResult = await apiClient.addExternalImages({
+          images: shoes.map((url) => ({ url })),
+          prompt: "Shoe images",
+          generation_method: "external",
+          remove_background: true,
+        });
+        if (shoeResult.images?.length) {
+          const ids = shoeResult.images.map((img: any) => img.id);
+          allNewIds.push(...ids);
+          useAppStore.getState().setImagesLayer(ids, "default"); // Shoes layer
+        }
+      }
 
-      useProgressStore.getState().updateProgress(80, "Updating canvas...");
+      // Load references (background removal OFF → references layer)
+      if (references.length > 0) {
+        useProgressStore.getState().updateProgress(50, `Loading ${references.length} reference image${references.length > 1 ? "s" : ""}...`);
+        const refResult = await apiClient.addExternalImages({
+          images: references.map((url) => ({ url })),
+          prompt: "Reference images",
+          generation_method: "external",
+          remove_background: false,
+        });
+        if (refResult.images?.length) {
+          const ids = refResult.images.map((img: any) => img.id);
+          allNewIds.push(...ids);
+          useAppStore.getState().setImagesLayer(ids, "references"); // References layer
+        }
+      }
 
+      useProgressStore.getState().updateProgress(85, "Updating canvas...");
       const state = await apiClient.getState();
       setImages(state.images);
       setHistoryGroups(state.history_groups);
 
-      // Auto-recenter canvas and select the newly imported images
       resetCanvasBounds();
-      if (importResult.images && importResult.images.length > 0) {
-        const newIds = importResult.images.map((img) => img.id);
-        useAppStore.getState().setSelectedImageIds(newIds);
-        // Auto-assign imported images to the References layer
-        useAppStore.getState().setImagesLayer(newIds, "references");
+      if (allNewIds.length > 0) {
+        useAppStore.getState().setSelectedImageIds(allNewIds);
       }
 
-      console.log(`✓ All ${urls.length} images loaded successfully`);
+      console.log(`✓ All ${total} images loaded successfully`);
       useProgressStore.getState().updateProgress(100, "Complete");
-
-      alert(`✅ Successfully loaded ${urls.length} images to canvas!`);
     } catch (error) {
       console.error("Failed to load external images:", error);
       useProgressStore.getState().hideProgress();
-      alert(
-        `Failed to load images: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      alert(`Failed to load images: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsGenerating(false);
       useProgressStore.getState().hideProgress();
@@ -735,6 +553,9 @@ export const App: React.FC = () => {
       console.log(
         `✓ Added ${result.images.length} fal.ai edited image(s) to canvas with ${parentIds.length} parent(s)`
       );
+      addToExplorationCounter(numImages);
+      addToAxisSuggestionCounter(numImages);
+      triggerConcurrentGhosts(prompt, parentIds, imageUrls).catch(console.error);
 
       // Fetch updated state since we're not using WebSocket
       useProgressStore.getState().updateProgress(90, "Updating canvas...");
@@ -742,77 +563,14 @@ export const App: React.FC = () => {
       setImages(state.images);
       setHistoryGroups(state.history_groups);
 
-      // Auto-select newly generated images
+      // Auto-select newly generated images + assign to shoes layer
       if (addResult?.images?.length > 0) {
-        useAppStore.getState().setSelectedImageIds(
-          addResult.images.map((img: any) => img.id)
-        );
+        const newIds = addResult.images.map((img: any) => img.id);
+        useAppStore.getState().setSelectedImageIds(newIds);
+        useAppStore.getState().setImagesLayer(newIds, 'default');
       }
 
       useProgressStore.getState().updateProgress(100);
-
-      // Auto-generate variations if brief is set (only if images were successfully added)
-      if (
-        currentBrief &&
-        unexpectedImagesCount > 0 &&
-        state.images.length > 0
-      ) {
-        console.log(
-          `🎨 Generating ${unexpectedImagesCount} variations from reference...`
-        );
-        useProgressStore
-          .getState()
-          .updateProgress(100, "Generating variations...");
-        try {
-          const variations = await apiClient.generateVariation(
-            prompt,
-            currentBrief,
-            unexpectedImagesCount
-          );
-
-          for (const variation of variations.variations) {
-            try {
-              const result = await falClient.generateImageEdit({
-                prompt: variation.prompt,
-                image_urls: imageUrls, // Reuse the uploaded reference images
-                num_images: 1,
-                aspect_ratio: "1:1",
-                output_format: "jpeg",
-              });
-
-              await apiClient.addExternalImages({
-                images: result.images.map((img) => ({ url: img.url })),
-                prompt: variation.prompt,
-                generation_method: "auto-variation",
-                remove_background: removeBackground,
-                parent_ids: parentIds,
-              });
-
-              // Refresh state to get the new image
-              const updatedState = await apiClient.getState();
-              const newImage =
-                updatedState.images[updatedState.images.length - 1];
-
-              setPendingImages((prev) => [
-                ...prev,
-                {
-                  id: `pending-${Date.now()}-${Math.random()}`,
-                  imageData: newImage,
-                  originalPrompt: prompt,
-                  variation: variation,
-                  isPending: true,
-                },
-              ]);
-            } catch (error) {
-              console.error("Failed to generate variation image:", error);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to generate variations:", error);
-        }
-      }
-
-      // Selection was already set to newly generated images above
     } catch (error) {
       console.error("Reference generation failed:", error);
       useProgressStore.getState().hideProgress();
@@ -824,329 +582,6 @@ export const App: React.FC = () => {
     } finally {
       setIsGenerating(false);
       useProgressStore.getState().hideProgress();
-
-      // Note: Auto-variations and analysis happen after progress modal closes
-    }
-  };
-
-  // Agent handlers
-  const handlePromptsGenerated = async (
-    prompts: SuggestedPrompt[],
-    brief: string
-  ) => {
-    setSuggestedPrompts(prompts);
-    setCurrentBrief(brief);
-    // Persist brief to backend
-    try {
-      await apiClient.updateDesignBrief(brief);
-      console.log("✓ Generated prompts from brief and saved:", brief);
-    } catch (error) {
-      console.error("Failed to save design brief:", error);
-    }
-  };
-
-  const handleAcceptPrompt = async (
-    prompt: string,
-    index: number,
-    count: number = 4
-  ) => {
-    console.log(`Accepting prompt ${index + 1}:`, prompt, `(${count} images)`);
-    setSuggestedPrompts([]); // Dismiss banner after accepting
-
-    // Auto-generate with the accepted prompt
-    setIsGenerating(true);
-    useProgressStore
-      .getState()
-      .showProgress(
-        "generating",
-        `Generating ${count} image${count > 1 ? "s" : ""} from suggestion...`,
-        true
-      );
-    useProgressStore.getState().updateProgress(0);
-
-    try {
-      if (!falClient.isConfigured()) {
-        alert(
-          "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
-        );
-        setIsGenerating(false);
-        useProgressStore.getState().hideProgress();
-        return;
-      }
-
-      // Generate using fal.ai
-      useProgressStore
-        .getState()
-        .updateProgress(10, "Generating with fal.ai...");
-      const result = await falClient.generateTextToImage({
-        prompt,
-        num_images: count,
-        aspect_ratio: "1:1",
-        output_format: "jpeg",
-      });
-
-      // Send to backend for CLIP embeddings
-      useProgressStore.getState().updateProgress(60, "Computing embeddings...");
-      await apiClient.addExternalImages({
-        images: result.images.map((img) => ({ url: img.url })),
-        prompt: prompt,
-        generation_method: "batch",
-        remove_background: removeBackground,
-      });
-
-      useProgressStore.getState().updateProgress(90, "Updating canvas...");
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-
-      useProgressStore.getState().updateProgress(100);
-
-      // Auto-generate variations if brief is set
-      if (currentBrief && unexpectedImagesCount > 0) {
-        console.log(
-          `🎨 Generating ${unexpectedImagesCount} variations for accepted prompt...`
-        );
-        useProgressStore
-          .getState()
-          .updateProgress(100, "Generating variations...");
-        try {
-          const variations = await apiClient.generateVariation(
-            prompt,
-            currentBrief,
-            unexpectedImagesCount
-          );
-
-          for (const variation of variations.variations) {
-            try {
-              const result = await falClient.generateTextToImage({
-                prompt: variation.prompt,
-                num_images: 1,
-                aspect_ratio: "1:1",
-                output_format: "jpeg",
-              });
-
-              await apiClient.addExternalImages({
-                images: result.images.map((img) => ({ url: img.url })),
-                prompt: variation.prompt,
-                generation_method: "auto-variation",
-                remove_background: removeBackground,
-              });
-
-              // Refresh state to get the new image
-              const updatedState = await apiClient.getState();
-              const newImage =
-                updatedState.images[updatedState.images.length - 1];
-
-              setPendingImages((prev) => [
-                ...prev,
-                {
-                  id: `pending-${Date.now()}-${Math.random()}`,
-                  imageData: newImage,
-                  originalPrompt: prompt,
-                  variation: variation,
-                  isPending: true,
-                },
-              ]);
-            } catch (error) {
-              console.error("Failed to generate variation image:", error);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to generate variations:", error);
-        }
-      }
-
-      console.log("✓ Generation complete");
-      // Note: Canvas analysis is now manual-only (triggered via button)
-      // Auto-generation of unexpected images remains active
-    } catch (error) {
-      console.error("Generation failed:", error);
-      alert(
-        `Generation failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    } finally {
-      setIsGenerating(false);
-      setTimeout(() => {
-        setGenerationProgress(0);
-        setGenerationCount(0, 0);
-      }, 1000);
-    }
-  };
-
-  const handleDismissPrompts = () => {
-    setSuggestedPrompts([]);
-  };
-
-  const handlePromptSuggestion = async () => {
-    // Open TextToImageDialog — it already has SuggestionsPanel with AI-generated prompts
-    useAppStore.getState().setAgentStatus("thinking");
-    setShowTextToImageDialog(true);
-    // Brief DI notification
-    useAppStore.getState().setAgentInsight({
-      id: `insight-prompt-${Date.now()}`,
-      type: "prompt",
-      message: "Prompt suggestions ready — see panel in the generation dialog",
-      data: { allRegions: [] },
-      isRead: false,
-      timestamp: Date.now(),
-    });
-  };
-
-  const suggestGhostNodes = async () => {
-    if (images.length < 3) {
-      useAppStore.getState().setAgentInsight({
-        id: `insight-ghost-warn-${Date.now()}`,
-        type: "gap",
-        message: "Need at least 3 images on canvas before suggesting ideas",
-        data: { allRegions: [] },
-        isRead: false,
-        timestamp: Date.now(),
-      });
-      return;
-    }
-
-    useAppStore.getState().setAgentStatus("thinking");
-    try {
-      const result = await apiClient.suggestGhosts(currentBrief || "Explore shoe designs", 3);
-
-      // Clear existing ghosts and add new ones
-      useAppStore.getState().clearGhostNodes();
-      result.ghosts.forEach((ghost) => {
-        useAppStore.getState().addGhostNode({
-          ...ghost,
-          isGhost: true,
-          suggestedPrompt: ghost.suggested_prompt,
-          group_id: `ghost-${ghost.id}`,
-          parents: [],
-          children: [],
-          generation_method: 'batch',
-          prompt: ghost.suggested_prompt,
-          timestamp: new Date().toISOString(),
-          visible: true,
-          base64_image: '',
-        } as any);
-      });
-
-      useAppStore.getState().setAgentInsight({
-        id: `insight-ghost-${Date.now()}`,
-        type: "gap",
-        message: `${result.ghosts.length} unexplored design space${result.ghosts.length > 1 ? "s" : ""} — ghost nodes placed on canvas`,
-        data: { allRegions: [] },
-        isRead: false,
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      console.error("Failed to suggest ghost nodes:", error);
-      useAppStore.getState().setAgentStatus("idle");
-    }
-  };
-
-  // analyzeCanvas now redirects to suggestGhostNodes (regions UI removed)
-  const analyzeCanvas = suggestGhostNodes;
-
-  const handleAcceptPending = async (pendingId: string) => {
-    console.log("Accepting pending image:", pendingId);
-
-    try {
-      // Remove from pending list (it's already in the main images list)
-      setPendingImages((prev) => prev.filter((p) => p.id !== pendingId));
-
-      // Refresh state to show the image in the main canvas
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-    } catch (error) {
-      console.error("Failed to accept pending image:", error);
-    }
-  };
-
-  const handleDiscardPending = async (pendingId: string) => {
-    console.log("Discarding pending image:", pendingId);
-    const pending = pendingImages.find((p) => p.id === pendingId);
-    if (!pending) return;
-
-    try {
-      // Delete from backend
-      await apiClient.deleteImage(pending.imageData.id);
-
-      // Remove from pending list
-      setPendingImages((prev) => prev.filter((p) => p.id !== pendingId));
-
-      // Refresh state
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-    } catch (error) {
-      console.error("Failed to discard pending image:", error);
-    }
-  };
-
-  const handleRefreshLayout = async () => {
-    const axisLabels = useAppStore.getState().axisLabels;
-    try {
-      useProgressStore
-        .getState()
-        .showProgress("reprojecting", "Refreshing layout...", false);
-      await apiClient.updateAxes({
-        x_negative: axisLabels.x[0],
-        x_positive: axisLabels.x[1],
-        y_negative: axisLabels.y[0],
-        y_positive: axisLabels.y[1],
-      });
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-      resetCanvasBounds();
-      useProgressStore.getState().hideProgress();
-    } catch (error) {
-      console.error("Failed to refresh layout:", error);
-      useProgressStore.getState().hideProgress();
-      alert("Failed to refresh layout");
-    }
-  };
-
-  const handleSuggestAxes = async () => {
-    // Prevent overlapping requests
-    if (isLoadingAxes) return;
-
-    const axisLabels = useAppStore.getState().axisLabels;
-    setIsLoadingAxes(true);
-    useAppStore.getState().setAgentStatus("thinking");
-
-    try {
-      const xLabel = `${axisLabels.x[0]} - ${axisLabels.x[1]}`;
-      const yLabel = `${axisLabels.y[0]} - ${axisLabels.y[1]}`;
-
-      const result = await apiClient.suggestAxes(
-        currentBrief || "Explore shoe design variations",
-        xLabel,
-        yLabel
-      );
-
-      const suggestions = result.suggestions || [];
-
-      if (suggestions.length > 0) {
-        // Store for InlineAxisSuggestions (persists independently of DI)
-        useAppStore.getState().setInlineAxisData(suggestions);
-
-        useAppStore.getState().setAgentInsight({
-          id: `insight-axis-${Date.now()}`,
-          type: "axis",
-          message: `${suggestions.length} new axis direction${suggestions.length > 1 ? "s" : ""} to explore`,
-          data: { axisSuggestions: suggestions },
-          isRead: false,
-          timestamp: Date.now(),
-        });
-      } else {
-        useAppStore.getState().setAgentStatus("idle");
-      }
-    } catch (error) {
-      console.error("Failed to suggest axes:", error);
-      useAppStore.getState().setAgentStatus("idle");
-    } finally {
-      setIsLoadingAxes(false);
     }
   };
 
@@ -1268,16 +703,6 @@ export const App: React.FC = () => {
       {/* Progress Modal */}
       <ProgressModal />
 
-      {/* Starter Prompts Modal */}
-      {suggestedPrompts.length > 0 && (
-        <StarterPromptsModal
-          prompts={suggestedPrompts}
-          onAccept={handleAcceptPrompt}
-          onClose={handleDismissPrompts}
-        />
-      )}
-
-
       <div className="app-layout">
         {/* Header Bar */}
         <HeaderBar
@@ -1297,15 +722,14 @@ export const App: React.FC = () => {
 
         {/* Center Canvas */}
         <div className="center-canvas">
-          {/* Dynamic Island — agent notifications */}
-          <DynamicIsland />
-
           {/* Inline axis suggestions — shown when agent suggests axes */}
           <InlineAxisSuggestions onApply={handleApplyAxes} />
 
           <div
             className="canvas-container"
           >
+            {/* Dynamic Island — agent notifications, floats over canvas */}
+            <DynamicIsland />
             {/* Design Brief floating overlay */}
             <DesignBriefOverlay />
             {/* Conditionally render 2D or 3D canvas */}
@@ -1325,45 +749,6 @@ export const App: React.FC = () => {
                   setRadialDialPos({ x, y });
                   setShowRadialDial(true);
                 }, [])}
-                pendingImages={pendingImages}
-                onAcceptPending={handleAcceptPending}
-                onDiscardPending={handleDiscardPending}
-                onGhostClick={setSelectedGhost}
-                onGhostAccept={async (ghost) => {
-                  useAppStore.getState().removeGhostNode(ghost.id);
-                  setShowTextToImageDialog(false);
-                  setIsGenerating(true);
-                  useProgressStore.getState().showProgress("generating", `Generating from ghost: ${ghost.suggestedPrompt.substring(0, 40)}…`, true);
-                  useProgressStore.getState().updateProgress(10, "Generating with fal.ai...");
-                  try {
-                    const result = await falClient.generateTextToImage({
-                      prompt: ghost.suggestedPrompt,
-                      num_images: 1,
-                      aspect_ratio: "1:1",
-                      output_format: "jpeg",
-                    });
-                    useProgressStore.getState().updateProgress(60, "Computing embeddings...");
-                    await apiClient.addExternalImages({
-                      images: result.images.map((img) => ({ url: img.url })),
-                      prompt: ghost.suggestedPrompt,
-                      generation_method: "batch",
-                      remove_background: removeBackground,
-                    });
-                    useProgressStore.getState().updateProgress(90, "Updating canvas...");
-                    const state = await apiClient.getState();
-                    setImages(state.images);
-                    setHistoryGroups(state.history_groups);
-                    useProgressStore.getState().updateProgress(100);
-                  } catch (err) {
-                    console.error("Ghost accept generation failed:", err);
-                  } finally {
-                    setIsGenerating(false);
-                    useProgressStore.getState().hideProgress();
-                  }
-                }}
-                onGhostDiscard={(ghostId) => {
-                  useAppStore.getState().removeGhostNode(ghostId);
-                }}
               />
             )}
 
@@ -1394,7 +779,7 @@ export const App: React.FC = () => {
             {showExternalImageLoader && (
               <ExternalImageLoader
                 onClose={() => setShowExternalImageLoader(false)}
-                onLoad={handleLoadExternalImages}
+                onLoad={(shoes, references) => handleLoadExternalImages(shoes, references)}
               />
             )}
 
@@ -1451,12 +836,16 @@ export const App: React.FC = () => {
                     setImages(state.images);
                     setHistoryGroups(state.history_groups);
 
-                    // Auto-select newly generated images
+                    // Auto-select newly generated images + assign to shoes layer
                     if (addResult?.images?.length > 0) {
-                      useAppStore.getState().setSelectedImageIds(
-                        addResult.images.map((img) => img.id)
-                      );
+                      const newIds = addResult.images.map((img: any) => img.id);
+                      useAppStore.getState().setSelectedImageIds(newIds);
+                      useAppStore.getState().setImagesLayer(newIds, 'default');
                     }
+
+                    addToExplorationCounter(count);
+                    addToAxisSuggestionCounter(count);
+                    triggerConcurrentGhosts(prompt, [], []).catch(console.error);
 
                     useProgressStore.getState().updateProgress(100);
                   } catch (error) {
@@ -1509,140 +898,19 @@ export const App: React.FC = () => {
       <SettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        unexpectedImagesCount={unexpectedImagesCount}
-        onUnexpectedImagesCountChange={setUnexpectedImagesCount}
         showLabels={showLabels}
-        showGrid={showGrid}
-        showClusters={showClusters}
         backgroundColor={backgroundColor}
         onToggleLabels={() => setShowLabels(!showLabels)}
-        onToggleGrid={() => setShowGrid(!showGrid)}
-        onToggleClusters={() => setShowClusters(!showClusters)}
         onBackgroundColorChange={setBackgroundColor}
         onExportZip={handleExportZip}
+        ghostCount={ghostCount}
+        onGhostCountChange={setGhostCount}
       />
 
       <ExplorationTreeModal
         isOpen={showExplorationTreeModal}
         onClose={() => setShowExplorationTreeModal(false)}
       />
-
-      {/* Ghost Node Accept/Discard Modal */}
-      {selectedGhost && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0, 0, 0, 0.7)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-          onClick={() => setSelectedGhost(null)}
-        >
-          <div
-            style={{
-              background: "#161b22",
-              border: "1px solid #30363d",
-              borderRadius: "12px",
-              padding: "24px",
-              maxWidth: "500px",
-              width: "90%",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 style={{ margin: "0 0 16px 0", color: "#58a6ff", fontSize: "18px" }}>
-              ✨ AI Suggestion
-            </h3>
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "14px", color: "#8b949e", marginBottom: "8px" }}>
-                Suggested Prompt:
-              </div>
-              <div style={{ fontSize: "16px", color: "#c9d1d9", marginBottom: "16px" }}>
-                "{selectedGhost.suggested_prompt}"
-              </div>
-              <div style={{ fontSize: "14px", color: "#8b949e", marginBottom: "8px" }}>
-                Reasoning:
-              </div>
-              <div style={{ fontSize: "14px", color: "#8b949e" }}>
-                {selectedGhost.reasoning}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setSelectedGhost(null)}
-                style={{
-                  padding: "8px 16px",
-                  background: "#21262d",
-                  border: "1px solid #30363d",
-                  borderRadius: "6px",
-                  color: "#c9d1d9",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                Dismiss
-              </button>
-              <button
-                onClick={async () => {
-                  const ghost = selectedGhost;
-                  setSelectedGhost(null);
-
-                  // Generate image from ghost suggestion
-                  useProgressStore.getState().showProgress("generating", "Generating from suggestion...", true);
-                  try {
-                    const result = await falClient.generateTextToImage({
-                      prompt: ghost.suggested_prompt,
-                      num_images: 1,
-                    });
-
-                    if (result.images && result.images.length > 0) {
-                      await apiClient.addExternalImages({
-                        images: result.images.map(img => ({ url: img.url })),
-                        prompt: ghost.suggested_prompt,
-                        generation_method: "batch",
-                        remove_background: removeBackground,
-                        parent_ids: [],
-                      });
-
-                      // Remove ghost from store
-                      useAppStore.getState().removeGhostNode(ghost.id);
-
-                      // Fetch updated state
-                      const state = await apiClient.getState();
-                      setImages(state.images);
-                      setHistoryGroups(state.history_groups);
-                    }
-
-                    useProgressStore.getState().hideProgress();
-                  } catch (error) {
-                    console.error("Failed to generate from ghost:", error);
-                    useProgressStore.getState().hideProgress();
-                    alert("Failed to generate image from suggestion");
-                  }
-                }}
-                style={{
-                  padding: "8px 16px",
-                  background: "#238636",
-                  border: "1px solid #2ea043",
-                  borderRadius: "6px",
-                  color: "white",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                }}
-              >
-                Generate ✨
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Radial Dial (global actions: Space or middle-click) */}
       <RadialDial
@@ -1674,12 +942,12 @@ export const App: React.FC = () => {
             onClick: () => setShowExternalImageLoader(true),
           },
           {
-            id: "analyze",
-            icon: "🔍",
-            label: "Analyze",
-            description: "Analyze canvas with AI",
+            id: "explore-canvas",
+            icon: "🔭",
+            label: "Explore Canvas",
+            description: "AI suggests unexplored design areas",
             category: "agentic",
-            onClick: analyzeCanvas,
+            onClick: () => triggerExplorationGhosts(),
           },
           {
             id: "analyze-axis",
@@ -1687,23 +955,7 @@ export const App: React.FC = () => {
             label: "Suggest Axes",
             description: "Suggest alternative axis labels",
             category: "agentic",
-            onClick: handleSuggestAxes,
-          },
-          {
-            id: "prompt-suggestion",
-            icon: "💡",
-            label: "Prompt Ideas",
-            description: "AI-generated starter prompts from brief",
-            category: "agentic",
-            onClick: handlePromptSuggestion,
-          },
-          {
-            id: "suggest-ghosts",
-            icon: "✨",
-            label: "Suggest Ideas",
-            description: "AI suggests unexplored gaps to fill",
-            category: "agentic",
-            onClick: suggestGhostNodes,
+            onClick: () => triggerAxisSuggestions(),
           },
           {
             id: "exploration-tree",

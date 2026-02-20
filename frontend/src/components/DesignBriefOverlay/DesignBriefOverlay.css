@@ -1,49 +1,48 @@
 .design-brief-overlay {
   position: absolute;
-  /* 56px = 40px header + 16px gap, to clear the header bar which overlays at y=0 */
-  top: 56px;
-  left: 84px;
+  top: 52px;
+  left: 12px;
   z-index: 50;
-  max-width: 300px;
+  max-width: 380px;
   pointer-events: all;
 }
 
 .dbo-read {
   background: none;
   border: none;
-  border-left: 1.5px solid rgba(0, 210, 255, 0.2);
-  padding: 2px 0 3px 9px;
+  border-left: 3px solid rgba(0, 210, 255, 0.55);
+  padding: 3px 0 4px 11px;
   cursor: pointer;
   transition: border-color 0.25s;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 
 .dbo-read:hover {
-  border-left-color: rgba(0, 210, 255, 0.55);
+  border-left-color: rgba(0, 210, 255, 0.7);
 }
 
 .dbo-label {
   display: block;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(0, 210, 255, 0.35);
+  color: rgba(0, 210, 255, 0.78);
   line-height: 1;
   transition: color 0.25s;
 }
 
 .dbo-read:hover .dbo-label {
-  color: rgba(0, 210, 255, 0.65);
+  color: rgba(0, 210, 255, 0.85);
 }
 
 .dbo-text {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.45;
-  color: rgba(200, 215, 230, 0.55);
+  color: rgba(210, 225, 240, 0.92);
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -52,15 +51,15 @@
 }
 
 .dbo-read:hover .dbo-text {
-  color: rgba(200, 215, 230, 0.82);
+  color: rgba(200, 215, 230, 0.95);
 }
 
 .dbo-empty .dbo-label {
-  color: rgba(0, 210, 255, 0.2);
+  color: rgba(0, 210, 255, 0.35);
 }
 
 .dbo-empty .dbo-text {
-  color: rgba(150, 165, 180, 0.28);
+  color: rgba(150, 165, 180, 0.45);
   font-style: italic;
 }
 

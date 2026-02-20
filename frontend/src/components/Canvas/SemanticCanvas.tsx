@@ -10,28 +10,14 @@ import { useProgressStore } from "../../store/progressStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
 import { AxisScaleSlider } from "../AxisScaleSlider/AxisScaleSlider";
 import { apiClient } from "../../api/client";
-import type { PendingImage } from "../../types";
-
 interface SemanticCanvasProps {
   onSelectionChange: (x: number, y: number, count: number) => void;
   onMiddleClick?: (x: number, y: number) => void;
-  pendingImages?: PendingImage[];
-  onAcceptPending?: (pendingId: string) => void;
-  onDiscardPending?: (pendingId: string) => void;
-  onGhostClick?: (ghost: any) => void;
-  onGhostAccept?: (ghost: any) => void;
-  onGhostDiscard?: (ghostId: number) => void;
 }
 
 export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   onSelectionChange,
   onMiddleClick,
-  pendingImages = [],
-  onAcceptPending,
-  onDiscardPending,
-  onGhostClick,
-  onGhostAccept,
-  onGhostDiscard,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomTransformRef = useRef<d3.ZoomTransform | null>(null);
@@ -58,15 +44,35 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const ghostNodes = useAppStore((state) => state.ghostNodes);
   const layers = useAppStore((state) => state.layers);
   const imageLayerMap = useAppStore((state) => state.imageLayerMap);
+  const imageSizeOverrides = useAppStore((state) => state.imageSizeOverrides);
+  const imageOpacityOverrides = useAppStore((state) => state.imageOpacityOverrides);
+  // Always-current refs so render closures never see stale overrides
+  const imageSizeOverridesRef = React.useRef<Record<number, number>>({});
+  imageSizeOverridesRef.current = imageSizeOverrides;
+  const imageOpacityOverridesRef = React.useRef<Record<number, number>>({});
+  imageOpacityOverridesRef.current = imageOpacityOverrides;
+  const imageLayerMapRef = React.useRef<Record<number, string>>({});
+  imageLayerMapRef.current = imageLayerMap;
 
   // Memoize filtered images — respects both individual visibility and layer visibility
+  // Sorted so lower layers (higher index in layers array) render first = below in SVG stack
+  // layers[0] = Shoes = topmost → rendered last (on top)
+  // layers[1] = References = bottom → rendered first (behind shoes)
   const images = useMemo(() => {
     const layerVisMap: Record<string, boolean> = {};
-    layers.forEach((l) => { layerVisMap[l.id] = l.visible; });
-    return allImages.filter((img) => {
+    const layerOrder: Record<string, number> = {};
+    layers.forEach((l, i) => { layerVisMap[l.id] = l.visible; layerOrder[l.id] = i; });
+    const filtered = allImages.filter((img) => {
       if (!img.visible) return false;
       const lid = imageLayerMap[img.id] ?? "default";
       return layerVisMap[lid] ?? true;
+    });
+    // Sort: higher layer index (deeper in stack) → render first; within same layer, lower ID first (older behind newer)
+    return filtered.sort((a, b) => {
+      const aIdx = layerOrder[imageLayerMap[a.id] ?? "default"] ?? 0;
+      const bIdx = layerOrder[imageLayerMap[b.id] ?? "default"] ?? 0;
+      if (bIdx !== aIdx) return bIdx - aIdx; // descending layer index: references first, shoes last
+      return a.id - b.id; // ascending ID within layer: older images render first (behind newer)
     });
   }, [allImages, layers, imageLayerMap]);
 
@@ -90,138 +96,125 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const onMiddleClickRef = React.useRef(onMiddleClick);
   React.useEffect(() => { onMiddleClickRef.current = onMiddleClick; }, [onMiddleClick]);
 
-  // Native pointer-event brush + context-menu prevention (separate from D3 zoom)
+  // Mouse-event brush + context-menu prevention (separate from D3 zoom)
+  // Uses mousedown/document-mousemove/mouseup to avoid D3 pointer event interference.
+  // D3 zoom only handles right-click (button===2) so left-click is fully ours.
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
 
-    // Prevent right-click context menu and middle-click autoscroll popup
+    // Prevent right-click context menu
     const preventContextMenu = (e: MouseEvent) => e.preventDefault();
-    const preventMiddleScroll = (e: MouseEvent) => { if (e.button === 1) e.preventDefault(); };
     svg.addEventListener("contextmenu", preventContextMenu);
-    svg.addEventListener("mousedown", preventMiddleScroll);
 
-    // ── Rubber-band brush (pointer events for reliable capture) ──
+    // ── Rubber-band brush (mouse events — no pointer capture conflicts) ──
     let brushStart: { x: number; y: number } | null = null;
-    let capturedPointerId: number | null = null;
+    let isBrushDragging = false;
+    let cleanupDocListeners: (() => void) | null = null;
 
-    const svgCoords = (e: PointerEvent) => {
+    const svgCoords = (e: MouseEvent) => {
       const r = svg.getBoundingClientRect();
       return { x: e.clientX - r.left, y: e.clientY - r.top };
     };
 
-    const onPointerDown = (e: PointerEvent) => {
+    const onMouseDown = (e: MouseEvent) => {
       // Middle-click → radial dial
       if (e.button === 1) {
         e.preventDefault();
         onMiddleClickRef.current?.(e.clientX, e.clientY);
         return;
       }
+      // Right-click → D3 handles pan
       if (e.button !== 0) return;
+
       // Only brush on background, not on image/ghost nodes
       const target = e.target as Element;
       if (target.closest(".image-node") || target.closest(".ghost-node") || target.closest(".pending-image")) return;
 
+      // Prevent native browser drag (shows forbidden cursor without this)
+      e.preventDefault();
+
       const coords = svgCoords(e);
       brushStart = coords;
-      capturedPointerId = e.pointerId;
-      svg.setPointerCapture(e.pointerId);
+      isBrushDragging = true;
       brushActiveRef.current = true;
       brushRectRef.current = null;
       setBrush(null);
-      console.log("🔲 Brush START at", coords);
-    };
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (!brushActiveRef.current || !brushStart || e.pointerId !== capturedPointerId) return;
-      const { x: ex, y: ey } = svgCoords(e);
-      const { x: sx, y: sy } = brushStart;
-      const rect = { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
-      brushRectRef.current = rect;
-      setBrush(rect);
-    };
+      const onDocMouseMove = (ev: MouseEvent) => {
+        if (!isBrushDragging || !brushStart) return;
+        const { x: ex, y: ey } = svgCoords(ev);
+        const { x: sx, y: sy } = brushStart;
+        const rect = { x: Math.min(sx, ex), y: Math.min(sy, ey), w: Math.abs(ex - sx), h: Math.abs(ey - sy) };
+        brushRectRef.current = rect;
+        setBrush(rect);
+      };
 
-    const onPointerUp = (e: PointerEvent) => {
-      if (!brushActiveRef.current || e.pointerId !== capturedPointerId) return;
-      brushActiveRef.current = false;
-      capturedPointerId = null;
-      try { svg.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      const onDocMouseUp = (ev: MouseEvent) => {
+        if (!isBrushDragging) return;
+        isBrushDragging = false;
+        brushActiveRef.current = false;
+        if (cleanupDocListeners) { cleanupDocListeners(); cleanupDocListeners = null; }
 
-      const currentBrush = brushRectRef.current;
-      brushRectRef.current = null;
-      setBrush(null);
+        const currentBrush = brushRectRef.current;
+        brushRectRef.current = null;
+        setBrush(null);
+        brushStart = null;
 
-      if (!currentBrush || currentBrush.w < 4 || currentBrush.h < 4) {
-        console.log("🔲 Brush too small, skipping selection");
-        return;
-      }
+        if (!currentBrush || currentBrush.w < 4 || currentBrush.h < 4) return;
 
-      const xScale = xScaleRef.current;
-      const yScale = yScaleRef.current;
-      const transform = zoomTransformRef.current ?? d3.zoomIdentity;
-      if (!xScale || !yScale) { console.warn("🔲 No scales available"); return; }
+        // DOM-based hit detection: use actual rendered positions
+        const svgEl = svgRef.current;
+        if (!svgEl) return;
+        const svgRect = svgEl.getBoundingClientRect();
 
-      const vs = visualSettingsRef.current;
-      const coordScale = coordScaleRef.current;
-      const coordOffset = coordOffsetRef.current;
-      const pivotX = stretchPivotXRef.current;
-      const pivotY = stretchPivotYRef.current;
-      const axisScaleX = vs.axisScaleX ?? 1;
-      const axisScaleY = vs.axisScaleY ?? 1;
+        const state = useAppStore.getState();
+        const layerVisMap: Record<string, boolean> = {};
+        state.layers.forEach((l) => { layerVisMap[l.id] = l.visible; });
+        const visibleIdSet = new Set<number>();
+        state.images.forEach((img) => {
+          if (!img.visible) return;
+          const lid = state.imageLayerMap[img.id] ?? "default";
+          if (layerVisMap[lid] ?? true) visibleIdSet.add(img.id);
+        });
 
-      // Get all visible images from store (with layer filter)
-      const state = useAppStore.getState();
-      const layerVisMap: Record<string, boolean> = {};
-      state.layers.forEach((l) => { layerVisMap[l.id] = l.visible; });
-      const allVisible = state.images.filter((img) => {
-        if (!img.visible) return false;
-        const lid = state.imageLayerMap[img.id] ?? "default";
-        return layerVisMap[lid] ?? true;
-      });
+        const inside: number[] = [];
+        svgEl.querySelectorAll("[data-image-id]").forEach((el: Element) => {
+          const id = parseInt(el.getAttribute("data-image-id") || "-1");
+          if (isNaN(id) || !visibleIdSet.has(id)) return;
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2 - svgRect.left;
+          const cy = r.top + r.height / 2 - svgRect.top;
+          if (cx >= currentBrush.x && cx <= currentBrush.x + currentBrush.w &&
+              cy >= currentBrush.y && cy <= currentBrush.y + currentBrush.h) {
+            inside.push(id);
+          }
+        });
 
-      console.log(`🔲 Brush END: rect=${JSON.stringify(currentBrush)}, checking ${allVisible.length} images`);
-
-      const inside: number[] = [];
-      allVisible.forEach((img) => {
-        const bx = (img.coordinates[0] + coordOffset[0]) * coordScale;
-        const by = (img.coordinates[1] + coordOffset[1]) * coordScale;
-        const sx = pivotX + (bx - pivotX) * axisScaleX;
-        const sy = pivotY + (by - pivotY) * axisScaleY;
-        const screenX = transform.applyX(xScale(sx));
-        const screenY = transform.applyY(yScale(sy));
-        const hit = screenX >= currentBrush.x && screenX <= currentBrush.x + currentBrush.w &&
-                    screenY >= currentBrush.y && screenY <= currentBrush.y + currentBrush.h;
-        if (hit) inside.push(img.id);
-        // Debug first few images
-        if (allVisible.indexOf(img) < 4) {
-          console.log(`  img#${img.id} coords=${img.coordinates.slice(0,2).map((v: number)=>v.toFixed(3))} → screen(${screenX.toFixed(0)},${screenY.toFixed(0)}) hit=${hit}`);
+        if (inside.length > 0) {
+          if (ev.shiftKey) {
+            const current = state.selectedImageIds;
+            state.setSelectedImageIds([...new Set([...current, ...inside])]);
+          } else {
+            state.setSelectedImageIds(inside);
+          }
         }
-      });
+      };
 
-      console.log(`🔲 Selected ${inside.length} images:`, inside.slice(0, 10));
-
-      if (inside.length > 0) {
-        if (e.shiftKey) {
-          const current = state.selectedImageIds;
-          state.setSelectedImageIds([...new Set([...current, ...inside])]);
-        } else {
-          state.setSelectedImageIds(inside);
-        }
-      }
+      document.addEventListener("mousemove", onDocMouseMove);
+      document.addEventListener("mouseup", onDocMouseUp);
+      cleanupDocListeners = () => {
+        document.removeEventListener("mousemove", onDocMouseMove);
+        document.removeEventListener("mouseup", onDocMouseUp);
+      };
     };
 
-    svg.addEventListener("pointerdown", onPointerDown);
-    svg.addEventListener("pointermove", onPointerMove);
-    svg.addEventListener("pointerup", onPointerUp);
-    svg.addEventListener("pointercancel", onPointerUp);
+    svg.addEventListener("mousedown", onMouseDown);
 
     return () => {
       svg.removeEventListener("contextmenu", preventContextMenu);
-      svg.removeEventListener("mousedown", preventMiddleScroll);
-      svg.removeEventListener("pointerdown", onPointerDown);
-      svg.removeEventListener("pointermove", onPointerMove);
-      svg.removeEventListener("pointerup", onPointerUp);
-      svg.removeEventListener("pointercancel", onPointerUp);
+      svg.removeEventListener("mousedown", onMouseDown);
+      if (cleanupDocListeners) cleanupDocListeners();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);  // Intentionally no deps — uses refs for all mutable data
@@ -489,6 +482,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
     terrainBlur.append("feGaussianBlur").attr("stdDeviation", 6);
 
+    // Soft halo filter for ghost nodes
+    const ghostHalo = defs.append("filter").attr("id", "ghost-halo")
+      .attr("x", "-60%").attr("y", "-60%").attr("width", "220%").attr("height", "220%");
+    ghostHalo.append("feGaussianBlur").attr("stdDeviation", 14).attr("in", "SourceGraphic").attr("result", "blur");
+
     // Create main group for zoom/pan
     const g = svg.append("g").attr("class", "main-group");
 
@@ -529,20 +527,21 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const axisScaleX = visualSettings.axisScaleX ?? 1.0;
     const axisScaleY = visualSettings.axisScaleY ?? 1.0;
 
-    // Stretch-from-center transform: center + (base - center) * scale
-    const baseCoords = images.map((d) => ({
+    // Stretch-from-center transform: use ALL images (unfiltered by layer) so grid/pivot
+    // stays stable regardless of layer visibility toggles
+    const allBaseCoords = allImages.map((d) => ({
       x: (d.coordinates[0] + coordOffset[0]) * coordScale,
       y: (d.coordinates[1] + coordOffset[1]) * coordScale,
     }));
-    const xExtentBase = d3.extent(baseCoords, (d) => d.x) as [number, number];
-    const yExtentBase = d3.extent(baseCoords, (d) => d.y) as [number, number];
-    const centerX = images.length ? (xExtentBase[0] + xExtentBase[1]) / 2 : 0;
-    const centerY = images.length ? (yExtentBase[0] + yExtentBase[1]) / 2 : 0;
+    const xExtentBase = d3.extent(allBaseCoords, (d) => d.x) as [number, number];
+    const yExtentBase = d3.extent(allBaseCoords, (d) => d.y) as [number, number];
+    const centerX = allImages.length ? (xExtentBase[0] + xExtentBase[1]) / 2 : 0;
+    const centerY = allImages.length ? (yExtentBase[0] + yExtentBase[1]) / 2 : 0;
     if (canvasBounds === null) {
-      // Calculate bounds from BASE coordinates (stretch applied per-node via toStretched)
+      // Calculate bounds from ALL images (stretch applied per-node via toStretched)
       console.log("📐 Calculating bounds from data extent");
-      const xExtent = d3.extent(baseCoords, (d) => d.x) as [number, number];
-      const yExtent = d3.extent(baseCoords, (d) => d.y) as [number, number];
+      const xExtent = d3.extent(allBaseCoords, (d) => d.x) as [number, number];
+      const yExtent = d3.extent(allBaseCoords, (d) => d.y) as [number, number];
 
       const paddingFactor = visualSettings.layoutPadding;
       const xRange = (xExtent[1] ?? 1) - (xExtent[0] ?? 0) || 1;
@@ -654,137 +653,149 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const [sx, sy] = toStretched(bx, by);
         return `translate(${xScale(sx)}, ${yScale(sy)})`;
       })
-      .attr("opacity", (d: any) => d.isHaze ? 1.0 : 0.28)
+      .attr("opacity", 1.0)
       .style("cursor", "pointer");
 
     const ghostSize = visualSettings.imageSize;
 
-    // Render: haze blob for isHaze nodes; preview image if available, else circle + sparkle
+    // Ghost rendering: halo glow + shoe image + action buttons (all in one .each for datum access)
     ghostNodeElements.each(function(d: any) {
       const el = d3.select(this);
-      if (d.isHaze) {
-        // Haze rendering: soft radial gradient blob + description label
-        const hazeR = ghostSize * 1.6;
-        el.append("circle")
-          .attr("class", "haze-blob")
-          .attr("r", hazeR)
-          .attr("fill", "url(#haze-nebula)")
-          .attr("pointer-events", "visibleFill");
-        const rawLabel = d.description || "Explore";
-        const label = rawLabel.length > 30 ? rawLabel.slice(0, 28) + "…" : rawLabel;
-        el.append("text")
-          .attr("class", "haze-label")
-          .attr("text-anchor", "middle")
-          .attr("y", hazeR + 14)
-          .attr("font-size", 10)
-          .attr("fill", "rgba(192, 132, 252, 0.6)")
-          .attr("pointer-events", "none")
-          .text(label);
-      } else if (d.previewBase64) {
-        // Actual preview image at low opacity
-        el.append("image")
-          .attr("x", -ghostSize / 2)
-          .attr("y", -ghostSize / 2)
-          .attr("width", ghostSize)
-          .attr("height", ghostSize)
-          .attr("href", `data:image/jpeg;base64,${d.previewBase64}`)
-          .attr("preserveAspectRatio", "xMidYMid meet");
-      } else {
-        // Fallback: dashed circle + sparkle
-        el.append("circle")
-          .attr("r", ghostSize / 2)
-          .attr("fill", "none")
-          .attr("stroke", "#58a6ff")
-          .attr("stroke-width", 2)
-          .attr("stroke-dasharray", "5,5");
-        el.append("text")
-          .attr("text-anchor", "middle")
-          .attr("dy", "0.3em")
-          .attr("font-size", ghostSize / 2)
-          .text("✨");
-      }
-    });
+      const haloColor = d.source === 'concurrent' ? '#a855f7' : '#14b8a6';
 
-    // Accept / Discard action group (shown on hover — non-haze nodes only)
-    ghostNodeElements.filter((d: any) => !d.isHaze).each(function() {
-      const el = d3.select(this);
+      // Extended hit area covers image + button zone below
+      const hitExtraY = 56; // extra space below image for buttons + reasoning
+      el.append("rect")
+        .attr("class", "ghost-hit")
+        .attr("x", -ghostSize / 2)
+        .attr("y", -ghostSize / 2)
+        .attr("width", ghostSize)
+        .attr("height", ghostSize + hitExtraY)
+        .attr("rx", 8)
+        .attr("fill", "transparent")
+        .attr("pointer-events", "all");
+
+      // Halo glow circle (blurred, behind image)
+      el.append("circle")
+        .attr("cx", 0).attr("cy", 0)
+        .attr("r", ghostSize * 0.52)
+        .attr("fill", haloColor)
+        .attr("opacity", 0.28)
+        .attr("filter", "url(#ghost-halo)")
+        .style("pointer-events", "none");
+
+      // Shoe image (full opacity — ghost effect is via halo, not image opacity)
+      el.append("image")
+        .attr("x", -ghostSize / 2).attr("y", -ghostSize / 2)
+        .attr("width", ghostSize).attr("height", ghostSize)
+        .attr("href", d.base64_image)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .style("pointer-events", "none");
+
+      // ── Action group (shown on hover) ──
       const actionGroup = el.append("g")
         .attr("class", "ghost-actions")
         .attr("display", "none");
 
-      // Accept button
+      // Reasoning label (truncated, above buttons)
+      const reasoning = (d.reasoning || '').substring(0, 55) + ((d.reasoning || '').length > 55 ? '…' : '');
+      actionGroup.append("rect")
+        .attr("x", -ghostSize / 2).attr("y", ghostSize / 2 + 2)
+        .attr("width", ghostSize).attr("height", 16)
+        .attr("rx", 4)
+        .attr("fill", "rgba(13,17,23,0.82)")
+        .style("pointer-events", "none");
+      actionGroup.append("text")
+        .attr("x", 0).attr("y", ghostSize / 2 + 13)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 9)
+        .attr("fill", "rgba(180,195,210,0.92)")
+        .style("pointer-events", "none")
+        .text(reasoning);
+
+      // Buttons below reasoning label
+      const btnY = ghostSize / 2 + 22;
+      const btnH = 22;
+      const btnW = 52;
+      const gap = 5;
+      const keepX = -(btnW + gap / 2);
+      const skipX = gap / 2;
+
+      // Keep button
       const acceptBg = actionGroup.append("rect")
-        .attr("x", -ghostSize * 0.28)
-        .attr("y", ghostSize * 0.28)
-        .attr("width", ghostSize * 0.56)
-        .attr("height", 22)
+        .attr("x", keepX).attr("y", btnY)
+        .attr("width", btnW).attr("height", btnH)
         .attr("rx", 11)
-        .attr("fill", "rgba(52,211,153,0.85)")
+        .attr("fill", "rgba(34,197,94,0.95)")
         .style("cursor", "pointer");
-
       actionGroup.append("text")
-        .attr("x", 0)
-        .attr("y", ghostSize * 0.28 + 15)
+        .attr("x", keepX + btnW / 2).attr("y", btnY + 15)
         .attr("text-anchor", "middle")
-        .attr("font-size", 11)
+        .attr("font-size", 11).attr("font-weight", "700")
         .attr("fill", "#0d1117")
-        .attr("font-weight", "bold")
-        .attr("pointer-events", "none")
-        .text("✓ Accept");
+        .style("pointer-events", "none")
+        .text("✓ Keep");
 
-      // Discard button (top-right X)
-      const discardBg = actionGroup.append("circle")
-        .attr("cx", ghostSize * 0.38)
-        .attr("cy", -ghostSize * 0.38)
-        .attr("r", 11)
-        .attr("fill", "rgba(248,81,73,0.85)")
+      // Skip button
+      const discardBg = actionGroup.append("rect")
+        .attr("x", skipX).attr("y", btnY)
+        .attr("width", btnW).attr("height", btnH)
+        .attr("rx", 11)
+        .attr("fill", "rgba(239,68,68,0.95)")
         .style("cursor", "pointer");
-
       actionGroup.append("text")
-        .attr("x", ghostSize * 0.38)
-        .attr("y", -ghostSize * 0.38 + 5)
+        .attr("x", skipX + btnW / 2).attr("y", btnY + 15)
         .attr("text-anchor", "middle")
-        .attr("font-size", 13)
+        .attr("font-size", 11).attr("font-weight", "700")
         .attr("fill", "white")
-        .attr("pointer-events", "none")
-        .text("×");
+        .style("pointer-events", "none")
+        .text("✕ Skip");
 
-      acceptBg.on("click", function(event) {
+      // Keep: call backend to register image as real shoe on canvas
+      acceptBg.on("click", async function(event: any) {
         event.stopPropagation();
-        const d = d3.select((this as any).parentNode!.parentNode!).datum() as any;
-        if (onGhostAccept) onGhostAccept(d);
+        useAppStore.getState().removeGhostNode(d.id); // immediate visual removal
+        try {
+          const result = await apiClient.addExternalImages({
+            images: [{ url: d.base64_image }],
+            prompt: d.prompt || 'AI suggested shoe',
+            generation_method: 'agent',
+            remove_background: false,
+            parent_ids: d.parents || [],
+          });
+          if (result?.images?.length > 0) {
+            const newIds = result.images.map((img: any) => img.id);
+            useAppStore.getState().setImagesLayer(newIds, 'default');
+            const updatedState = await apiClient.getState();
+            useAppStore.getState().setImages(updatedState.images);
+            useAppStore.getState().setHistoryGroups(updatedState.history_groups);
+          }
+        } catch (err) {
+          console.error('[Ghost accept] Failed to add image:', err);
+        }
       });
 
-      discardBg.on("click", function(event) {
+      // Skip: just remove ghost
+      discardBg.on("click", function(event: any) {
         event.stopPropagation();
-        const d = d3.select((this as any).parentNode!.parentNode!).datum() as any;
-        if (onGhostDiscard) onGhostDiscard(d.id);
+        useAppStore.getState().removeGhostNode(d.id);
       });
     });
 
-    // Hover show/hide actions (haze: brighten label; non-haze: show action buttons)
+    // Hover: show action buttons (mouseleave only fires when truly leaving the <g>)
     ghostNodeElements
-      .on("mouseenter.ghost", function(_event, d: any) {
-        if (d.isHaze) {
-          d3.select(this).select(".haze-label").attr("fill", "rgba(192, 132, 252, 0.9)");
-        } else {
-          d3.select(this).attr("opacity", 0.75);
-          d3.select(this).select(".ghost-actions").attr("display", null);
-        }
+      .on("mouseenter.ghost", function() {
+        d3.select(this).select(".ghost-hit").attr("fill", "rgba(255,255,255,0.04)");
+        d3.select(this).select(".ghost-actions").attr("display", null);
       })
-      .on("mouseleave.ghost", function(_event, d: any) {
-        if (d.isHaze) {
-          d3.select(this).select(".haze-label").attr("fill", "rgba(192, 132, 252, 0.6)");
-        } else {
-          d3.select(this).attr("opacity", 0.28);
-          d3.select(this).select(".ghost-actions").attr("display", "none");
-        }
+      .on("mouseleave.ghost", function() {
+        d3.select(this).select(".ghost-hit").attr("fill", "transparent");
+        d3.select(this).select(".ghost-actions").attr("display", "none");
       });
 
-    // Click handler — also triggers accept for quick click
-    ghostNodeElements.on("click", function(event, d) {
+    // Click on ghost body — no-op (accept/discard via inline buttons)
+    ghostNodeElements.on("click", function(event: any) {
       event.stopPropagation();
-      if (onGhostClick) onGhostClick(d);
     });
 
     // Group for images
@@ -809,13 +820,23 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     console.log("🎯 Attaching click handlers to", images.length, "image nodes");
 
-    // Add invisible click area: full width, 60% vertical center (shoes are side-view, wide but not tall)
+    // Add invisible click area:
+    //   - References layer: full square (edge-to-edge image bounds, for any non-shoe content)
+    //   - Shoes layer: 60% vertical center crop (shoes are side-view, centred around middle)
     imageNodes
       .append("rect")
-      .attr("x", -imageSize / 2)
-      .attr("y", -imageSize * 0.3)
-      .attr("width", imageSize)
-      .attr("height", imageSize * 0.6)
+      .attr("x", (d: any) => -(imageSizeOverridesRef.current[d.id] ?? imageSize) / 2)
+      .attr("y", (d: any) => {
+        const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
+        const isRef = (imageLayerMapRef.current[d.id] ?? "default") === "references";
+        return isRef ? -sz / 2 : -sz * 0.3;
+      })
+      .attr("width", (d: any) => imageSizeOverridesRef.current[d.id] ?? imageSize)
+      .attr("height", (d: any) => {
+        const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
+        const isRef = (imageLayerMapRef.current[d.id] ?? "default") === "references";
+        return isRef ? sz : sz * 0.6;
+      })
       .attr("rx", 8)
       .attr("fill", "transparent")
       .attr("pointer-events", "all")
@@ -916,156 +937,15 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     imageNodes
       .append("image")
       .attr("href", (d) => `data:image/png;base64,${d.base64_image}`)
-      .attr("x", -imageSize / 2)
-      .attr("y", -imageSize / 2)
-      .attr("width", imageSize)
-      .attr("height", imageSize)
-      .attr("opacity", visualSettings.imageOpacity)
+      .attr("x", (d: any) => -(imageSizeOverridesRef.current[d.id] ?? imageSize) / 2)
+      .attr("y", (d: any) => -(imageSizeOverridesRef.current[d.id] ?? imageSize) / 2)
+      .attr("width", (d: any) => imageSizeOverridesRef.current[d.id] ?? imageSize)
+      .attr("height", (d: any) => imageSizeOverridesRef.current[d.id] ?? imageSize)
+      .attr("opacity", (d: any) => imageOpacityOverridesRef.current[d.id] ?? visualSettings.imageOpacity)
       .style("pointer-events", "none");
 
     // Selection and parent/child highlighting uses CSS drop-shadow classes
     // applied to <g> groups — pulsing cyan glow for selection
-
-    // Render pending/background images with faded opacity
-    if (pendingImages.length > 0) {
-      const pendingGroup = imagesGroup
-        .selectAll(".pending-image")
-        .data(pendingImages, (d: any) => d.id)
-        .join("g")
-        .attr("class", "pending-image")
-        .attr("id", (d) => `pending-${d.id}`)
-        .attr("transform", (d) => {
-          const bx = (d.imageData.coordinates[0] + coordOffset[0]) * coordScale;
-          const by = (d.imageData.coordinates[1] + coordOffset[1]) * coordScale;
-          const [sx, sy] = toStretched(bx, by);
-          return `translate(${xScale(sx)}, ${yScale(sy)})`;
-        })
-        .attr("opacity", 0.35);  // Faded opacity
-
-      // Add image
-      pendingGroup
-        .append("image")
-        .attr("href", (d) => `data:image/png;base64,${d.imageData.base64_image}`)
-        .attr("x", -imageSize / 2)
-        .attr("y", -imageSize / 2)
-        .attr("width", imageSize)
-        .attr("height", imageSize)
-        .attr("clip-path", "inset(0 round 8px)");
-
-      // Add border
-      pendingGroup
-        .append("rect")
-        .attr("x", -imageSize / 2)
-        .attr("y", -imageSize / 2)
-        .attr("width", imageSize)
-        .attr("height", imageSize)
-        .attr("rx", 8)
-        .attr("fill", "none")
-        .attr("stroke", "#f0e68c")
-        .attr("stroke-width", 2)
-        .attr("stroke-dasharray", "5,5");
-
-      // Add accept/discard buttons
-      pendingGroup.each(function(d) {
-        const group = d3.select(this);
-        const buttonY = imageSize / 2 + 15;
-
-        // Accept button
-        const acceptBtn = group
-          .append("foreignObject")
-          .attr("x", -imageSize / 2)
-          .attr("y", buttonY)
-          .attr("width", imageSize / 2 - 2)
-          .attr("height", 30)
-          .style("pointer-events", "all");
-
-        acceptBtn
-          .append("xhtml:button")
-          .style("width", "100%")
-          .style("height", "100%")
-          .style("background", "#238636")
-          .style("border", "none")
-          .style("border-radius", "4px")
-          .style("color", "white")
-          .style("font-size", "11px")
-          .style("cursor", "pointer")
-          .style("pointer-events", "all")
-          .text("✓ Accept")
-          .on("click", () => {
-            if (onAcceptPending) {
-              onAcceptPending(d.id);
-            }
-          })
-          .on("mouseover", function() {
-            d3.select(this).style("background", "#2ea043");
-          })
-          .on("mouseout", function() {
-            d3.select(this).style("background", "#238636");
-          });
-
-        // Discard button
-        const discardBtn = group
-          .append("foreignObject")
-          .attr("x", imageSize / 2 - (imageSize / 2 - 2))
-          .attr("y", buttonY)
-          .attr("width", imageSize / 2 - 2)
-          .attr("height", 30)
-          .style("pointer-events", "all");
-
-        discardBtn
-          .append("xhtml:button")
-          .style("width", "100%")
-          .style("height", "100%")
-          .style("background", "#da3633")
-          .style("border", "none")
-          .style("border-radius", "4px")
-          .style("color", "white")
-          .style("font-size", "11px")
-          .style("cursor", "pointer")
-          .style("pointer-events", "all")
-          .text("✕ Discard")
-          .on("click", () => {
-            if (onDiscardPending) {
-              onDiscardPending(d.id);
-            }
-          })
-          .on("mouseover", function() {
-            d3.select(this).style("background", "#e5534b");
-          })
-          .on("mouseout", function() {
-            d3.select(this).style("background", "#da3633");
-          });
-
-        // Add hover to show reasoning
-        group
-          .on("mouseover", function() {
-            // Show tooltip with variation reasoning
-            const tooltip = group
-              .append("foreignObject")
-              .attr("class", "variation-tooltip")
-              .attr("x", -imageSize / 2)
-              .attr("y", -imageSize / 2 - 50)
-              .attr("width", 200)
-              .attr("height", 50);
-
-            tooltip
-              .append("xhtml:div")
-              .style("background", "rgba(22, 27, 34, 0.95)")
-              .style("border", "1px solid #f0e68c")
-              .style("border-radius", "4px")
-              .style("padding", "6px")
-              .style("color", "#c9d1d9")
-              .style("font-size", "11px")
-              .text(`Variation: ${d.variation.reasoning}`);
-
-            group.attr("opacity", 0.7);
-          })
-          .on("mouseout", function() {
-            group.selectAll(".variation-tooltip").remove();
-            group.attr("opacity", 0.35);
-          });
-      });
-    }
 
     // Click on canvas background to deselect
     svg.on("click", (event) => {
@@ -1093,7 +973,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     visualSettings,
     axisLabels,
     canvasBounds,
-    pendingImages,
     ghostNodes,
     // Note: Excluded selectedImageIds and hoveredGroupId to prevent full redraws on selection/hover changes
     // These are handled in a separate effect below
@@ -1429,64 +1308,145 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         </div>
       </div>
 
-      {/* Image size slider: vertical bar at right edge (12px from edge) */}
+      {/* Size + Opacity sliders: stacked vertically at right edge */}
       <div style={{
         position: "absolute",
         right: 12,
         top: "50%",
         transform: "translateY(-50%)",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
-        width: 28,
-        height: 140,
+        gap: 28,
         pointerEvents: "auto",
       }}>
-        <div style={{ transform: "rotate(-90deg)", width: 140, flexShrink: 0 }}>
-          <AxisScaleSlider
-            axis="size"
-            value={visualSettings.imageSize}
-            onChange={(v) => useAppStore.getState().updateVisualSettings({ imageSize: Math.round(v) })}
-            compact
-            minVal={100}
-            maxVal={500}
-            isLinear
-            unit="px"
-          />
+        {/* Size slider */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 140 }}>
+          <div style={{ transform: "rotate(-90deg)", width: 140, flexShrink: 0 }}>
+            <AxisScaleSlider
+              axis="size"
+              value={selectedImageIds.length > 0
+                ? (imageSizeOverrides[selectedImageIds[0]] ?? visualSettings.imageSize)
+                : visualSettings.imageSize}
+              onChange={(v) => {
+                const sel = useAppStore.getState().selectedImageIds;
+                const sz = Math.round(v);
+                if (sel.length > 0) {
+                  // Direct DOM update for immediate feedback
+                  const svg = d3.select(svgRef.current!);
+                  sel.forEach((id) => {
+                    svg.select(`[data-image-id="${id}"]`).each(function() {
+                      d3.select(this).select("rect")
+                        .attr("x", -sz / 2).attr("y", -sz * 0.3)
+                        .attr("width", sz).attr("height", sz * 0.6);
+                      d3.select(this).select("image")
+                        .attr("x", -sz / 2).attr("y", -sz / 2)
+                        .attr("width", sz).attr("height", sz);
+                    });
+                  });
+                  useAppStore.getState().setImageSizeOverrides(sel, sz);
+                } else {
+                  useAppStore.getState().updateVisualSettings({ imageSize: sz });
+                }
+              }}
+              compact
+              minVal={40}
+              maxVal={500}
+              isLinear
+              unit="px"
+            />
+          </div>
+        </div>
+        {/* Opacity slider */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 140 }}>
+          <div style={{ transform: "rotate(-90deg)", width: 140, flexShrink: 0 }}>
+            <AxisScaleSlider
+              axis="opacity"
+              value={(selectedImageIds.length > 0
+                ? (imageOpacityOverrides[selectedImageIds[0]] ?? visualSettings.imageOpacity)
+                : visualSettings.imageOpacity) * 100}
+              onChange={(v) => {
+                const sel = useAppStore.getState().selectedImageIds;
+                const op = Math.round(v) / 100;
+                if (sel.length > 0) {
+                  const svg = d3.select(svgRef.current!);
+                  sel.forEach((id) => {
+                    svg.select(`[data-image-id="${id}"]`).select("image").attr("opacity", op);
+                  });
+                  useAppStore.getState().setImageOpacityOverrides(sel, op);
+                } else {
+                  useAppStore.getState().updateVisualSettings({ imageOpacity: op });
+                }
+              }}
+              compact
+              minVal={10}
+              maxVal={100}
+              isLinear
+              unit="%"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Recenter / fit-all button */}
-      <button
-        style={{
-          position: "absolute",
-          bottom: 60,
-          right: 16,
-          background: "rgba(22, 27, 34, 0.85)",
-          backdropFilter: "blur(6px)",
-          border: "1px solid rgba(48, 54, 61, 0.6)",
-          borderRadius: 6,
-          color: "#c9d1d9",
-          fontSize: 12,
-          padding: "6px 12px",
-          cursor: "pointer",
-          pointerEvents: "auto",
-          opacity: 0.7,
-          transition: "opacity 0.2s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-        onClick={() => {
-          // Reset bounds + clear zoom so the view re-fits all shoes
-          zoomTransformRef.current = null;
-          useAppStore.getState().resetCanvasBounds();
-          // Also reset axis scales to 1x
-          useAppStore.getState().updateVisualSettings({ axisScaleX: 1.0, axisScaleY: 1.0 });
-        }}
-        title="Recenter canvas to fit all shoes"
-      >
-        Recenter
-      </button>
+      {/* Bottom-right buttons: Visual Reset + Recenter */}
+      <div style={{
+        position: "absolute",
+        bottom: 60,
+        right: 16,
+        display: "flex",
+        gap: 8,
+        pointerEvents: "auto",
+      }}>
+        {/* Visual Reset: clear per-image size/opacity overrides */}
+        <button
+          style={{
+            background: "rgba(22, 27, 34, 0.85)",
+            backdropFilter: "blur(6px)",
+            border: "1px solid rgba(48, 54, 61, 0.6)",
+            borderRadius: 6,
+            color: "#c9d1d9",
+            fontSize: 12,
+            padding: "6px 12px",
+            cursor: "pointer",
+            opacity: 0.7,
+            transition: "opacity 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
+          onClick={() => {
+            useAppStore.getState().clearImageOverrides();
+            useAppStore.getState().updateVisualSettings({ imageSize: 120, imageOpacity: 1.0 });
+          }}
+          title="Reset all image sizes and opacities to default"
+        >
+          Visual Reset
+        </button>
+        {/* Recenter / fit-all button */}
+        <button
+          style={{
+            background: "rgba(22, 27, 34, 0.85)",
+            backdropFilter: "blur(6px)",
+            border: "1px solid rgba(48, 54, 61, 0.6)",
+            borderRadius: 6,
+            color: "#c9d1d9",
+            fontSize: 12,
+            padding: "6px 12px",
+            cursor: "pointer",
+            opacity: 0.7,
+            transition: "opacity 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
+          onClick={() => {
+            zoomTransformRef.current = null;
+            useAppStore.getState().resetCanvasBounds();
+            useAppStore.getState().updateVisualSettings({ axisScaleX: 1.0, axisScaleY: 1.0 });
+          }}
+          title="Recenter canvas to fit all shoes"
+        >
+          Recenter
+        </button>
+      </div>
 
     </div>
   );

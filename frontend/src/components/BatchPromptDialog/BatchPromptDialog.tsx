@@ -14,7 +14,7 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
 }) => {
   const [jsonText, setJsonText] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [imagesPerPrompt, setImagesPerPrompt] = useState(4);
+  const [imagesPerPrompt, setImagesPerPrompt] = useState(2);
 
   const handleGenerate = () => {
     setError(null);

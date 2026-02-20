@@ -61,6 +61,7 @@ export const BottomDrawer: React.FC = () => {
                 [],
                 { hour: "2-digit", minute: "2-digit" }
               );
+              const typeIcon = group.type === "reference" ? "🔄" : group.type === "batch" ? "🎲" : "📁";
 
               return (
                 <div
@@ -70,25 +71,30 @@ export const BottomDrawer: React.FC = () => {
                   onMouseEnter={() => setHoveredGroupId(group.id)}
                   onMouseLeave={() => setHoveredGroupId(null)}
                 >
-                  <div className="group-header">
-                    <span className="group-type-badge">
-                      {group.type === "reference" ? "🔄" : group.type === "batch" ? "🎲" : "📁"}
-                      {" "}{group.type.toUpperCase()}
-                    </span>
-                    <span className="group-count">{group.image_ids.length}</span>
-                  </div>
-                  <div className="group-prompt" title={group.prompt}>
-                    {group.prompt.substring(0, 40)}
-                    {group.prompt.length > 40 ? "..." : ""}
-                  </div>
-                  <div className="group-time">{timestamp}</div>
-                  {thumbnailImage && (
+                  {/* Background image fills the entire card */}
+                  {thumbnailImage ? (
                     <img
-                      className="group-thumb"
+                      className="group-thumb-bg"
                       src={`data:image/png;base64,${thumbnailImage.base64_image}`}
                       alt={group.type}
                     />
+                  ) : (
+                    <div className="group-thumb-placeholder" />
                   )}
+
+                  {/* Overlay: text floats on top */}
+                  <div className="group-overlay">
+                    <div className="group-overlay-top">
+                      <span className="group-type-badge">{typeIcon} {group.type.toUpperCase()}</span>
+                      <span className="group-count">{group.image_ids.length}</span>
+                    </div>
+                    <div className="group-overlay-bottom">
+                      <div className="group-prompt" title={group.prompt}>
+                        {group.prompt.substring(0, 50)}{group.prompt.length > 50 ? "…" : ""}
+                      </div>
+                      <div className="group-time">{timestamp}</div>
+                    </div>
+                  </div>
                 </div>
               );
             })}

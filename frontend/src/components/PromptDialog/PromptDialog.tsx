@@ -22,7 +22,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   onGenerate,
 }) => {
   const [prompt, setPrompt] = useState('');
-  const [numImages, setNumImages] = useState(4);  // New: number of variations to generate
+  const [numImages, setNumImages] = useState(2);
   const isGenerating = useAppStore((state) => state.isGenerating);
 
   const handleGenerate = () => {

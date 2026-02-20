@@ -13,7 +13,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   onGenerate,
 }) => {
   const [prompt, setPrompt] = useState('');
-  const [imageCount, setImageCount] = useState(4);
+  const [imageCount, setImageCount] = useState(2);
 
   const handleSubmit = () => {
     if (!prompt.trim()) {

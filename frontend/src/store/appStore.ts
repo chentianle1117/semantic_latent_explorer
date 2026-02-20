@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry } from '../types';
 
 interface AppStore extends AppState {
   // Actions
@@ -24,6 +24,9 @@ interface AppStore extends AppState {
   setHoveredGroupId: (groupId: string | null) => void;
 
   updateVisualSettings: (settings: Partial<VisualSettings>) => void;
+  setImageSizeOverrides: (ids: number[], size: number) => void;
+  setImageOpacityOverrides: (ids: number[], opacity: number) => void;
+  clearImageOverrides: () => void;
 
   setAxisLabels: (labels: { x: [string, string]; y: [string, string]; z?: [string, string] }) => void;
 
@@ -45,19 +48,33 @@ interface AppStore extends AppState {
   setActiveToolbarFlyout: (flyout: string | null) => void;
   setFlyToImageId: (id: number | null) => void;
 
-  // Agent passive observer
+  // Agent — DynamicIsland state
   agentStatus: AgentStatus;
   agentInsight: AgentInsight | null;
+  isAgentWorking: boolean;
   setAgentStatus: (status: AgentStatus) => void;
   setAgentInsight: (insight: AgentInsight | null) => void;
   dismissInsight: () => void;
+  setIsAgentWorking: (v: boolean) => void;
 
-  // Agent proactive mode
+  // Agent — exploration accumulator (Behavior C trigger)
+  imagesSinceLastExploration: number;
+  addToExplorationCounter: (count: number) => void;
+  resetExplorationCounter: () => void;
+
+  // Agent — axis suggestion accumulator (Behavior D trigger: every 20 images)
+  imagesSinceLastAxisSuggestion: number;
+  addToAxisSuggestionCounter: (count: number) => void;
+  resetAxisSuggestionCounter: () => void;
+
+  // Agent mode (kept for SettingsModal compat)
   setAgentMode: (mode: AgentMode) => void;
+
+  // Ghost nodes — real generated images shown semi-transparent on canvas
   addGhostNode: (ghost: GhostNode) => void;
   removeGhostNode: (id: number) => void;
   clearGhostNodes: () => void;
-  acceptGhostNode: (id: number) => Promise<void>;
+  acceptGhostNode: (id: number) => void;
 
   // CLIP model selection
   setClipModelType: (modelType: 'fashionclip' | 'huggingface') => void;
@@ -85,8 +102,16 @@ interface AppStore extends AppState {
   setImagesLayer: (imageIds: number[], layerId: string) => void;
   moveLayerUp: (id: string) => void;
   moveLayerDown: (id: string) => void;
+  reorderLayers: (fromIndex: number, toIndex: number) => void;
 
   clearAll: () => void;
+
+  // Session / Multi-Canvas
+  setCurrentCanvasId: (id: string | null) => void;
+  setCanvasName: (name: string) => void;
+  setParticipantId: (id: string) => void;
+  setCanvasList: (list: CanvasMeta[]) => void;
+  addEventLogEntry: (entry: EventLogEntry) => void;
 }
 
 const initialState: AppState = {
@@ -132,7 +157,10 @@ const initialState: AppState = {
   // Agent defaults
   agentStatus: 'idle' as AgentStatus,
   agentInsight: null as AgentInsight | null,
-  agentMode: 'auto' as AgentMode, // Default to proactive mode
+  isAgentWorking: false,
+  imagesSinceLastExploration: 0,
+  imagesSinceLastAxisSuggestion: 0,
+  agentMode: 'auto' as AgentMode, // kept for SettingsModal compat
   ghostNodes: [] as GhostNode[],
 
   // CLIP model selection
@@ -151,12 +179,23 @@ const initialState: AppState = {
   // Inline axis suggestions (decoupled from agentInsight so DynamicIsland dismiss doesn't kill them)
   inlineAxisData: null as Array<{ x_axis: string; y_axis: string; reasoning: string }> | null,
 
+  // Per-image visual overrides (selection-aware sliders)
+  imageSizeOverrides: {} as Record<number, number>,
+  imageOpacityOverrides: {} as Record<number, number>,
+
   // Layer system
   layers: [
     { id: 'default', name: 'Shoes', visible: true, color: '#58a6ff' },
     { id: 'references', name: 'References', visible: true, color: '#ff7b72' },
   ] as CanvasLayer[],
   imageLayerMap: {} as Record<number, string>,
+
+  // Session / Multi-Canvas
+  currentCanvasId: null as string | null,
+  canvasName: 'Canvas 1',
+  participantId: 'researcher',
+  canvasList: [] as CanvasMeta[],
+  eventLog: [] as EventLogEntry[],
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -230,6 +269,21 @@ export const useAppStore = create<AppStore>((set) => ({
       visualSettings: { ...state.visualSettings, ...settings },
     })),
 
+  // Per-image visual overrides (selection-aware sliders)
+  setImageSizeOverrides: (ids: number[], size: number) =>
+    set((state) => {
+      const overrides = { ...state.imageSizeOverrides };
+      ids.forEach((id) => { overrides[id] = size; });
+      return { imageSizeOverrides: overrides };
+    }),
+  setImageOpacityOverrides: (ids: number[], opacity: number) =>
+    set((state) => {
+      const overrides = { ...state.imageOpacityOverrides };
+      ids.forEach((id) => { overrides[id] = opacity; });
+      return { imageOpacityOverrides: overrides };
+    }),
+  clearImageOverrides: () => set({ imageSizeOverrides: {}, imageOpacityOverrides: {} }),
+
   // Axis labels
   setAxisLabels: (labels) => set({ axisLabels: labels }),
 
@@ -265,32 +319,44 @@ export const useAppStore = create<AppStore>((set) => ({
   })),
   setFlyToImageId: (id) => set({ flyToImageId: id }),
 
-  // Agent passive observer
+  // Agent — DynamicIsland state
   agentStatus: 'idle',
   agentInsight: null,
+  isAgentWorking: false,
   setAgentStatus: (status) => set({ agentStatus: status }),
   setAgentInsight: (insight) => set({
     agentInsight: insight,
     agentStatus: insight ? 'insight-ready' : 'idle',
   }),
   dismissInsight: () => set({ agentInsight: null, agentStatus: 'idle' }),
+  setIsAgentWorking: (v) => set({ isAgentWorking: v }),
 
-  // Agent proactive mode actions
+  // Agent — exploration accumulator
+  imagesSinceLastExploration: 0,
+  addToExplorationCounter: (count) => set((state) => ({ imagesSinceLastExploration: state.imagesSinceLastExploration + count })),
+  resetExplorationCounter: () => set({ imagesSinceLastExploration: 0 }),
+
+  // Agent — axis suggestion accumulator (Behavior D)
+  imagesSinceLastAxisSuggestion: 0,
+  addToAxisSuggestionCounter: (count) => set((state) => ({ imagesSinceLastAxisSuggestion: state.imagesSinceLastAxisSuggestion + count })),
+  resetAxisSuggestionCounter: () => set({ imagesSinceLastAxisSuggestion: 0 }),
+
+  // Agent mode compat
   setAgentMode: (mode) => set({ agentMode: mode }),
+
+  // Ghost nodes
   addGhostNode: (ghost) => set((state) => ({ ghostNodes: [...state.ghostNodes, ghost] })),
   removeGhostNode: (id) => set((state) => ({ ghostNodes: state.ghostNodes.filter(g => g.id !== id) })),
   clearGhostNodes: () => set({ ghostNodes: [] }),
-  acceptGhostNode: async (id) => {
-    // Convert ghost to real image by generating it
-    const ghost = useAppStore.getState().ghostNodes.find(g => g.id === id);
+  acceptGhostNode: (id) => {
+    // Promote ghost to real image: move base64_image into a stub ImageData
+    const store = useAppStore.getState();
+    const ghost = store.ghostNodes.find(g => g.id === id);
     if (!ghost) return;
-
-    // Remove from ghost nodes
-    useAppStore.getState().removeGhostNode(id);
-
-    // Trigger generation with the suggested prompt
-    // This will be implemented when we wire up the generation flow
-    console.log('Accepting ghost node:', ghost.suggestedPrompt);
+    store.removeGhostNode(id);
+    // The accepted image was already generated by the backend (suggest-ghosts endpoint)
+    // The actual promotion (registering server-side) is handled by the hook caller
+    console.log('Ghost promoted:', ghost.prompt);
   },
 
   // CLIP model selection
@@ -368,6 +434,15 @@ export const useAppStore = create<AppStore>((set) => ({
       return { layers };
     }),
 
+  reorderLayers: (fromIndex, toIndex) =>
+    set((state) => {
+      if (fromIndex === toIndex) return state;
+      const layers = [...state.layers];
+      const [moved] = layers.splice(fromIndex, 1);
+      layers.splice(toIndex, 0, moved);
+      return { layers };
+    }),
+
   // Clear all
   clearAll: () =>
     set({
@@ -377,4 +452,11 @@ export const useAppStore = create<AppStore>((set) => ({
       hoveredImageId: null,
       hoveredGroupId: null,
     }),
+
+  // Session / Multi-Canvas actions
+  setCurrentCanvasId: (id) => set({ currentCanvasId: id }),
+  setCanvasName: (name) => set({ canvasName: name }),
+  setParticipantId: (id) => set({ participantId: id }),
+  setCanvasList: (list) => set({ canvasList: list }),
+  addEventLogEntry: (entry) => set((s) => ({ eventLog: [...s.eventLog, entry] })),
 }));

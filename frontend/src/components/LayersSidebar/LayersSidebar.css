@@ -10,11 +10,11 @@
   overflow: hidden;
   z-index: 50;
   /* Collapsed height matches BottomDrawer collapsed */
-  height: var(--drawer-collapsed, clamp(48px, 4.5vh, 64px));
+  height: var(--drawer-collapsed, clamp(72px, 7vh, 96px));
 }
 
 .layers-sidebar.expanded {
-  height: var(--drawer-expanded, clamp(220px, 24vh, 360px));
+  height: var(--drawer-expanded, clamp(330px, 36vh, 520px));
 }
 
 /* Collapsed state — horizontal row of named layer dots */

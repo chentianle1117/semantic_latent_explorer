@@ -1,0 +1,193 @@
+/* CanvasSwitcher — canvas name pill + dropdown */
+
+.canvas-switcher {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ── Trigger — styled like the logo text ──────────────────── */
+.cs-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--primary-blue, #58a6ff);
+  font-size: var(--fs-lg, 14px);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
+  max-width: 260px;
+}
+.cs-trigger:hover {
+  opacity: 0.8;
+  background: rgba(88, 166, 255, 0.08);
+}
+.cs-trigger-open {
+  opacity: 0.9;
+  background: rgba(88, 166, 255, 0.1);
+}
+.cs-trigger:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.cs-switching {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.cs-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.cs-arrow {
+  font-size: 9px;
+  color: rgba(88, 166, 255, 0.6);
+  flex-shrink: 0;
+}
+
+/* ── Inline name edit input ───────────────────────────────── */
+.cs-name-input {
+  padding: 4px 10px;
+  background: rgba(13, 17, 23, 0.9);
+  border: 1px solid rgba(88, 166, 255, 0.5);
+  border-radius: 20px;
+  color: #c9d1d9;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  width: 180px;
+}
+
+/* ── Dropdown panel ───────────────────────────────────────── */
+.cs-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  transform: none;
+  width: 260px;
+  background: rgba(13, 17, 23, 0.97);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  overflow: hidden;
+  padding: 6px 0;
+}
+
+/* ── Canvas list section ──────────────────────────────────── */
+.cs-canvas-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.cs-empty {
+  font-size: 11px;
+  color: #6e7681;
+  padding: 8px 14px;
+  text-align: center;
+}
+
+.cs-canvas-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 12px;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  color: #8b949e;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+.cs-canvas-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #c9d1d9;
+}
+.cs-current {
+  border-left-color: #58a6ff;
+  color: #c9d1d9;
+  background: rgba(88, 166, 255, 0.06);
+}
+
+.cs-check {
+  width: 14px;
+  flex-shrink: 0;
+  color: #58a6ff;
+  font-size: 11px;
+}
+.cs-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cs-row-count {
+  font-size: 10px;
+  color: #6e7681;
+  flex-shrink: 0;
+}
+
+/* ── Separator ────────────────────────────────────────────── */
+.cs-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 4px 0;
+}
+
+/* ── Action rows ──────────────────────────────────────────── */
+.cs-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 14px;
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+.cs-action:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: #c9d1d9;
+}
+.cs-action-disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.cs-action-disabled:hover {
+  background: transparent;
+  color: #8b949e;
+}
+
+.cs-action-icon {
+  font-size: 13px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.cs-badge {
+  margin-left: auto;
+  background: rgba(88, 166, 255, 0.15);
+  border: 1px solid rgba(88, 166, 255, 0.3);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 10px;
+  color: #58a6ff;
+}

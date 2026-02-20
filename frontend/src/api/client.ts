@@ -147,17 +147,6 @@ class APIClient {
   }
 
   // Agent endpoints
-  async generateVariation(originalPrompt: string, brief: string, numVariations: number = 2): Promise<{
-    variations: Array<{ prompt: string; reasoning: string }>;
-  }> {
-    const response = await axios.post('http://localhost:8000/api/agent/generate-variation', {
-      original_prompt: originalPrompt,
-      brief,
-      num_variations: numVariations
-    });
-    return response.data;
-  }
-
   async suggestAxes(brief: string, currentXAxis: string, currentYAxis: string): Promise<{
     suggestions: Array<{ x_axis: string; y_axis: string; reasoning: string }>;
   }> {
@@ -166,12 +155,6 @@ class APIClient {
       current_x_axis: currentXAxis,
       current_y_axis: currentYAxis
     });
-    return response.data;
-  }
-
-  // Generate initial prompts from design brief
-  async getInitialPrompts(brief: string): Promise<{ prompts: Array<{ prompt: string; reasoning: string }> }> {
-    const response = await axios.post(`${API_BASE}/agent/initial-prompts`, { brief });
     return response.data;
   }
 
@@ -203,6 +186,89 @@ class APIClient {
     prompts: Array<{ prompt: string; reasoning: string }>;
   }> {
     const response = await axios.post(`${API_BASE}/agent/context-prompts`, { brief });
+    return response.data;
+  }
+
+  // Embed a ghost image via CLIP and get coordinates without adding to canvas
+  async embedGhost(imageUrl: string): Promise<{
+    base64_image: string;
+    coordinates: [number, number];
+  }> {
+    const response = await axios.post(`${API_BASE}/embed-ghost`, { image_url: imageUrl });
+    return response.data;
+  }
+
+  // Generate an alternative prompt for concurrent ghost (Behavior B)
+  async getConcurrentPrompt(userPrompt: string, brief: string | null, referenceImageUrls: string[]): Promise<{
+    prompt: string;
+    reasoning: string;
+  }> {
+    const response = await axios.post(`${API_BASE}/agent/concurrent-prompt`, {
+      user_prompt: userPrompt,
+      brief: brief ?? '',
+      reference_image_urls: referenceImageUrls,
+    });
+    return response.data;
+  }
+
+  // ─── Session / Multi-Canvas ───────────────────────────────────────────────
+
+  async getCurrentSession(): Promise<{ canvasId: string; canvasName: string; participantId: string; createdAt: string }> {
+    const response = await axios.get(`${API_BASE}/session/current`);
+    return response.data;
+  }
+
+  async saveSession(): Promise<{ success: boolean; path: string }> {
+    const response = await axios.post(`${API_BASE}/sessions/save`);
+    return response.data;
+  }
+
+  async listSessions(): Promise<{ sessions: Array<{ id: string; name: string; participantId: string; createdAt: string; updatedAt: string; parentCanvasId: string | null; imageCount: number }> }> {
+    const response = await axios.get(`${API_BASE}/sessions/list`);
+    return response.data;
+  }
+
+  async loadSession(canvasId: string): Promise<{ canvasId: string; canvasName: string; state: any }> {
+    const response = await axios.post(`${API_BASE}/sessions/load`, { canvas_id: canvasId });
+    return response.data;
+  }
+
+  async newCanvas(name: string, participantId?: string): Promise<{ canvasId: string; canvasName: string; participantId: string }> {
+    const response = await axios.post(`${API_BASE}/sessions/new`, { name, participant_id: participantId });
+    return response.data;
+  }
+
+  async branchCanvas(name: string, imageIds: number[]): Promise<{ canvasId: string; canvasName: string; parentCanvasId: string; imageCount: number }> {
+    const response = await axios.post(`${API_BASE}/sessions/branch`, { name, image_ids: imageIds });
+    return response.data;
+  }
+
+  async renameCanvas(name: string): Promise<{ canvasId: string; canvasName: string }> {
+    const response = await axios.post(`${API_BASE}/sessions/rename`, { name });
+    return response.data;
+  }
+
+  async setParticipant(participantId: string): Promise<{ participantId: string }> {
+    const response = await axios.post(`${API_BASE}/session/set-participant`, { participant_id: participantId });
+    return response.data;
+  }
+
+  async logEvent(type: string, data?: Record<string, any>): Promise<void> {
+    await axios.post(`${API_BASE}/events/log`, { type, data }).catch(() => {/* fire-and-forget */});
+  }
+
+  // Sync frontend layer state to backend (called when layers change, so export is always fresh)
+  async syncLayers(imageLayerMap: Record<number, string>, layerDefinitions: Array<{id: string; name: string; color: string; visible: boolean}>): Promise<void> {
+    await axios.post(`${API_BASE}/sync-layers`, { imageLayerMap, layerDefinitions }).catch(() => {/* non-critical */});
+  }
+
+  // Import a canvas from a previously exported ZIP file
+  async importZip(file: File): Promise<{ status: string; images_loaded: number; groups_loaded: number }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await axios.post(`${API_BASE}/import-zip`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
     return response.data;
   }
 }

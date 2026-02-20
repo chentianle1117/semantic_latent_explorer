@@ -744,6 +744,11 @@
   color: rgba(200, 215, 230, 1);
 }
 
+.action-layer-select-inline option {
+  background: #161b22;
+  color: #c9d1d9;
+}
+
 /* Legacy — keep for any remaining references */
 .action-layer-select {
   flex: 1;

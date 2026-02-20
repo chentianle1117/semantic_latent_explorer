@@ -4,103 +4,209 @@ import "./ExternalImageLoader.css";
 
 interface ExternalImageLoaderProps {
   onClose: () => void;
-  onLoad: (urls: string[]) => void;
+  onLoad: (shoes: string[], references: string[]) => void;
+}
+
+interface FileEntry {
+  file: File;
+  previewUrl: string;
 }
 
 export const ExternalImageLoader: React.FC<ExternalImageLoaderProps> = ({
   onClose,
   onLoad,
 }) => {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [shoeFiles, setShoeFiles] = useState<FileEntry[]>([]);
+  const [refFiles, setRefFiles] = useState<FileEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const shoeInputRef = useRef<HTMLInputElement>(null);
+  const refInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+  const readAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  const addFiles = (
+    files: FileList | null,
+    setter: React.Dispatch<React.SetStateAction<FileEntry[]>>
+  ) => {
     if (!files) return;
-    const imageFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
-    if (imageFiles.length === 0) { setError("No valid image files selected"); return; }
+    const imageFiles = Array.from(files).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (imageFiles.length === 0) {
+      setError("No valid image files selected");
+      return;
+    }
     setError(null);
-    setSelectedFiles(imageFiles);
+    const entries: FileEntry[] = imageFiles.map((file) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setter((prev) => [...prev, ...entries]);
+  };
+
+  const removeFile = (
+    index: number,
+    setter: React.Dispatch<React.SetStateAction<FileEntry[]>>
+  ) => {
+    setter((prev) => {
+      URL.revokeObjectURL(prev[index].previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleLoad = async () => {
-    if (selectedFiles.length === 0) { setError("Please select at least one image file"); return; }
+    if (shoeFiles.length === 0 && refFiles.length === 0) {
+      setError("Please add at least one image");
+      return;
+    }
     setIsLoading(true);
     try {
-      const dataUrls = await Promise.all(
-        selectedFiles.map(
-          (file) =>
-            new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = reject;
-              reader.readAsDataURL(file);
-            })
-        )
-      );
-      onLoad(dataUrls);
+      const [shoeUrls, refUrls] = await Promise.all([
+        Promise.all(shoeFiles.map((e) => readAsDataUrl(e.file))),
+        Promise.all(refFiles.map((e) => readAsDataUrl(e.file))),
+      ]);
+      onLoad(shoeUrls, refUrls);
     } catch (err) {
-      setError(`Failed to read files: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setError(
+        `Failed to read files: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
       setIsLoading(false);
     }
   };
 
-  const handleRemoveFile = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+  const totalCount = shoeFiles.length + refFiles.length;
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog el-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="el-header">
-          <h2>Load Reference Images</h2>
-          <button className="el-close" onClick={onClose}>×</button>
+          <h2>Load Images</h2>
+          <button className="el-close" onClick={onClose}>
+            ×
+          </button>
         </div>
 
-        <p className="el-hint">
-          Images load into the <span className="el-layer-chip">● References</span> layer. Background is preserved.
-        </p>
-
-        <div className="el-drop-zone" onClick={() => fileInputRef.current?.click()}>
+        {/* Shoes section */}
+        <div className="el-section">
+          <div className="el-section-header">
+            <span className="el-section-icon" style={{ color: "#58a6ff" }}>
+              👟
+            </span>
+            <span className="el-section-title">
+              Shoes
+              <span className="el-section-hint">
+                {" "}
+                · background auto-removed · added to Shoes layer
+              </span>
+            </span>
+            <button
+              className="el-add-btn el-add-shoe"
+              onClick={() => shoeInputRef.current?.click()}
+            >
+              + Add
+            </button>
+          </div>
           <input
-            ref={fileInputRef}
+            ref={shoeInputRef}
             type="file"
             accept="image/*"
             multiple
-            onChange={handleFileSelect}
             style={{ display: "none" }}
+            onChange={(e) => addFiles(e.target.files, setShoeFiles)}
           />
-          {selectedFiles.length === 0 ? (
-            <span className="el-drop-label">Click to choose images  ·  JPG · PNG · WebP</span>
-          ) : (
-            <span className="el-drop-label el-drop-ready">✓ {selectedFiles.length} file{selectedFiles.length !== 1 ? "s" : ""} selected — click to change</span>
+          {shoeFiles.length > 0 && (
+            <div className="el-thumbs">
+              {shoeFiles.map((entry, i) => (
+                <div key={i} className="el-thumb el-thumb-shoe">
+                  <img src={entry.previewUrl} alt={entry.file.name} />
+                  <button
+                    className="el-thumb-remove"
+                    onClick={() => removeFile(i, setShoeFiles)}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {shoeFiles.length === 0 && (
+            <p className="el-section-empty">No shoe images added yet</p>
           )}
         </div>
 
-        {selectedFiles.length > 0 && (
-          <div className="el-files-list">
-            {selectedFiles.map((file, i) => (
-              <div key={i} className="el-file-row">
-                <span className="el-file-name">📷 {file.name}</span>
-                <span className="el-file-size">{(file.size / 1024).toFixed(0)} KB</span>
-                <button className="el-remove-btn" onClick={() => handleRemoveFile(i)} title="Remove">×</button>
-              </div>
-            ))}
+        {/* References section */}
+        <div className="el-section">
+          <div className="el-section-header">
+            <span className="el-section-icon" style={{ color: "#ff7b72" }}>
+              🖼
+            </span>
+            <span className="el-section-title">
+              References
+              <span className="el-section-hint">
+                {" "}
+                · background preserved · added to References layer
+              </span>
+            </span>
+            <button
+              className="el-add-btn el-add-ref"
+              onClick={() => refInputRef.current?.click()}
+            >
+              + Add
+            </button>
           </div>
-        )}
+          <input
+            ref={refInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: "none" }}
+            onChange={(e) => addFiles(e.target.files, setRefFiles)}
+          />
+          {refFiles.length > 0 && (
+            <div className="el-thumbs">
+              {refFiles.map((entry, i) => (
+                <div key={i} className="el-thumb el-thumb-ref">
+                  <img src={entry.previewUrl} alt={entry.file.name} />
+                  <button
+                    className="el-thumb-remove"
+                    onClick={() => removeFile(i, setRefFiles)}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          {refFiles.length === 0 && (
+            <p className="el-section-empty">No reference images added yet</p>
+          )}
+        </div>
 
         {error && <div className="el-error">⚠️ {error}</div>}
 
         <div className="el-actions">
-          <button className="action-button-secondary" onClick={onClose}>Cancel</button>
+          <button className="action-button-secondary" onClick={onClose}>
+            Cancel
+          </button>
           <button
             className="action-button-primary"
             onClick={handleLoad}
-            disabled={selectedFiles.length === 0 || isLoading}
+            disabled={totalCount === 0 || isLoading}
           >
-            {isLoading ? "⏳ Loading…" : "Load to Canvas"}
+            {isLoading
+              ? "⏳ Loading…"
+              : totalCount > 0
+              ? `Load ${totalCount} image${totalCount !== 1 ? "s" : ""} to Canvas`
+              : "Load to Canvas"}
           </button>
         </div>
       </div>

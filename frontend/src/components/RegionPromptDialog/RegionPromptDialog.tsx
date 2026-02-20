@@ -17,7 +17,7 @@ export const RegionPromptDialog: React.FC<RegionPromptDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const [imageCount, setImageCount] = useState(4);
+  const [imageCount, setImageCount] = useState(2);
 
   return (
     <div className="region-prompt-dialog-overlay" onClick={onCancel}>

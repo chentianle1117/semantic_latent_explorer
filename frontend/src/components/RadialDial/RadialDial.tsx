@@ -100,7 +100,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           const angle = ((360 / n) * i + startAngle) * (Math.PI / 180);
           const tx = cx + RADIUS * Math.cos(angle);
           const ty = cy + RADIUS * Math.sin(angle);
-          const labelDist = 44;
+          const labelDist = 78;
           const lx = BUTTON_SIZE / 2 + labelDist * Math.cos(angle);
           const ly = BUTTON_SIZE / 2 + labelDist * Math.sin(angle);
           return (

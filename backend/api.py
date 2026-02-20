@@ -1,6 +1,6 @@
 """FastAPI backend for Zappos Semantic Explorer."""
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -27,9 +27,15 @@ from dotenv import load_dotenv
 import re
 import socket
 from sklearn.neighbors import NearestNeighbors
+import uuid as _uuid
+import copy
 
 # Load environment variables
 load_dotenv()
+
+# Session storage directory
+DATA_DIR = Path(__file__).parent / "data"
+ADMIN_KEY = os.getenv("ADMIN_KEY", "zappos-admin")
 
 # Configure Gemini
 gemini_api_key = os.getenv('GOOGLE_API_KEY')
@@ -153,6 +159,20 @@ class AppState:
         # Caches to avoid redundant Gemini/embedding calls
         self._gemini_expansion_cache: Dict[str, List[str]] = {}  # concept -> expanded concepts
         self._axis_directions_cache: Optional[Tuple] = None  # (labels_key, (x_dir, y_dir, z_dir?))
+        # Session / multi-canvas tracking
+        self.current_canvas_id: str = str(_uuid.uuid4())
+        self.canvas_name: str = "Canvas 1"
+        self.participant_id: str = "researcher"
+        self.canvas_created_at: str = datetime.now().isoformat()
+        self.parent_canvas_id: Optional[str] = None
+        self.shared_image_ids: List[int] = []
+        self.event_log: List[Dict] = []
+        # Frontend-synced layer state (for export)
+        self.image_layer_map: Dict[int, str] = {}   # image_id -> layer_id
+        self.layer_definitions: List[Dict] = [      # ordered list of layer descriptors
+            {"id": "default", "name": "Shoes", "color": "#58a6ff", "visible": True},
+            {"id": "references", "name": "References", "color": "#f0883e", "visible": True},
+        ]
 
 state = AppState()
 
@@ -164,6 +184,197 @@ def pil_to_base64(pil_image: Image.Image) -> str:
     pil_image.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return img_str
+
+
+# ─── Session helpers ──────────────────────────────────────────────────────────
+
+def _session_path(participant_id: str, canvas_id: str) -> Path:
+    """Return the path to a session JSON file, creating parent dirs as needed."""
+    p = DATA_DIR / participant_id / "sessions" / f"{canvas_id}.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def _serialize_canvas() -> dict:
+    """Serialize current AppState to a JSON-safe dict."""
+    images_data = []
+    for img in state.images_metadata:
+        buf = BytesIO()
+        img.pil_image.save(buf, format="PNG")
+        b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+        ts = img.timestamp.isoformat() if isinstance(img.timestamp, datetime) else str(img.timestamp)
+        images_data.append({
+            "id": img.id,
+            "group_id": img.group_id,
+            "base64_image": b64,
+            "embedding": img.embedding.tolist(),
+            "coordinates": list(img.coordinates),
+            "parents": img.parents,
+            "children": img.children,
+            "reference_ids": img.reference_ids,
+            "generation_method": img.generation_method,
+            "prompt": img.prompt,
+            "timestamp": ts,
+            "visible": img.visible,
+            "is_ghost": img.is_ghost,
+            "suggested_prompt": img.suggested_prompt,
+            "reasoning": img.reasoning,
+        })
+    history_data = []
+    for hg in state.history_groups:
+        ts = hg.timestamp.isoformat() if isinstance(hg.timestamp, datetime) else str(hg.timestamp)
+        history_data.append({
+            "id": hg.id,
+            "type": hg.type,
+            "image_ids": hg.image_ids,
+            "prompt": hg.prompt,
+            "visible": hg.visible,
+            "thumbnail_id": hg.thumbnail_id,
+            "timestamp": ts,
+        })
+    return {
+        "id": state.current_canvas_id,
+        "name": state.canvas_name,
+        "participantId": state.participant_id,
+        "createdAt": state.canvas_created_at,
+        "updatedAt": datetime.now().isoformat(),
+        "parentCanvasId": state.parent_canvas_id,
+        "sharedImageIds": state.shared_image_ids,
+        "axisLabels": {k: list(v) for k, v in state.axis_labels.items()},
+        "designBrief": state.design_brief,
+        "nextId": state.next_id,
+        "images": images_data,
+        "historyGroups": history_data,
+        "eventLog": state.event_log,
+    }
+
+
+def _save_canvas_to_disk() -> Path:
+    """Save current canvas state to disk and return the file path."""
+    data = _serialize_canvas()
+    path = _session_path(state.participant_id, state.current_canvas_id)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+    return path
+
+
+def _deserialize_canvas(data: dict) -> None:
+    """Restore AppState from a saved canvas dict (clears existing state)."""
+    from models.data_structures import ImageMetadata, HistoryGroup
+
+    # Restore canvas meta
+    state.current_canvas_id = data.get("id") or str(_uuid.uuid4())
+    state.canvas_name = data.get("name", "Canvas 1")
+    state.participant_id = data.get("participantId", "researcher")
+    state.canvas_created_at = data.get("createdAt", datetime.now().isoformat())
+    state.parent_canvas_id = data.get("parentCanvasId")
+    state.shared_image_ids = data.get("sharedImageIds", [])
+    state.event_log = data.get("eventLog", [])
+    state.design_brief = data.get("designBrief")
+    state.next_id = data.get("nextId", 0)
+
+    # Restore axis labels (tuples)
+    raw_axes = data.get("axisLabels", {"x": ["formal","sporty"], "y": ["dark","colorful"]})
+    state.axis_labels = {k: tuple(v) for k, v in raw_axes.items()}
+
+    # Invalidate caches so reprojection uses restored axis labels
+    state._axis_directions_cache = None
+    state._gemini_expansion_cache = {}
+
+    # Restore images
+    state.images_metadata = []
+    all_embeddings = []
+    img_records = []
+    for img_data in data.get("images", []):
+        b64_str = img_data["base64_image"].split(",", 1)[-1]
+        pil_img = Image.open(BytesIO(base64.b64decode(b64_str))).convert("RGBA")
+        embedding = np.array(img_data["embedding"], dtype=np.float32)
+        ts_raw = img_data.get("timestamp", "")
+        try:
+            ts = datetime.fromisoformat(ts_raw)
+        except Exception:
+            ts = datetime.now()
+        all_embeddings.append(embedding)
+        img_records.append((img_data, pil_img, embedding, ts))
+
+    # Reproject all embeddings using restored axis labels
+    if img_records and state.embedder and state.axis_builder:
+        emb_matrix = np.array([e for _, _, e, _ in img_records])
+        coords = project_embeddings_to_coordinates(emb_matrix)
+    else:
+        coords = [img_data.get("coordinates", [0.0, 0.0]) for img_data, _, _, _ in img_records]
+
+    for i, (img_data, pil_img, embedding, ts) in enumerate(img_records):
+        coord = tuple(coords[i]) if hasattr(coords[i], '__iter__') else (0.0, 0.0)
+        meta = ImageMetadata(
+            id=img_data["id"],
+            group_id=img_data.get("group_id", ""),
+            pil_image=pil_img,
+            embedding=embedding,
+            coordinates=coord,
+            parents=img_data.get("parents", []),
+            children=img_data.get("children", []),
+            reference_ids=img_data.get("reference_ids", []),
+            generation_method=img_data.get("generation_method", "batch"),
+            prompt=img_data.get("prompt", ""),
+            timestamp=ts,
+            visible=img_data.get("visible", True),
+            is_ghost=img_data.get("is_ghost", False),
+            suggested_prompt=img_data.get("suggested_prompt", ""),
+            reasoning=img_data.get("reasoning", ""),
+        )
+        state.images_metadata.append(meta)
+
+    # Restore history groups
+    from models.data_structures import HistoryGroup
+    state.history_groups = []
+    for hg_data in data.get("historyGroups", []):
+        ts_raw = hg_data.get("timestamp", "")
+        try:
+            ts = datetime.fromisoformat(ts_raw)
+        except Exception:
+            ts = datetime.now()
+        state.history_groups.append(HistoryGroup(
+            id=hg_data["id"],
+            type=hg_data.get("type", "batch"),
+            image_ids=hg_data.get("image_ids", []),
+            prompt=hg_data.get("prompt", ""),
+            visible=hg_data.get("visible", True),
+            thumbnail_id=hg_data.get("thumbnail_id"),
+            timestamp=ts,
+        ))
+
+    # Reset cluster data
+    state.cluster_centroids = []
+    state.cluster_labels = []
+
+
+def _list_sessions(participant_id: str) -> List[dict]:
+    """List all saved canvases for a participant, sorted by updatedAt descending."""
+    sessions_dir = DATA_DIR / participant_id / "sessions"
+    if not sessions_dir.exists():
+        return []
+    result = []
+    for f in sessions_dir.glob("*.json"):
+        try:
+            with open(f, encoding="utf-8") as fh:
+                d = json.load(fh)
+            result.append({
+                "id": d.get("id", f.stem),
+                "name": d.get("name", "Untitled"),
+                "participantId": d.get("participantId", participant_id),
+                "createdAt": d.get("createdAt", ""),
+                "updatedAt": d.get("updatedAt", ""),
+                "parentCanvasId": d.get("parentCanvasId"),
+                "imageCount": len(d.get("images", [])),
+            })
+        except Exception:
+            pass
+    result.sort(key=lambda x: x.get("updatedAt", ""), reverse=True)
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _get_cached_expansion(concept: str, num_expansions: int = 4) -> Optional[List[str]]:
@@ -1266,66 +1477,6 @@ async def get_canvas_digest():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class InitialPromptsRequest(BaseModel):
-    brief: str
-
-@app.post("/api/agent/initial-prompts")
-async def get_initial_prompts(request: InitialPromptsRequest):
-    """Generate initial prompt suggestions based on design brief"""
-    try:
-        if not gemini_api_key:
-            raise HTTPException(status_code=500, detail="Gemini API key not configured")
-
-        print(f"\n=== Initial Prompts Request ===")
-        print(f"Brief: {request.brief}")
-
-        prompt = f"""You are a design exploration assistant helping with shoe design.
-
-DESIGN BRIEF:
-{request.brief}
-
-TASK:
-Suggest 3 specific, diverse prompts to start exploring this design space.
-Each prompt should:
-1. Be specific and detailed (not generic)
-2. Cover different aspects of the brief
-3. Be ready to use with an image generation model
-
-Return JSON ONLY (no markdown, no explanation):
-{{
-  "prompts": [
-    {{"prompt": "minimal white leather sneaker with clean lines", "reasoning": "Explores minimalism aspect"}},
-    {{"prompt": "chunky athletic running shoe in bright colors", "reasoning": "Explores sporty/bold direction"}},
-    {{"prompt": "sleek low-profile canvas casual shoe", "reasoning": "Explores everyday wearability"}}
-  ]
-}}"""
-
-        # Using gemini-2.5-flash-lite (fast, low-cost, high-performance)
-        # Note: gemini-1.5-flash was retired in April 2025
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
-
-        # Parse JSON from response
-        json_match = re.search(r'\{[\s\S]*\}', response.text)
-        if json_match:
-            result = json.loads(json_match.group(0))
-            print(f"Generated {len(result.get('prompts', []))} initial prompts")
-            return result
-
-        # Fallback if parsing fails
-        return {"prompts": [
-            {"prompt": "minimal athletic sneaker", "reasoning": "Starting point"},
-            {"prompt": "classic leather shoe", "reasoning": "Alternative style"},
-            {"prompt": "modern running shoe", "reasoning": "Third direction"}
-        ]}
-
-    except Exception as e:
-        print(f"ERROR in initial-prompts: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 class ContextPromptsRequest(BaseModel):
     brief: str
 
@@ -1403,326 +1554,10 @@ Return JSON ONLY (no markdown):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class AnalyzeCanvasRequest(BaseModel):
-    brief: str
-
-@app.post("/api/agent/analyze-canvas")
-async def analyze_canvas(request: AnalyzeCanvasRequest):
-    """Analyze canvas and suggest exploration regions"""
-    try:
-        if not gemini_api_key:
-            raise HTTPException(status_code=500, detail="Gemini API key not configured")
-
-        print(f"\n=== Analyze Canvas Request ===")
-        print(f"Brief: {request.brief}")
-
-        # Get canvas digest
-        digest = await get_canvas_digest()
-
-        if digest["count"] == 0:
-            return {"regions": []}
-
-        print(f"Canvas has {digest['count']} images in {len(digest['clusters'])} clusters")
-
-        # Build pre-computed regions from algorithmic detection
-        # Clusters: use exact centers and ellipses from digest
-        # Gaps: use algorithmically detected empty areas from digest
-        precomputed_regions = []
-
-        db = digest.get('bounds', {"x": [0, 1], "y": [0, 1]})
-        dx_range = db["x"][1] - db["x"][0] if db["x"][1] != db["x"][0] else 1.0
-        dy_range = db["y"][1] - db["y"][0] if db["y"][1] != db["y"][0] else 1.0
-
-        for c in digest['clusters']:
-            precomputed_regions.append({
-                "data_center": c['center'],  # actual data coords for frontend positioning
-                "normalized_center": c['normalized_center'],  # for Gemini semantic context
-                "type": "cluster",
-                "size": c['size'],
-                "sample_prompts": c['sample_prompts'][:2],
-                "ellipse": c.get('ellipse', {"rx": 0.1, "ry": 0.08, "angle": 0})
-            })
-
-        for g in digest.get('gaps', []):
-            # Convert gap normalized center to actual data coordinates
-            gap_data_x = db["x"][0] + g['center'][0] * dx_range
-            gap_data_y = db["y"][0] + g['center'][1] * dy_range
-            precomputed_regions.append({
-                "data_center": [gap_data_x, gap_data_y],  # actual data coords
-                "normalized_center": g['center'],  # for Gemini semantic context
-                "type": "gap",
-                "neighbor_density": g['neighbor_density'],
-                "ellipse": g.get('ellipse', {"rx": 0.08, "ry": 0.06, "angle": 0})
-            })
-
-        # Build Gemini-facing summary (uses normalized coords for semantic interpretation)
-        gemini_regions = []
-        for r in precomputed_regions:
-            gr = {"normalized_center": r["normalized_center"], "type": r["type"]}
-            if "size" in r: gr["size"] = r["size"]
-            if "sample_prompts" in r: gr["sample_prompts"] = r["sample_prompts"]
-            gemini_regions.append(gr)
-
-        # Format for Gemini — ask it only to NAME and DESCRIBE, not guess coordinates
-        prompt = f"""You are a design exploration assistant. Name and describe pre-computed regions on a shoe design canvas.
-
-DESIGN BRIEF:
-{request.brief}
-
-AXES:
-- X-Axis: {digest['axis_labels']['x'][0]} (left/0.0) to {digest['axis_labels']['x'][1]} (right/1.0)
-- Y-Axis: {digest['axis_labels']['y'][0]} (bottom/0.0) to {digest['axis_labels']['y'][1]} (top/1.0)
-
-PRE-COMPUTED REGIONS (coordinates are algorithmically determined — do NOT change them):
-{json.dumps(gemini_regions, indent=2)}
-
-TASK:
-For each region above (in order), provide a short title, 1-sentence description, and 1-2 specific shoe prompts.
-Use the axis labels to interpret what each [x, y] coordinate means semantically.
-Keep titles under 5 words. Keep descriptions under 15 words.
-
-Return JSON ONLY (no markdown):
-{{
-  "regions": [
-    {{
-      "index": 0,
-      "title": "Short Title",
-      "description": "Brief description",
-      "suggested_prompts": ["specific shoe prompt"]
-    }}
-  ]
-}}"""
-
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
-
-        # Parse JSON and merge Gemini names with precomputed geometry
-        json_match = re.search(r'\{[\s\S]*\}', response.text)
-        final_regions = []
-        if json_match:
-            try:
-                result = json.loads(json_match.group(0))
-                gemini_output = result.get('regions', [])
-                for i, precomp in enumerate(precomputed_regions):
-                    # Find matching Gemini output by index
-                    gemini_r = next((g for g in gemini_output if g.get('index') == i), None)
-                    if not gemini_r and i < len(gemini_output):
-                        gemini_r = gemini_output[i]
-                    final_regions.append({
-                        "center": precomp["data_center"],  # actual data coords
-                        "type": precomp["type"],
-                        "title": gemini_r.get("title", f"Region {i+1}") if gemini_r else f"Region {i+1}",
-                        "description": gemini_r.get("description", "") if gemini_r else "",
-                        "suggested_prompts": gemini_r.get("suggested_prompts", precomp.get("sample_prompts", ["shoe design"])) if gemini_r else precomp.get("sample_prompts", ["shoe design"]),
-                        "ellipse": precomp["ellipse"]
-                    })
-            except (json.JSONDecodeError, KeyError):
-                pass
-
-        # Fallback if Gemini parsing failed
-        if not final_regions:
-            for i, r in enumerate(precomputed_regions):
-                final_regions.append({
-                    "center": r["data_center"],
-                    "type": r["type"],
-                    "title": f"{'Cluster' if r['type'] == 'cluster' else 'Gap'} {i+1}",
-                    "description": f"{'Existing group' if r['type'] == 'cluster' else 'Unexplored area'}",
-                    "suggested_prompts": r.get("sample_prompts", ["shoe design variation"]),
-                    "ellipse": r.get("ellipse", {"rx": 0.08, "ry": 0.06, "angle": 0})
-                })
-
-        print(f"Generated {len(final_regions)} region suggestions")
-        return {"regions": final_regions}
-
-    except Exception as e:
-        print(f"ERROR in analyze-canvas: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class AnalyzePreferencesRequest(BaseModel):
-    brief: str
-
-@app.post("/api/agent/analyze-preferences")
-async def analyze_preferences(request: AnalyzePreferencesRequest):
-    """Analyze user's exploration patterns and preferences"""
-    try:
-        if not gemini_api_key:
-            raise HTTPException(status_code=500, detail="Gemini API key not configured")
-
-        print(f"\n=== Analyze Preferences Request ===")
-        print(f"Brief: {request.brief}")
-
-        # Get canvas digest
-        digest = await get_canvas_digest()
-
-        if digest['count'] == 0:
-            return {
-                "preferences": {
-                    "favored_attributes": [],
-                    "avoided_attributes": [],
-                    "exploration_style": "Getting started"
-                },
-                "trajectory": {
-                    "current_focus": "No images yet",
-                    "trends": []
-                },
-                "statistics": {
-                    "total_images": 0,
-                    "cluster_distribution": {}
-                }
-            }
-
-        # Collect prompts from all clusters
-        all_prompts = []
-        cluster_sizes = {}
-        for cluster in digest['clusters']:
-            all_prompts.extend(cluster['sample_prompts'])
-            cluster_sizes[cluster['id']] = cluster['size']
-
-        prompt_analysis = f"""You are a design exploration analyst helping understand user preferences.
-
-DESIGN BRIEF:
-{request.brief}
-
-EXPLORATION DATA:
-- Total images: {digest['count']}
-- Number of clusters: {len(digest['clusters'])}
-- Sample prompts: {', '.join(all_prompts[:15])}
-- Cluster sizes: {cluster_sizes}
-
-TASK:
-Analyze the user's exploration patterns and infer their preferences.
-
-Return JSON ONLY (no markdown):
-{{
-  "preferences": {{
-    "favored_attributes": ["Minimalist designs", "Light colors", "Clean lines"],
-    "avoided_attributes": ["Heavy ornamentation", "Dark colors"],
-    "exploration_style": "Focused on specific aesthetic"
-  }},
-  "trajectory": {{
-    "current_focus": "Exploring minimalist white sneakers with subtle variations",
-    "trends": ["Moving toward simpler designs", "Consistent color palette"]
-  }},
-  "statistics": {{
-    "total_images": {digest['count']},
-    "cluster_distribution": {json.dumps(cluster_sizes)},
-    "dominant_themes": ["Minimalism", "White colorways"]
-  }}
-}}"""
-
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt_analysis)
-
-        # Parse JSON
-        json_match = re.search(r'\{[\s\S]*\}', response.text)
-        if json_match:
-            result = json.loads(json_match.group(0))
-            print(f"Analyzed preferences for {digest['count']} images")
-            return result
-
-        # Fallback
-        return {
-            "preferences": {
-                "favored_attributes": ["Contemporary"],
-                "avoided_attributes": [],
-                "exploration_style": "Broad exploration"
-            },
-            "trajectory": {
-                "current_focus": "Exploring various styles",
-                "trends": ["Diverse exploration"]
-            },
-            "statistics": {
-                "total_images": digest['count'],
-                "cluster_distribution": cluster_sizes
-            }
-        }
-
-    except Exception as e:
-        print(f"ERROR in analyze-preferences: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-class ExtractParametersRequest(BaseModel):
-    brief: str
-
-@app.post("/api/agent/extract-parameters")
-async def extract_parameters(request: ExtractParametersRequest):
-    """Extract design parameters from brief"""
-    try:
-        if not gemini_api_key:
-            raise HTTPException(status_code=500, detail="Gemini API key not configured")
-
-        print(f"\n=== Extract Parameters Request ===")
-        print(f"Brief: {request.brief}")
-
-        # Get canvas digest for context
-        digest = await get_canvas_digest()
-        
-        # Get sample prompts from canvas if available
-        sample_prompts = []
-        if digest['count'] > 0:
-            for cluster in digest['clusters'][:3]:
-                sample_prompts.extend(cluster['sample_prompts'][:2])
-
-        prompt = f"""You are a design analysis assistant helping with shoe design.
-
-DESIGN BRIEF:
-{request.brief}
-
-CURRENT EXPLORATION:
-- Total images: {digest['count']}
-- Sample prompts: {', '.join(sample_prompts) if sample_prompts else 'None yet'}
-
-TASK:
-Extract structured design parameters from the brief and current exploration.
-Identify key attributes that define the design space being explored.
-
-Return JSON ONLY (no markdown):
-{{
-  "type": ["Running", "Casual", "Athletic"],
-  "inspiration": ["Minimalist", "Modern", "Retro"],
-  "materials": ["Leather", "Canvas", "Mesh"],
-  "colors": ["White", "Black", "Blue accents"],
-  "style_keywords": ["Clean lines", "Bold", "Performance"],
-  "last_updated": "{json.dumps(sample_prompts) if sample_prompts else 'Initial extraction'}"
-}}"""
-
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
-
-        # Parse JSON
-        json_match = re.search(r'\{[\s\S]*\}', response.text)
-        if json_match:
-            result = json.loads(json_match.group(0))
-            print(f"Extracted parameters: {list(result.keys())}")
-            return result
-
-        # Fallback
-        return {
-            "type": ["Sneaker"],
-            "inspiration": ["Modern"],
-            "materials": ["Mixed"],
-            "colors": ["Various"],
-            "style_keywords": ["Contemporary"],
-            "last_updated": "Fallback"
-        }
-
-    except Exception as e:
-        print(f"ERROR in extract-parameters: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 class SuggestAxesRequest(BaseModel):
     brief: str
-    current_x_axis: str
-    current_y_axis: str
+    current_x_axis: Optional[str] = None
+    current_y_axis: Optional[str] = None
 
 @app.post("/api/agent/suggest-axes")
 async def suggest_axes(request: SuggestAxesRequest):
@@ -1929,70 +1764,6 @@ class GenerateVariationRequest(BaseModel):
     brief: str
     num_variations: int = 2
 
-@app.post("/api/agent/generate-variation")
-async def generate_variation(request: GenerateVariationRequest):
-    """Generate alternative prompt variations to avoid design fixation"""
-    try:
-        if not gemini_api_key:
-            raise HTTPException(status_code=500, detail="Gemini API key not configured")
-
-        print(f"\n=== Generate Variation Request ===")
-        print(f"Original prompt: {request.original_prompt}")
-        print(f"Brief: {request.brief}")
-        print(f"Num variations: {request.num_variations}")
-
-        prompt = f"""You are a design exploration assistant helping with shoe design.
-
-DESIGN BRIEF:
-{request.brief}
-
-USER'S CURRENT PROMPT:
-{request.original_prompt}
-
-TASK:
-Generate {request.num_variations} alternative prompts that:
-1. Are RELATED to the user's prompt but explore DIFFERENT design directions
-2. Help avoid design fixation by introducing diversity
-3. Stay within the scope of the design brief
-4. Are specific enough for image generation
-
-The variations should explore different aspects like:
-- Different materials
-- Different color schemes
-- Different silhouettes or forms
-- Different style inspirations
-
-Return JSON ONLY (no markdown):
-{{
-  "variations": [
-    {{"prompt": "...", "reasoning": "Explores different material/color/etc."}},
-    {{"prompt": "...", "reasoning": "Alternative style direction"}}
-  ]
-}}"""
-
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
-
-        # Parse JSON
-        json_match = re.search(r'\{[\s\S]*\}', response.text)
-        if json_match:
-            result = json.loads(json_match.group(0))
-            print(f"Generated {len(result.get('variations', []))} variations")
-            return result
-
-        # Fallback
-        return {"variations": [
-            {"prompt": f"{request.original_prompt} with different colors", "reasoning": "Color variation"},
-            {"prompt": f"{request.original_prompt} in alternative style", "reasoning": "Style variation"}
-        ]}
-
-    except Exception as e:
-        print(f"ERROR in generate-variation: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/api/agent/suggest-ghosts")
 async def suggest_ghost_nodes(request: Request):
     """Generate ghost node suggestions for unexplored gaps in the semantic space.
@@ -2094,7 +1865,7 @@ Be bold and specific. If no design brief is set, infer interesting directions fr
                 })
             return {"ghosts": ghosts}
 
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
         response = model.generate_content(prompt)
         text = response.text.strip()
 
@@ -2136,6 +1907,289 @@ Be bold and specific. If no design brief is set, infer interesting directions fr
         traceback.print_exc()
         # Return empty on error rather than failing
         return {"ghosts": []}
+
+
+@app.post("/api/embed-ghost")
+async def embed_ghost_image(request: Request):
+    """Embed an image and compute CLIP coordinates WITHOUT adding it to the canvas.
+    Used by the frontend useAgentBehaviors hook after fal.ai generates a ghost image.
+    Returns: { base64_image, coordinates }"""
+    try:
+        body = await request.json()
+        image_url = body.get("image_url", "")
+
+        if not image_url:
+            raise HTTPException(status_code=400, detail="image_url is required")
+
+        if state.embedder is None:
+            raise HTTPException(status_code=400, detail="CLIP embedder not initialized")
+
+        # Load image from data URL or HTTP URL
+        if image_url.startswith("data:"):
+            if "," not in image_url:
+                raise HTTPException(status_code=400, detail="Invalid data URL")
+            _, encoded = image_url.split(",", 1)
+            img_bytes = base64.b64decode(encoded)
+            img = Image.open(BytesIO(img_bytes))
+        elif image_url.startswith("http://") or image_url.startswith("https://"):
+            resp = requests.get(image_url, timeout=30)
+            resp.raise_for_status()
+            img = Image.open(BytesIO(resp.content))
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported URL format")
+
+        # Normalize to RGB for CLIP embedding
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGB")
+
+        # Remove background (ghost shoes should show transparent, like real shoes)
+        img_bytes_in = BytesIO()
+        img.convert("RGB").save(img_bytes_in, format="PNG")
+        img_bytes_out = remove(img_bytes_in.getvalue())
+        img = Image.open(BytesIO(img_bytes_out)).convert("RGBA")
+
+        # Embed via CLIP using RGB version
+        img_rgb = img.convert("RGB")
+        embeddings = state.embedder.extract_image_embeddings_from_pil([img_rgb])
+        emb = np.array(embeddings[0])
+
+        # Project to 2D coordinates using current axes (no state mutation)
+        coords = project_embeddings_to_coordinates(emb.reshape(1, -1), use_3d=False)
+        x, y = float(coords[0][0]), float(coords[0][1])
+
+        # Encode as PNG to preserve transparency
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        base64_image = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+        return {"base64_image": base64_image, "coordinates": [x, y]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in embed-ghost: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class ConcurrentPromptRequest(BaseModel):
+    user_prompt: str
+    brief: Optional[str] = None
+    reference_image_urls: Optional[List[str]] = []
+
+@app.post("/api/agent/concurrent-prompt")
+async def concurrent_ghost_prompt(request: ConcurrentPromptRequest):
+    """Generate an alternative prompt for Behavior B: Concurrent Ghost.
+    Called in parallel with user generation — Gemini suggests a different design direction
+    using the same references and brief.
+    Returns: { prompt, reasoning }"""
+    try:
+        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_api_key:
+            # Fallback without Gemini
+            axis_x = state.axis_labels.get("x", ["formal", "sporty"])
+            axis_y = state.axis_labels.get("y", ["dark", "colorful"])
+            return {
+                "prompt": f"A shoe exploring the {axis_x[1]} and {axis_y[1]} direction",
+                "reasoning": "Exploring an adjacent design direction"
+            }
+
+        genai.configure(api_key=gemini_api_key)
+
+        brief_section = f"\nDESIGN BRIEF:\n{request.brief}" if request.brief else ""
+        axis_x = state.axis_labels.get("x", ["formal", "sporty"])
+        axis_y = state.axis_labels.get("y", ["dark", "colorful"])
+        axis_info = f"X axis: {axis_x[0]} ↔ {axis_x[1]}, Y axis: {axis_y[0]} ↔ {axis_y[1]}"
+
+        prompt = f"""You are a creative design exploration AI for shoe design.
+
+The user just generated a shoe with this prompt:
+"{request.user_prompt}"
+{brief_section}
+
+SEMANTIC AXES (canvas dimensions):
+{axis_info}
+
+TASK:
+Suggest ONE alternative shoe design that takes a meaningfully different direction — exploring a different part of the design space while still being relevant to the same general intent. The alternative should:
+1. Contrast meaningfully with the user's prompt (e.g., different style, material, or mood)
+2. Be specific and concrete (not generic)
+3. Be under 20 words
+
+Return JSON ONLY (no markdown):
+{{
+  "prompt": "the alternative design prompt",
+  "reasoning": "one sentence: what design direction this explores and why it's interesting"
+}}"""
+
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+
+        # Strip markdown if present
+        json_match = re.search(r'\{[\s\S]*\}', text)
+        if json_match:
+            text = json_match.group(0)
+
+        result = json.loads(text)
+        return {
+            "prompt": result.get("prompt", f"Alternative to: {request.user_prompt}"),
+            "reasoning": result.get("reasoning", "Exploring an adjacent design direction")
+        }
+
+    except Exception as e:
+        print(f"ERROR in concurrent-prompt: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback on error
+        return {
+            "prompt": f"Alternative shoe design: {request.user_prompt}",
+            "reasoning": "Exploring an adjacent design direction"
+        }
+
+
+@app.post("/api/sync-layers")
+async def sync_layers(request: Request):
+    """Receive current frontend layer assignments + definitions and store in backend state.
+    Called by frontend whenever layers or imageLayerMap change (so export always has fresh data)."""
+    body = await request.json()
+    state.image_layer_map = {int(k): v for k, v in body.get("imageLayerMap", {}).items()}
+    state.layer_definitions = body.get("layerDefinitions", state.layer_definitions)
+    return {"status": "ok"}
+
+
+@app.post("/api/import-zip")
+async def import_zip_canvas(file: UploadFile = File(...)):
+    """Restore a canvas from a previously exported ZIP file.
+
+    The ZIP must contain:
+      - export_summary.json  (axis_labels, history_groups, layer info, image list)
+      - img_{id}_*.png       (image files)
+      - img_{id}_*.json      (per-image metadata including embedding array)
+
+    Re-uses stored embeddings — no CLIP re-embedding needed.
+    """
+    import io as _io
+    try:
+        zip_bytes = await file.read()
+        with zipfile.ZipFile(_io.BytesIO(zip_bytes)) as zf:
+            # ── 1. Parse summary ──────────────────────────────────────────
+            if "export_summary.json" not in zf.namelist():
+                raise HTTPException(status_code=400, detail="Missing export_summary.json in ZIP")
+            summary = json.loads(zf.read("export_summary.json"))
+
+            axis_raw = summary.get("axis_labels", {})
+            new_axis_labels = {}
+            for k, v in axis_raw.items():
+                new_axis_labels[k] = tuple(v) if isinstance(v, list) else v
+            if not new_axis_labels:
+                new_axis_labels = state.axis_labels  # keep current if absent
+
+            history_groups_raw = summary.get("history_groups", [])
+            layer_defs = summary.get("layer_definitions", state.layer_definitions)
+            img_layer_map_raw = summary.get("image_layer_map", {})
+
+            # ── 2. Build index of per-image JSON/PNG pairs ────────────────
+            # Filenames: img_{id}_{timestamp}.png / .json
+            png_map: Dict[str, bytes] = {}   # filename_stem -> png bytes
+            json_map: Dict[str, dict] = {}   # filename_stem -> metadata dict
+            for name in zf.namelist():
+                stem, ext = name.rsplit(".", 1) if "." in name else (name, "")
+                if ext.lower() == "png" and stem.startswith("img_"):
+                    png_map[stem] = zf.read(name)
+                elif ext.lower() == "json" and stem.startswith("img_"):
+                    json_map[stem] = json.loads(zf.read(name))
+
+            # ── 3. Rebuild images ─────────────────────────────────────────
+            new_images: List[ImageMetadata] = []
+            max_id = 0
+            for stem, meta in json_map.items():
+                if stem not in png_map:
+                    print(f"  ⚠ No PNG for {stem}, skipping")
+                    continue
+                img_id = meta.get("id", 0)
+                max_id = max(max_id, img_id)
+                pil_img = Image.open(_io.BytesIO(png_map[stem])).convert("RGBA")
+                embedding_list = meta.get("embedding", None)
+                if embedding_list:
+                    embedding = np.array(embedding_list, dtype=np.float32)
+                else:
+                    embedding = np.zeros(1024, dtype=np.float32)  # fallback
+                try:
+                    ts = datetime.fromisoformat(meta.get("timestamp", datetime.now().isoformat()))
+                except Exception:
+                    ts = datetime.now()
+                coord_raw = meta.get("coordinates", [0.0, 0.0])
+                coord = tuple(coord_raw[:2]) if len(coord_raw) >= 2 else (0.0, 0.0)
+                new_images.append(ImageMetadata(
+                    id=img_id,
+                    group_id=meta.get("group_id", ""),
+                    pil_image=pil_img,
+                    embedding=embedding,
+                    coordinates=coord,
+                    parents=meta.get("parents", []),
+                    children=meta.get("children", []),
+                    reference_ids=meta.get("reference_ids", []),
+                    generation_method=meta.get("generation_method", "batch"),
+                    prompt=meta.get("prompt", ""),
+                    timestamp=ts,
+                    visible=True,
+                    is_ghost=False,
+                    suggested_prompt="",
+                    reasoning="",
+                ))
+
+            if not new_images:
+                raise HTTPException(status_code=400, detail="No valid images found in ZIP")
+
+            # If embedder available, reproject to current axes
+            if state.embedder and state.axis_builder:
+                state.axis_labels = new_axis_labels
+                state._axis_directions_cache = None  # force recompute
+                embeddings_matrix = np.array([img.embedding for img in new_images])
+                new_coords = project_embeddings_to_coordinates(embeddings_matrix, use_3d=False)
+                for i, img in enumerate(new_images):
+                    img.coordinates = (float(new_coords[i][0]), float(new_coords[i][1]))
+            else:
+                state.axis_labels = new_axis_labels
+
+            # ── 4. Rebuild history groups ─────────────────────────────────
+            from models.data_structures import HistoryGroup
+            new_history: List[HistoryGroup] = []
+            for hg in history_groups_raw:
+                try:
+                    ts_hg = datetime.fromisoformat(hg.get("timestamp", datetime.now().isoformat()))
+                except Exception:
+                    ts_hg = datetime.now()
+                new_history.append(HistoryGroup(
+                    id=hg["id"],
+                    type=hg.get("type", "batch"),
+                    image_ids=hg.get("image_ids", []),
+                    prompt=hg.get("prompt", ""),
+                    visible=True,
+                    thumbnail_id=hg.get("thumbnail_id", None),
+                    timestamp=ts_hg,
+                ))
+
+            # ── 5. Commit to state ────────────────────────────────────────
+            state.images_metadata = sorted(new_images, key=lambda x: x.id)
+            state.history_groups = new_history
+            state.next_id = max_id + 1
+            state.image_layer_map = {int(k): v for k, v in img_layer_map_raw.items()}
+            state.layer_definitions = layer_defs
+
+            print(f"✓ Import complete: {len(new_images)} images, {len(new_history)} groups")
+            await broadcast_state_update()
+            return {"status": "ok", "images_loaded": len(new_images), "groups_loaded": len(new_history)}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in import-zip: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/export-zip")
@@ -2187,6 +2241,7 @@ async def export_zip(ids: Optional[str] = None):
                     "parents": img_meta.parents,
                     "children": img_meta.children,
                     "reference_ids": img_meta.reference_ids,
+                    "embedding": img_meta.embedding.tolist(),
                 }
 
                 json_path = temp_path / f"{filename}.json"
@@ -2195,19 +2250,36 @@ async def export_zip(ids: Optional[str] = None):
 
             print(f"Saved all {saved_count} images successfully")
 
+            # Build generation sequence map: image_id -> (group_index, position_in_group)
+            gen_sequence: Dict[int, Dict] = {}
+            for g_idx, g in enumerate(state.history_groups):
+                for pos, img_id in enumerate(g.image_ids):
+                    gen_sequence[img_id] = {
+                        "group_index": g_idx,
+                        "position_in_group": pos,
+                        "group_id": g.id,
+                        "group_type": g.type,
+                        "group_prompt": g.prompt,
+                        "group_timestamp": g.timestamp.isoformat(),
+                    }
+
             # Create a summary metadata file
             summary = {
                 "export_timestamp": datetime.now().isoformat(),
                 "total_images": len(visible_images),
-                "axis_labels": state.axis_labels,
+                "axis_labels": {k: list(v) for k, v in state.axis_labels.items()},
                 "is_3d_mode": state.is_3d_mode,
+                "design_brief": state.design_brief,
+                "layer_definitions": state.layer_definitions,
+                "image_layer_map": {str(k): v for k, v in state.image_layer_map.items()},
                 "history_groups": [
                     {
                         "id": g.id,
                         "type": g.type,
                         "image_ids": g.image_ids,
                         "prompt": g.prompt,
-                        "timestamp": g.timestamp.isoformat()
+                        "timestamp": g.timestamp.isoformat(),
+                        "thumbnail_id": g.thumbnail_id,
                     }
                     for g in state.history_groups
                 ],
@@ -2217,8 +2289,13 @@ async def export_zip(ids: Optional[str] = None):
                         "filename": f"img_{img.id}_{img.timestamp.strftime('%Y%m%d_%H%M%S_%f')[:-3]}.png",
                         "prompt": img.prompt,
                         "generation_method": img.generation_method,
+                        "timestamp": img.timestamp.isoformat(),
+                        "coordinates": list(img.coordinates),
                         "parents": img.parents,
                         "children": img.children,
+                        "reference_ids": img.reference_ids,
+                        "layer_id": state.image_layer_map.get(img.id, "default"),
+                        **gen_sequence.get(img.id, {"group_index": -1, "position_in_group": -1, "group_id": None, "group_type": None, "group_prompt": None, "group_timestamp": None}),
                     }
                     for img in state.images_metadata if img.visible
                 ]
@@ -2274,6 +2351,241 @@ async def export_zip(ids: Optional[str] = None):
 
 
 # HTML export endpoint removed - was unstable with embedded base64 images
+
+
+# ─── Session / Multi-Canvas Endpoints ─────────────────────────────────────────
+
+@app.get("/api/session/current")
+async def get_current_session():
+    """Return metadata about the currently active canvas."""
+    return {
+        "canvasId": state.current_canvas_id,
+        "canvasName": state.canvas_name,
+        "participantId": state.participant_id,
+        "createdAt": state.canvas_created_at,
+    }
+
+
+class SaveSessionRequest(BaseModel):
+    pass  # body optional — saves current state
+
+
+@app.post("/api/sessions/save")
+async def save_session():
+    """Save the current canvas state to disk."""
+    try:
+        path = _save_canvas_to_disk()
+        return {"success": True, "path": str(path)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/sessions/list")
+async def list_sessions():
+    """List all saved canvases for the current participant."""
+    return {"sessions": _list_sessions(state.participant_id)}
+
+
+class LoadSessionRequest(BaseModel):
+    canvas_id: str
+
+
+@app.post("/api/sessions/load")
+async def load_session(request: LoadSessionRequest):
+    """Save current canvas, then load a different one from disk."""
+    try:
+        # Save current canvas first
+        _save_canvas_to_disk()
+        # Find and load the requested canvas
+        path = _session_path(state.participant_id, request.canvas_id)
+        if not path.exists():
+            # Also search other participant dirs for this canvas_id
+            found = None
+            for pid_dir in DATA_DIR.iterdir():
+                candidate = pid_dir / "sessions" / f"{request.canvas_id}.json"
+                if candidate.exists():
+                    found = candidate
+                    break
+            if not found:
+                raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
+            path = found
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        _deserialize_canvas(data)
+        await broadcast_state_update()
+        visible = [img for img in state.images_metadata if img.visible]
+        neighbor_map = get_semantic_neighbors(visible, k=5) if len(visible) > 1 else {}
+        return {
+            "canvasId": state.current_canvas_id,
+            "canvasName": state.canvas_name,
+            "state": StateResponse(
+                images=[image_metadata_to_response(img, neighbor_map) for img in visible],
+                history_groups=[{
+                    "id": g.id, "type": g.type, "image_ids": g.image_ids,
+                    "prompt": g.prompt, "visible": g.visible,
+                    "thumbnail_id": g.thumbnail_id,
+                    "timestamp": g.timestamp.isoformat() if isinstance(g.timestamp, datetime) else str(g.timestamp)
+                } for g in state.history_groups],
+                axis_labels=state.axis_labels,
+                is_3d_mode=state.is_3d_mode,
+                design_brief=state.design_brief,
+                grid_cell_size=state.grid_cell_size,
+                neighbor_map=neighbor_map,
+                clip_model_type=state.clip_model_type,
+            ).model_dump()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class NewCanvasRequest(BaseModel):
+    name: str = "Canvas 1"
+    participant_id: Optional[str] = None
+
+
+@app.post("/api/sessions/new")
+async def new_canvas(request: NewCanvasRequest):
+    """Save current canvas, then start a fresh empty canvas."""
+    try:
+        _save_canvas_to_disk()
+        # Reset state (like /api/clear but also resets session meta)
+        state.images_metadata = []
+        state.history_groups = []
+        state.next_id = 0
+        state.event_log = []
+        state.cluster_centroids = []
+        state.cluster_labels = []
+        state.current_canvas_id = str(_uuid.uuid4())
+        state.canvas_name = request.name
+        state.canvas_created_at = datetime.now().isoformat()
+        state.parent_canvas_id = None
+        state.shared_image_ids = []
+        if request.participant_id:
+            state.participant_id = request.participant_id
+        await broadcast_state_update()
+        return {
+            "canvasId": state.current_canvas_id,
+            "canvasName": state.canvas_name,
+            "participantId": state.participant_id,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class BranchCanvasRequest(BaseModel):
+    name: str = "Branch"
+    image_ids: List[int]
+
+
+@app.post("/api/sessions/branch")
+async def branch_canvas(request: BranchCanvasRequest):
+    """Save current canvas, then create a new canvas pre-seeded with selected images."""
+    try:
+        parent_canvas_id = state.current_canvas_id
+        _save_canvas_to_disk()
+
+        # Deep-copy selected images
+        selected = [img for img in state.images_metadata if img.id in request.image_ids]
+        if not selected:
+            raise HTTPException(status_code=400, detail="No matching images found")
+
+        import copy as _copy
+        new_images = [_copy.copy(img) for img in selected]
+        # Remap IDs so they start fresh
+        old_to_new: Dict[int, int] = {}
+        for i, img in enumerate(new_images):
+            old_to_new[img.id] = i
+            img.id = i
+        # Fix genealogy references
+        for img in new_images:
+            img.parents = [old_to_new[p] for p in img.parents if p in old_to_new]
+            img.children = [old_to_new[c] for c in img.children if c in old_to_new]
+            img.reference_ids = [old_to_new[r] for r in img.reference_ids if r in old_to_new]
+            img._cached_base64_url = None  # clear cache
+
+        # Reset state with new images
+        state.images_metadata = new_images
+        state.history_groups = []
+        state.next_id = len(new_images)
+        state.event_log = []
+        state.cluster_centroids = []
+        state.cluster_labels = []
+        state.current_canvas_id = str(_uuid.uuid4())
+        state.canvas_name = request.name
+        state.canvas_created_at = datetime.now().isoformat()
+        state.parent_canvas_id = parent_canvas_id
+        state.shared_image_ids = request.image_ids
+
+        await broadcast_state_update()
+        return {
+            "canvasId": state.current_canvas_id,
+            "canvasName": state.canvas_name,
+            "parentCanvasId": state.parent_canvas_id,
+            "imageCount": len(state.images_metadata),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RenameCanvasRequest(BaseModel):
+    name: str
+
+
+@app.post("/api/sessions/rename")
+async def rename_canvas(request: RenameCanvasRequest):
+    """Rename the current canvas."""
+    state.canvas_name = request.name.strip() or "Untitled"
+    return {"canvasId": state.current_canvas_id, "canvasName": state.canvas_name}
+
+
+class SetParticipantRequest(BaseModel):
+    participant_id: str
+
+
+@app.post("/api/session/set-participant")
+async def set_participant(request: SetParticipantRequest):
+    """Update the participant ID (affects where future saves are written)."""
+    state.participant_id = request.participant_id.strip() or "researcher"
+    return {"participantId": state.participant_id}
+
+
+@app.get("/api/admin/sessions")
+async def admin_sessions(admin_key: str = ""):
+    """List all participants' canvases (admin only)."""
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    if not DATA_DIR.exists():
+        return {"participants": []}
+    result = []
+    for pid_dir in DATA_DIR.iterdir():
+        if pid_dir.is_dir():
+            sessions = _list_sessions(pid_dir.name)
+            result.append({"participantId": pid_dir.name, "sessions": sessions})
+    return {"participants": result}
+
+
+class EventLogRequest(BaseModel):
+    type: str
+    data: Optional[Dict] = None
+
+
+@app.post("/api/events/log")
+async def log_event(request: EventLogRequest):
+    """Append an event to the current canvas event log (fire-and-forget)."""
+    state.event_log.append({
+        "type": request.type,
+        "timestamp": datetime.now().isoformat(),
+        "data": request.data or {},
+    })
+    return {"ok": True}
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 @app.websocket("/ws")

@@ -8,7 +8,7 @@ import React, { useCallback } from "react";
 import "./AxisScaleSlider.css";
 
 interface AxisScaleSliderProps {
-  axis: "x" | "y" | "size";
+  axis: "x" | "y" | "size" | "opacity";
   value: number;
   onChange: (value: number) => void;
   compact?: boolean;
@@ -28,7 +28,7 @@ export const AxisScaleSlider: React.FC<AxisScaleSliderProps> = ({
   isLinear = false,
   unit = "×",
 }) => {
-  const colorClass = axis === "x" ? "axis-x" : axis === "y" ? "axis-y" : "axis-size";
+  const colorClass = axis === "x" ? "axis-x" : axis === "y" ? "axis-y" : axis === "opacity" ? "axis-size" : "axis-size";
 
   const valueToSlider = useCallback((v: number): number => {
     const clamped = Math.max(minVal, Math.min(maxVal, v));

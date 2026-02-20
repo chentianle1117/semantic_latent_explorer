@@ -13,10 +13,17 @@ export const LayersPanel: React.FC = () => {
   const toggleLayerVisibility = useAppStore((s) => s.toggleLayerVisibility);
   const setImagesLayer = useAppStore((s) => s.setImagesLayer);
   const setSelectedImageIds = useAppStore((s) => s.setSelectedImageIds);
+  const reorderLayers = useAppStore((s) => s.reorderLayers);
 
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
+
+  // Drag-to-reorder state
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+  const dragLayerRef = useRef<HTMLDivElement | null>(null);
+  const dragGhostRef = useRef<HTMLDivElement | null>(null);
 
   const getLayerImageIds = (layerId: string): number[] => {
     const ids: number[] = [];
@@ -65,6 +72,74 @@ export const LayersPanel: React.FC = () => {
     if (selectedImageIds.length > 0) setImagesLayer(selectedImageIds, layerId);
   };
 
+  // ── Drag-to-reorder handlers (left mouse button) ────────────────
+  const handleDragHandleMouseDown = (e: React.MouseEvent, index: number) => {
+    if (e.button !== 0) return; // left button only
+    e.preventDefault();
+    e.stopPropagation();
+
+    setDragIndex(index);
+    setDropIndex(index);
+
+    // Create a ghost pill that follows the cursor
+    const ghost = document.createElement("div");
+    ghost.className = "lp-drag-ghost";
+    ghost.textContent = layers[index].name;
+    ghost.style.cssText = `
+      position: fixed; pointer-events: none; z-index: 9999;
+      background: rgba(88,166,255,0.18); border: 1px solid rgba(88,166,255,0.55);
+      border-radius: 6px; padding: 5px 12px; font-size: 12px;
+      color: rgba(200,215,230,0.95); white-space: nowrap;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      transform: translate(-50%, -50%);
+      left: ${e.clientX}px; top: ${e.clientY}px;
+    `;
+    document.body.appendChild(ghost);
+    dragGhostRef.current = ghost;
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (dragGhostRef.current) {
+        dragGhostRef.current.style.left = `${ev.clientX}px`;
+        dragGhostRef.current.style.top = `${ev.clientY}px`;
+      }
+      // Determine new drop index from cursor position
+      if (dragLayerRef.current) {
+        const listEl = dragLayerRef.current.closest(".lp-list") as HTMLElement;
+        if (!listEl) return;
+        const rows = Array.from(listEl.querySelectorAll<HTMLElement>(".lp-row"));
+        let newDrop = index;
+        for (let i = 0; i < rows.length; i++) {
+          const rect = rows[i].getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (ev.clientY < midY) { newDrop = i; break; }
+          newDrop = i + 1;
+        }
+        setDropIndex(Math.min(newDrop, layers.length - 1));
+      }
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      if (dragGhostRef.current) {
+        document.body.removeChild(dragGhostRef.current);
+        dragGhostRef.current = null;
+      }
+      setDragIndex((from) => {
+        setDropIndex((to) => {
+          if (from !== null && to !== null && from !== to) {
+            reorderLayers(from, to);
+          }
+          return null;
+        });
+        return null;
+      });
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
+
   return (
     <div className="layers-panel">
       <div className="lp-header">
@@ -73,15 +148,27 @@ export const LayersPanel: React.FC = () => {
       </div>
 
       <div className="lp-list">
-        {layers.map((layer) => {
+        {layers.map((layer, index) => {
           const count = getLayerImageIds(layer.id).length;
           const isEditing = editingLayerId === layer.id;
+          const isDragging = dragIndex === index;
+          const isDropTarget = dropIndex === index && dragIndex !== null && dragIndex !== index;
 
           return (
             <div
               key={layer.id}
-              className={`lp-row ${!layer.visible ? "lp-row--hidden" : ""}`}
+              ref={isDragging ? (el) => { dragLayerRef.current = el; } : undefined}
+              className={`lp-row ${!layer.visible ? "lp-row--hidden" : ""} ${isDragging ? "lp-row--dragging" : ""} ${isDropTarget ? "lp-row--drop-target" : ""}`}
             >
+              {/* Drag handle — left mouse drag to reorder */}
+              <span
+                className="lp-drag-handle"
+                onMouseDown={(e) => handleDragHandleMouseDown(e, index)}
+                title="Drag to reorder"
+              >
+                ⠿
+              </span>
+
               {/* Color dot — click to toggle visibility */}
               <span
                 className="lp-dot"

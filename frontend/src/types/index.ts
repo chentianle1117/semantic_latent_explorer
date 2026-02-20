@@ -79,9 +79,13 @@ export interface AppState {
   clusterCentroids: number[][]; // [[x,y], [x,y], ...]
   clusterLabels: number[]; // Per-image cluster assignment
 
-  // Agent proactive mode
-  agentMode: AgentMode; // 'auto' = proactive suggestions, 'manual' = only on demand
-  ghostNodes: GhostNode[]; // Preview suggestions (30% opacity) before generation
+  // Agent state
+  agentStatus: AgentStatus;
+  agentInsight: AgentInsight | null;
+  isAgentWorking: boolean;
+  imagesSinceLastExploration: number;
+  agentMode: AgentMode; // kept for SettingsModal compat
+  ghostNodes: GhostNode[];
 
   // CLIP model selection
   clipModelType: 'fashionclip' | 'huggingface';
@@ -99,9 +103,20 @@ export interface AppState {
   // Inline axis suggestions (decoupled from agentInsight so DI dismiss doesn't kill them)
   inlineAxisData: Array<{ x_axis: string; y_axis: string; reasoning: string }> | null;
 
+  // Per-image visual overrides (selection-aware sliders)
+  imageSizeOverrides: Record<number, number>;    // imageId → size override
+  imageOpacityOverrides: Record<number, number>; // imageId → opacity override
+
   // Layer system
   layers: CanvasLayer[];
   imageLayerMap: Record<number, string>; // imageId → layerId
+
+  // Session / Multi-Canvas
+  currentCanvasId: string | null;
+  canvasName: string;
+  participantId: string;
+  canvasList: CanvasMeta[];
+  eventLog: EventLogEntry[];
 }
 
 export interface VisualSettings {
@@ -154,57 +169,6 @@ export interface SuggestedPrompt {
   reasoning: string;
 }
 
-export interface RegionHighlight {
-  center: [number, number]; // Normalized coordinates (0-1)
-  title: string;
-  description: string;
-  suggested_prompts: string[];
-  type: 'cluster' | 'gap'; // Type of region: existing cluster vs unexplored gap
-  confidence?: number; // 0-1, for clusters (how dense/confident the cluster is)
-}
-
-export interface InitialPromptsRequest {
-  brief: string;
-}
-
-export interface InitialPromptsResponse {
-  prompts: SuggestedPrompt[];
-}
-
-export interface AnalyzeCanvasRequest {
-  brief: string;
-  canvas_summary: {
-    num_images: number;
-    clusters: Array<{
-      center: [number, number];
-      size: number;
-      avg_prompt: string;
-    }>;
-    axis_labels: AxisLabels;
-    bounds: {
-      x_range: [number, number];
-      y_range: [number, number];
-    };
-  };
-}
-
-export interface AnalyzeCanvasResponse {
-  regions: RegionHighlight[];
-}
-
-export interface PromptVariation {
-  prompt: string;
-  reasoning: string;
-}
-
-export interface PendingImage {
-  id: string; // temporary ID
-  imageData: ImageData;
-  originalPrompt: string;
-  variation: PromptVariation;
-  isPending: true;
-}
-
 // Agent Passive Observer types
 export type AgentInsightType = 'gap' | 'axis' | 'prompt' | 'variation';
 
@@ -219,14 +183,34 @@ export interface AgentInsight {
 
 export type AgentStatus = 'idle' | 'thinking' | 'insight-ready';
 
-export type AgentMode = 'auto' | 'manual'; // auto = proactive suggestions, manual = only on demand
+export type AgentMode = 'auto' | 'manual'; // kept for SettingsModal backward compat
 
-// Ghost node (preview suggestion before generation)
-export interface GhostNode extends Omit<ImageData, 'base64_image'> {
-  isGhost: true;
-  suggestedPrompt: string;
+// Ghost node — real generated image shown at 45% opacity with colored badge
+export interface GhostNode {
+  id: number;
+  coordinates: number[];
+  base64_image: string;           // actual generated image
+  prompt: string;
   reasoning: string;
-  previewUrl?: string;       // Optional preview image URL
-  previewBase64?: string;    // Optional preview image as base64 (shown at 25% opacity)
-  referenceIds?: number[];   // Nearby shoes to use as references in accept flow
+  parents: number[];              // same parents as user's gen (B) or [] (C)
+  source: 'concurrent' | 'exploration';
+  timestamp: number;
+}
+
+// ─── Session / Multi-Canvas ───────────────────────────────────────────────────
+
+export interface CanvasMeta {
+  id: string;
+  name: string;
+  participantId: string;
+  createdAt: string;
+  updatedAt: string;
+  parentCanvasId: string | null;
+  imageCount: number;
+}
+
+export interface EventLogEntry {
+  type: 'generation' | 'axis_change' | 'canvas_save' | 'canvas_switch';
+  timestamp: string;
+  data?: Record<string, any>;
 }

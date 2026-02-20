@@ -9,8 +9,8 @@
   flex-direction: column;
   overflow: hidden;
   z-index: 50;
-  /* Collapsed height matches BottomDrawer collapsed */
-  height: var(--drawer-collapsed, clamp(72px, 7vh, 96px));
+  /* Collapsed height matches BottomDrawer collapsed (44px) */
+  height: 44px;
 }
 
 .layers-sidebar.expanded {

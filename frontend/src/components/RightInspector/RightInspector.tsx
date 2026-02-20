@@ -4,140 +4,6 @@ import type { ImageData } from "../../types";
 import "./RightInspector.css";
 
 type LineSegment = { from: { x: number; y: number }; to: { x: number; y: number }; type: "ancestor" | "child" };
-type LineageLevel = { level: number; nodes: ImageData[]; parentIds: Map<number, number[]> };
-
-interface FullLineageViewProps {
-  levels: LineageLevel[];
-  inspectedImageId: number | null;
-  selectedImageIds: number[];
-  onNodeClick: (id: number) => void;
-  onAddToSelection: (id: number) => void;
-}
-
-const FullLineageView: React.FC<FullLineageViewProps> = ({
-  levels,
-  inspectedImageId,
-  selectedImageIds,
-  onNodeClick,
-  onAddToSelection,
-}) => {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [lineSegments, setLineSegments] = useState<LineSegment[]>([]);
-
-  useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (!el || levels.length === 0) {
-      setLineSegments([]);
-      return;
-    }
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      setLineSegments([]);
-      return;
-    }
-    const toPct = (clientX: number, clientY: number) => ({
-      x: ((clientX - rect.left) / rect.width) * 100,
-      y: ((clientY - rect.top) / rect.height) * 100,
-    });
-    const segments: LineSegment[] = [];
-    for (let i = 0; i < levels.length - 1; i++) {
-      const curr = levels[i];
-      const next = levels[i + 1];
-      const currWrappers = el.querySelectorAll(`[data-level="${curr.level}"] .full-lineage-thumb`);
-      const nextWrappers = el.querySelectorAll(`[data-level="${next.level}"] .full-lineage-thumb`);
-      curr.nodes.forEach((node, ni) => {
-        const childIds = new Set(node.children || []);
-        next.nodes.forEach((child, ci) => {
-          if (childIds.has(child.id)) {
-            const fromEl = currWrappers[ni] as HTMLElement | undefined;
-            const toEl = nextWrappers[ci] as HTMLElement | undefined;
-            if (fromEl && toEl) {
-              const fr = fromEl.getBoundingClientRect();
-              const tr = toEl.getBoundingClientRect();
-              segments.push({
-                from: toPct(fr.left + fr.width / 2, fr.bottom),
-                to: toPct(tr.left + tr.width / 2, tr.top),
-                type: curr.level < 0 ? "ancestor" : "child",
-              });
-            }
-          }
-        });
-      });
-    }
-    setLineSegments(segments);
-  }, [levels]);
-
-  return (
-    <div className="full-lineage-container">
-      <div className="full-lineage-content" ref={contentRef}>
-        {lineSegments.length > 0 && (
-          <div className="river-lines-overlay full-lineage-lines" aria-hidden>
-            <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="river-lines-svg">
-              <defs>
-                <linearGradient id="river-line-ancestor-full" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="rgba(0, 229, 255, 0.35)" />
-                  <stop offset="100%" stopColor="rgba(0, 229, 255, 0)" />
-                </linearGradient>
-                <linearGradient id="river-line-child-full" x1="0%" y1="100%" x2="0%" y2="0%">
-                  <stop offset="0%" stopColor="rgba(255, 170, 0, 0.35)" />
-                  <stop offset="100%" stopColor="rgba(255, 170, 0, 0)" />
-                </linearGradient>
-              </defs>
-              {lineSegments.map((seg, i) => (
-                <line
-                  key={i}
-                  x1={seg.from.x}
-                  y1={seg.from.y}
-                  x2={seg.to.x}
-                  y2={seg.to.y}
-                  stroke={seg.type === "ancestor" ? "url(#river-line-ancestor-full)" : "url(#river-line-child-full)"}
-                  strokeWidth={0.35}
-                  strokeDasharray="2 1.5"
-                  strokeLinecap="butt"
-                />
-              ))}
-            </svg>
-          </div>
-        )}
-        {levels.map((lv) => (
-          <div
-            key={lv.level}
-            className="full-lineage-row"
-            data-level={lv.level}
-          >
-            {lv.nodes.map((node) => {
-              const isHero = node.id === inspectedImageId;
-              const isInSelection = selectedImageIds.includes(node.id);
-              return (
-                <div key={node.id} className="full-lineage-node-wrapper">
-                  <div
-                    className={`full-lineage-thumb ${isHero ? "hero" : ""} ${isInSelection ? "in-selection" : ""}`}
-                    onClick={() => onNodeClick(node.id)}
-                    title={`#${node.id} ${node.generation_method}`}
-                  >
-                    <img src={`data:image/png;base64,${node.base64_image}`} alt={`#${node.id}`} />
-                  </div>
-                  {!isInSelection && (
-                    <button
-                      className="river-add-btn full-lineage-add"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddToSelection(node.id);
-                      }}
-                      title="Add to selection"
-                    >
-                      +
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 // #region agent log
 const DEBUG_LOG = (data: Record<string, unknown>) => {
@@ -185,13 +51,11 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   // Split-state: inspectedImageId can diverge from selectedImageIds
   const [inspectedImageId, setInspectedImageId] = useState<number | null>(null);
   const [heroHoverAdd, setHeroHoverAdd] = useState(false);
-  const [isFullLineageView, setIsFullLineageView] = useState(false);
 
+  // Inspector is never collapsed — disable auto-collapse as well
   useEffect(() => {
-    if (selectedImageIds.length > 0 && isCollapsed) {
-      setIsCollapsed(false);
-    }
-  }, [selectedImageIds.length, isCollapsed, setIsCollapsed]);
+    if (isCollapsed) setIsCollapsed(false);
+  }, [isCollapsed, setIsCollapsed]);
 
   useEffect(() => {
     if (selectedImageIds.length > 0) {
@@ -231,109 +95,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
       .filter(Boolean) as ImageData[];
   }, [inspectedImage, imageMap]);
 
-  const fullLineageLevels = useMemo((): LineageLevel[] => {
-    if (selectedImageIds.length === 0 || !imageMap.size) return [];
-    const allIds = new Set<number>();
-
-    for (const sid of selectedImageIds) {
-      allIds.add(sid);
-      let frontier: number[] = [sid];
-      const seen = new Set<number>([sid]);
-      while (frontier.length > 0) {
-        const next: number[] = [];
-        for (const id of frontier) {
-          const node = imageMap.get(id);
-          if (!node) continue;
-          for (const pid of node.parents || []) {
-            if (!seen.has(pid)) {
-              seen.add(pid);
-              allIds.add(pid);
-              next.push(pid);
-            }
-          }
-        }
-        frontier = next;
-      }
-    }
-
-    for (const sid of selectedImageIds) {
-      const node = imageMap.get(sid);
-      if (!node) continue;
-      let frontier: number[] = (node.children || []).slice();
-      const seen = new Set<number>([sid]);
-      while (frontier.length > 0) {
-        const next: number[] = [];
-        for (const id of frontier) {
-          if (!seen.has(id)) {
-            seen.add(id);
-            allIds.add(id);
-          }
-          const n = imageMap.get(id);
-          if (!n) continue;
-          for (const cid of n.children || []) {
-            if (!seen.has(cid)) {
-              seen.add(cid);
-              allIds.add(cid);
-              next.push(cid);
-            }
-          }
-        }
-        frontier = next;
-      }
-    }
-
-    const roots = Array.from(allIds).filter((id) => {
-      const node = imageMap.get(id);
-      if (!node?.parents?.length) return true;
-      return node.parents.every((p) => !allIds.has(p));
-    });
-
-    const levelMap = new Map<number, number>();
-    roots.forEach((r) => levelMap.set(r, 0));
-
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const id of allIds) {
-        if (levelMap.has(id)) continue;
-        const node = imageMap.get(id);
-        if (!node?.parents?.length) {
-          levelMap.set(id, 0);
-          changed = true;
-          continue;
-        }
-        const parentsInSet = node.parents.filter((p) => allIds.has(p));
-        const parentLevels = parentsInSet.map((p) => levelMap.get(p)).filter((l): l is number => l !== undefined);
-        if (parentLevels.length === parentsInSet.length) {
-          levelMap.set(id, parentLevels.length > 0 ? 1 + Math.max(...parentLevels) : 0);
-          changed = true;
-        }
-      }
-    }
-
-    const byLevel = new Map<number, ImageData[]>();
-    for (const id of allIds) {
-      const node = imageMap.get(id);
-      if (!node) continue;
-      const lvl = levelMap.get(id) ?? 0;
-      const arr = byLevel.get(lvl) || [];
-      arr.push(node);
-      byLevel.set(lvl, arr);
-    }
-
-    const sortedLevels = Array.from(byLevel.keys()).sort((a, b) => a - b);
-    return sortedLevels.map((lvl) => ({
-      level: lvl,
-      nodes: byLevel.get(lvl) || [],
-      parentIds: new Map(),
-    }));
-  }, [selectedImageIds, imageMap]);
-
   const riverRef = useRef<HTMLDivElement>(null);
   const [lineSegments, setLineSegments] = useState<LineSegment[]>([]);
 
   useLayoutEffect(() => {
-    if (isFullLineageView) return;
     const el = riverRef.current;
     if (!el || (ancestors.length === 0 && children.length === 0)) {
       setLineSegments([]);
@@ -383,7 +148,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [isFullLineageView, ancestors.length, children.length, inspectedImageId]);
+  }, [ancestors.length, children.length, inspectedImageId]);
 
   // #region agent log
   useEffect(() => {
@@ -419,20 +184,6 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   }, [ancestors.length, children.length]);
   // #endregion
 
-  if (isCollapsed) {
-    return (
-      <div className="right-inspector collapsed">
-        <button
-          className="inspector-expand-tab"
-          onClick={() => setIsCollapsed(false)}
-          title="Open Inspector"
-        >
-          &#9664;
-        </button>
-      </div>
-    );
-  }
-
   const handleNodeClick = (id: number) => {
     setInspectedImageId(id);
     setFlyToImageId(id);
@@ -456,13 +207,6 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     <div className="ethereal-inspector">
       <div className="inspector-header">
         <span className="inspector-title">INSPECTOR</span>
-        <button
-          className="inspector-collapse-btn"
-          onClick={() => setIsCollapsed(true)}
-          title="Collapse"
-        >
-          &#9654;
-        </button>
       </div>
 
       {selectedImageIds.length === 0 && (
@@ -490,32 +234,8 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
             </div>
           </div>
 
-          {/* River header: Full Lineage toggle */}
-          <div className="river-header-bar">
-            <button
-              className="river-mode-btn"
-              onClick={() => setIsFullLineageView(!isFullLineageView)}
-              title={isFullLineageView ? "Return to hero view" : "Show full lineage tree"}
-            >
-              {isFullLineageView ? "← Return" : "🌳 Full lineage"}
-            </button>
-          </div>
-
-          {/* Genealogy River - Fixed Grid Layout or Full Lineage */}
-          <div
-            className={`genealogy-river ${isFullLineageView ? "full-lineage-mode" : ""}`}
-            ref={riverRef}
-          >
-            {isFullLineageView ? (
-              <FullLineageView
-                levels={fullLineageLevels}
-                inspectedImageId={inspectedImageId}
-                selectedImageIds={selectedImageIds}
-                onNodeClick={handleNodeClick}
-                onAddToSelection={handleAddToSelection}
-              />
-            ) : (
-              <>
+          {/* Genealogy River */}
+          <div className="genealogy-river" ref={riverRef}>
             {/* Lines overlay: SVG so lines are never clipped by overflow */}
             {lineSegments.length > 0 && (
               <div className="river-lines-overlay" aria-hidden>
@@ -589,6 +309,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
 
             {/* Hero Card - Fixed center */}
             <div className="hero-card">
+              {/* Pure hero image — meta moved below children, above action bar */}
               <div
                 className={`hero-image-wrapper ${isHeroSelected ? "selected" : ""}`}
                 onMouseEnter={() => setHeroHoverAdd(!isHeroSelected)}
@@ -603,13 +324,6 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                   <button className="hero-add-btn" onClick={handleHeroAddClick}>
                     + Add to Selection
                   </button>
-                )}
-              </div>
-              <div className="hero-meta">
-                <span className="hero-id">#{inspectedImage.id}</span>
-                <span className="hero-method">{inspectedImage.generation_method}</span>
-                {inspectedImage.prompt && (
-                  <p className="hero-prompt">{inspectedImage.prompt}</p>
                 )}
               </div>
             </div>
@@ -649,99 +363,102 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </div>
             )}
 
-            {ancestors.length === 0 && children.length === 0 && (
-              <div className="no-lineage">No lineage</div>
-            )}
-              </>
+          </div>
+
+          {/* Metadata strip — between tree and action bar */}
+          <div className="hero-meta">
+            <span className="hero-id">#{inspectedImage.id}</span>
+            <span className="hero-meta-sep">·</span>
+            <span className="hero-method">{inspectedImage.generation_method}</span>
+            {inspectedImage.prompt && (
+              <span className="hero-prompt" title={inspectedImage.prompt}>{inspectedImage.prompt}</span>
             )}
           </div>
 
           {/* Action Bar */}
           <div className="action-bar">
-            {/* ① Star Rating */}
-            <div className="action-star-row">
-              <span className="action-star-label">Rate</span>
-              <div className="star-rating">
-                {[1, 2, 3, 4, 5].map((n) => {
-                  const currentRating = imageRatings[inspectedImage.id] ?? 0;
-                  const filled = n <= currentRating;
-                  return (
-                    <button
-                      key={n}
-                      className={`star-btn ${filled ? "star-filled" : "star-empty"}`}
-                      onClick={() => {
-                        // Click same star = clear rating; otherwise set
-                        const newRating = currentRating === n ? 0 : n;
-                        // If multiple selected, rate all
+            {/* Row 1: Rate + Layer side by side */}
+            <div className="action-row">
+              <div className="action-star-row">
+                <span className="action-star-label">Rate</span>
+                <div className="star-rating">
+                  {[1, 2, 3, 4, 5].map((n) => {
+                    const currentRating = imageRatings[inspectedImage.id] ?? 0;
+                    const filled = n <= currentRating;
+                    return (
+                      <button
+                        key={n}
+                        className={`star-btn ${filled ? "star-filled" : "star-empty"}`}
+                        onClick={() => {
+                          const newRating = currentRating === n ? 0 : n;
+                          if (selectedImageIds.length > 1) {
+                            selectedImageIds.forEach((id) => setImageRating(id, newRating));
+                          } else {
+                            setImageRating(inspectedImage.id, newRating);
+                          }
+                        }}
+                        title={`Rate ${n} star${n > 1 ? "s" : ""}`}
+                      >
+                        {filled ? "★" : "☆"}
+                      </button>
+                    );
+                  })}
+                  {(imageRatings[inspectedImage.id] ?? 0) > 0 && (
+                    <span className="star-value">{imageRatings[inspectedImage.id]}/5</span>
+                  )}
+                </div>
+              </div>
+              {(() => {
+                const lid = imageLayerMap[inspectedImage.id] ?? "default";
+                const layer = layers.find((l) => l.id === lid) ?? layers[0];
+                return (
+                  <div className="action-layer-wrap">
+                    <span className="action-layer-dot-inset" style={{ background: layer?.color }} />
+                    <select
+                      className="action-layer-select-inline"
+                      value={selectedImageIds.length > 1 ? "" : lid}
+                      onChange={(e) => {
                         if (selectedImageIds.length > 1) {
-                          selectedImageIds.forEach((id) => setImageRating(id, newRating));
+                          setImagesLayer(selectedImageIds, e.target.value);
                         } else {
-                          setImageRating(inspectedImage.id, newRating);
+                          setImageLayer(inspectedImage.id, e.target.value);
                         }
                       }}
-                      title={`Rate ${n} star${n > 1 ? "s" : ""}`}
+                      title={selectedImageIds.length > 1 ? `Move ${selectedImageIds.length} selected to layer` : "Change layer"}
                     >
-                      {filled ? "★" : "☆"}
-                    </button>
-                  );
-                })}
-                {(imageRatings[inspectedImage.id] ?? 0) > 0 && (
-                  <span className="star-value">{imageRatings[inspectedImage.id]}/5</span>
-                )}
-              </div>
+                      {selectedImageIds.length > 1 && <option value="" disabled>Move {selectedImageIds.length} to →</option>}
+                      {layers.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* ② Layer assignment row */}
-            {(() => {
-              const lid = imageLayerMap[inspectedImage.id] ?? "default";
-              const layer = layers.find((l) => l.id === lid) ?? layers[0];
-              return (
-                <div className="action-layer-row">
-                  <span className="action-layer-dot" style={{ background: layer?.color }} />
-                  <select
-                    className="action-layer-select-inline"
-                    value={selectedImageIds.length > 1 ? "" : lid}
-                    onChange={(e) => {
-                      if (selectedImageIds.length > 1) {
-                        setImagesLayer(selectedImageIds, e.target.value);
-                      } else {
-                        setImageLayer(inspectedImage.id, e.target.value);
-                      }
-                    }}
-                    title={selectedImageIds.length > 1 ? `Move ${selectedImageIds.length} selected to layer` : "Change layer"}
-                  >
-                    {selectedImageIds.length > 1 && <option value="" disabled>Move {selectedImageIds.length} to →</option>}
-                    {layers.map((l) => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </select>
-                </div>
-              );
-            })()}
-
-            {/* ③ Isolate / Unhide toggle */}
-            <button
-              className={isolatedImageIds !== null ? "action-unhide" : "action-isolate"}
-              onClick={() => {
-                if (isolatedImageIds !== null) {
-                  setIsolatedImageIds(null);
-                } else {
-                  setIsolatedImageIds([...selectedImageIds]);
-                }
-              }}
-              title={isolatedImageIds !== null ? "Exit isolate mode" : `Isolate ${selectedImageIds.length} selected image(s)`}
-            >
-              {isolatedImageIds !== null ? "⊙ Unhide All" : "◎ Isolate"}
-            </button>
-
-            {/* ④ Generate Variations */}
-            {onGenerateFromReference && (
-              <button className="action-primary" onClick={onGenerateFromReference}>
-                Generate Variations
+            {/* Row 2: Generate Variations + Isolate side by side */}
+            <div className="action-row">
+              {onGenerateFromReference && (
+                <button className="action-primary" onClick={onGenerateFromReference}>
+                  Generate Variations
+                </button>
+              )}
+              <button
+                className={isolatedImageIds !== null ? "action-unhide" : "action-isolate"}
+                onClick={() => {
+                  if (isolatedImageIds !== null) {
+                    setIsolatedImageIds(null);
+                  } else {
+                    setIsolatedImageIds([...selectedImageIds]);
+                  }
+                }}
+                title={isolatedImageIds !== null ? "Exit isolate mode" : `Isolate ${selectedImageIds.length} selected image(s)`}
+              >
+                {isolatedImageIds !== null ? "⊙ Unhide All" : "◎ Isolate"}
               </button>
-            )}
+            </div>
 
-            {/* ⑤ Remove + Deselect */}
+            {/* Row 3: Remove + Deselect */}
             <div className="action-row">
               {onRemoveSelected && (
                 <button className="action-danger" onClick={onRemoveSelected}>

@@ -1271,34 +1271,27 @@ async def add_external_images(request: AddExternalImagesRequest):
                 print(f"  ✗ ERROR: Unsupported URL format: {url[:100]}")
                 raise HTTPException(status_code=400, detail=f"Unsupported URL format for image {i+1}: {url[:100]}")
 
-            # Convert to RGB if needed
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-
             # Remove background if requested
             if request.remove_background is True:
+                # rembg needs RGB input
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
                 print(f"  Removing background from image {i+1}...")
-                # Convert PIL image to bytes
                 img_bytes = BytesIO()
                 img.save(img_bytes, format='PNG')
                 img_bytes.seek(0)
 
-                # Remove background
                 output_bytes = remove(img_bytes.getvalue())
 
-                # Convert back to PIL image with transparency
                 img = Image.open(BytesIO(output_bytes))
-                # Keep as RGBA to preserve transparency
                 if img.mode != 'RGBA':
                     img = img.convert('RGBA')
                 print(f"  OK: Background removed from image {i+1} (transparent)")
             else:
-                # Ensure RGB mode if not removing background
-                if img.mode == 'RGBA':
-                    # Convert RGBA to RGB with white background
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    background.paste(img, mask=img.split()[3])
-                    img = background
+                # Preserve RGBA transparency (agent ghost images already have BG removed).
+                # Only normalise exotic modes (P, CMYK, etc.) to RGB.
+                if img.mode not in ('RGB', 'RGBA'):
+                    img = img.convert('RGB')
 
             pil_images.append(img)
 
@@ -1967,11 +1960,16 @@ async def embed_ghost_image(request: Request):
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGB")
 
-        # Remove background (ghost shoes should show transparent, like real shoes)
-        img_bytes_in = BytesIO()
-        img.convert("RGB").save(img_bytes_in, format="PNG")
-        img_bytes_out = remove(img_bytes_in.getvalue())
-        img = Image.open(BytesIO(img_bytes_out)).convert("RGBA")
+        # Remove background so ghost shoes show transparent, like user-generated shoes
+        try:
+            img_bytes_in = BytesIO()
+            img.convert("RGB").save(img_bytes_in, format="PNG")
+            img_bytes_out = remove(img_bytes_in.getvalue())
+            img = Image.open(BytesIO(img_bytes_out)).convert("RGBA")
+            print(f"  ✓ Background removed from ghost image")
+        except Exception as rembg_err:
+            print(f"  ⚠ rembg failed for ghost ({rembg_err}), keeping original")
+            img = img.convert("RGBA")  # ensure RGBA even without removal
 
         # Embed via CLIP using RGB version
         img_rgb = img.convert("RGB")
@@ -2560,6 +2558,31 @@ async def branch_canvas(request: BranchCanvasRequest):
 
 class RenameCanvasRequest(BaseModel):
     name: str
+
+
+class DeleteCanvasRequest(BaseModel):
+    canvas_id: str
+
+
+@app.post("/api/sessions/delete")
+async def delete_canvas(request: DeleteCanvasRequest):
+    """Delete a saved canvas from disk. Cannot delete the currently active canvas."""
+    if request.canvas_id == state.current_canvas_id:
+        raise HTTPException(status_code=400, detail="Cannot delete the active canvas. Switch to another canvas first.")
+    path = _session_path(state.participant_id, request.canvas_id)
+    if not path.exists():
+        # Search other participant dirs
+        found = None
+        for pid_dir in DATA_DIR.iterdir():
+            candidate = pid_dir / "sessions" / f"{request.canvas_id}.json"
+            if candidate.exists():
+                found = candidate
+                break
+        if not found:
+            raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
+        path = found
+    path.unlink()
+    return {"success": True, "deleted": request.canvas_id}
 
 
 @app.post("/api/sessions/rename")

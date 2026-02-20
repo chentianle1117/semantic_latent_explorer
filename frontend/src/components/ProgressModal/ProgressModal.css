@@ -13,7 +13,8 @@
 
 .pm-modal {
   position: fixed;
-  top: 50%;
+  /* Center in the canvas area (above drawer ~7vh, below header ~40px) */
+  top: calc(40px + (100vh - 40px - 44px) / 2);
   left: 50%;
   transform: translate(-50%, -50%);
   width: 460px;
@@ -33,7 +34,7 @@
 }
 
 @keyframes pm-slide-up {
-  from { opacity: 0; transform: translate(-50%, -44%); }
+  from { opacity: 0; transform: translate(-50%, -42%); }
   to   { opacity: 1; transform: translate(-50%, -50%); }
 }
 
@@ -279,7 +280,7 @@
 .pm-minimized {
   position: fixed;
   bottom: 24px;
-  right: 24px;
+  right: calc(min(28vw, 380px) + 16px);
   background: #13181f;
   border: 1px solid #2a3142;
   border-radius: 10px;
@@ -343,4 +344,26 @@
   height: 100%;
   background: linear-gradient(90deg, #58a6ff, #bc8cff);
   transition: width 0.35s ease;
+}
+
+.pm-min-dismiss {
+  background: none;
+  border: none;
+  color: #5a6680;
+  font-size: 16px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.12s;
+  line-height: 1;
+}
+
+.pm-min-dismiss:hover {
+  color: #ff6060;
 }

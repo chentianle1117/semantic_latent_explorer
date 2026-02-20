@@ -4,7 +4,6 @@
  */
 
 import React, { useState } from 'react';
-import { useAppStore } from '../../store/appStore';
 import type { ImageData } from '../../types';
 import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
 import { SuggestionsPanel } from '../SuggestionsPanel/SuggestionsPanel';
@@ -23,7 +22,6 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
 }) => {
   const [prompt, setPrompt] = useState('');
   const [numImages, setNumImages] = useState(2);
-  const isGenerating = useAppStore((state) => state.isGenerating);
 
   const handleGenerate = () => {
     if (!prompt.trim()) {
@@ -78,7 +76,6 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="e.g., more minimalist, brighter colors..."
                 rows={4}
-                disabled={isGenerating}
                 autoFocus
               />
 
@@ -91,15 +88,15 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
           </div>
 
           <div className="dialog-actions">
-            <button onClick={onClose} disabled={isGenerating}>
+            <button onClick={onClose}>
               Cancel
             </button>
             <button
               className="primary"
               onClick={handleGenerate}
-              disabled={isGenerating || !prompt.trim()}
+              disabled={!prompt.trim()}
             >
-              {isGenerating ? 'Generating...' : 'Generate'}
+              Generate
             </button>
           </div>
         </div>

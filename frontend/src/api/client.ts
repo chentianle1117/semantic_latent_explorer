@@ -254,6 +254,11 @@ class APIClient {
     return response.data;
   }
 
+  async deleteSession(canvasId: string): Promise<{ success: boolean; deleted: string }> {
+    const response = await axios.post(`${API_BASE}/sessions/delete`, { canvas_id: canvasId });
+    return response.data;
+  }
+
   async setParticipant(participantId: string): Promise<{ participantId: string }> {
     const response = await axios.post(`${API_BASE}/session/set-participant`, { participant_id: participantId });
     return response.data;

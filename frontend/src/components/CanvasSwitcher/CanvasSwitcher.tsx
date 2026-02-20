@@ -144,7 +144,17 @@ export const CanvasSwitcher: React.FC = () => {
     const port = window.location.port || '8000';
     const base = `http://localhost:${port}/api`;
     window.open(`${base}/export-zip`, '_blank');
-    setIsOpen(false);
+  };
+
+  const handleDeleteCanvas = async (canvasId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this canvas? This cannot be undone.')) return;
+    try {
+      await apiClient.deleteSession(canvasId);
+      await refreshList();
+    } catch (err) {
+      alert(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   };
 
   const handleNameEdit = async (newName: string) => {
@@ -195,16 +205,26 @@ export const CanvasSwitcher: React.FC = () => {
               <div className="cs-empty">No saved canvases yet</div>
             ) : (
               canvasList.map((c) => (
-                <button
-                  key={c.id}
-                  className={`cs-canvas-row ${c.id === currentCanvasId ? 'cs-current' : ''}`}
-                  onClick={() => handleSwitchCanvas(c.id)}
-                >
-                  <span className="cs-check">{c.id === currentCanvasId ? '✓' : ' '}</span>
-                  <span className="cs-row-name">{c.name}</span>
-                  <span className="cs-row-count">{c.imageCount} img</span>
-                </button>
-              ))
+                <div key={c.id} className={`cs-canvas-row ${c.id === currentCanvasId ? 'cs-current' : ''}`}>
+                  <button
+                    className="cs-row-main"
+                    onClick={() => handleSwitchCanvas(c.id)}
+                  >
+                    <span className="cs-check">{c.id === currentCanvasId ? '✓' : ' '}</span>
+                    <span className="cs-row-name">{c.name}</span>
+                    <span className="cs-row-count">{c.imageCount} img</span>
+                  </button>
+                  {c.id !== currentCanvasId && (
+                    <button
+                      className="cs-row-delete"
+                      onClick={(e) => handleDeleteCanvas(c.id, e)}
+                      title="Delete canvas"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              )))
             )}
           </div>
 
@@ -226,16 +246,6 @@ export const CanvasSwitcher: React.FC = () => {
             )}
           </button>
 
-          <div className="cs-sep" />
-
-          {/* Save / export */}
-          <button className="cs-action" onClick={handleSaveNow}>
-            <span className="cs-action-icon">↑</span>
-            {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : 'Save now'}
-          </button>
-          <button className="cs-action" onClick={handleExportZip}>
-            <span className="cs-action-icon">↓</span> Export ZIP
-          </button>
         </div>
       )}
     </div>

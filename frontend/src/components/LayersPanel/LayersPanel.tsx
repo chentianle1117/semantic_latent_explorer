@@ -238,8 +238,8 @@ export const LayersPanel: React.FC = () => {
                   Select all
                 </button>
 
-                {/* Delete (non-default layers only) */}
-                {layer.id !== "default" && (
+                {/* Delete — locked for built-in layers (default = Shoes, references = References) */}
+                {layer.id !== "default" && layer.id !== "references" && (
                   <button
                     className="lp-icon-btn lp-trash-btn"
                     onClick={() => handleDelete(layer)}

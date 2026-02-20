@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState, useCallback } from "react";
 import "./HeaderBar.css";
 import { CanvasSwitcher } from "../CanvasSwitcher/CanvasSwitcher";
+import { apiClient } from "../../api/client";
 
 interface HeaderBarProps {
   imageCount: number;
@@ -18,10 +19,44 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onToggle3D,
   onOpenSettings,
 }) => {
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  const handleSave = useCallback(async () => {
+    if (saveStatus === 'saving') return;
+    setSaveStatus('saving');
+    try {
+      await apiClient.saveSession();
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 1500);
+    } catch {
+      setSaveStatus('idle');
+    }
+  }, [saveStatus]);
+
+  const handleExport = useCallback(() => {
+    const port = window.location.port || '8000';
+    window.open(`http://localhost:${port}/api/export-zip`, '_blank');
+  }, []);
+
   return (
     <div className="header-bar">
       <div className="header-left">
         <CanvasSwitcher />
+        <button
+          className="header-canvas-action"
+          onClick={handleSave}
+          title="Save canvas to disk"
+          disabled={saveStatus === 'saving'}
+        >
+          {saveStatus === 'saving' ? '…' : saveStatus === 'saved' ? '✓ Saved' : '↑ Save'}
+        </button>
+        <button
+          className="header-canvas-action"
+          onClick={handleExport}
+          title="Export canvas as ZIP"
+        >
+          ↓ Export
+        </button>
       </div>
       <div className="header-center" />
       <div className="header-right">

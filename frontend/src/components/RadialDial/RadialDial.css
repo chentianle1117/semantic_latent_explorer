@@ -76,30 +76,48 @@
 }
 
 .radial-dial-btn:hover {
-  background: rgba(33, 38, 45, 0.96);
   transform: scale(1.10);
   color: #e6edf3;
 }
 
-/* Subtle category color on hover border only */
+/* Always-on category color backgrounds */
+.radial-dial-btn--agentic {
+  background: rgba(168, 85, 247, 0.13);
+  border-color: rgba(168, 85, 247, 0.35);
+}
+.radial-dial-btn--image {
+  background: rgba(20, 184, 166, 0.11);
+  border-color: rgba(20, 184, 166, 0.32);
+}
+.radial-dial-btn--global {
+  background: rgba(251, 191, 36, 0.10);
+  border-color: rgba(251, 191, 36, 0.28);
+}
+.radial-dial-btn--system {
+  background: rgba(88, 166, 255, 0.10);
+  border-color: rgba(88, 166, 255, 0.28);
+}
+
+/* Stronger glow on hover */
 .radial-dial-btn--agentic:hover {
-  border-color: rgba(168, 85, 247, 0.55);
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.15);
+  background: rgba(168, 85, 247, 0.24);
+  border-color: rgba(168, 85, 247, 0.65);
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.28);
 }
-
 .radial-dial-btn--image:hover {
-  border-color: rgba(56, 189, 166, 0.55);
-  box-shadow: 0 0 10px rgba(56, 189, 166, 0.12);
+  background: rgba(20, 184, 166, 0.22);
+  border-color: rgba(20, 184, 166, 0.62);
+  box-shadow: 0 0 14px rgba(20, 184, 166, 0.24);
 }
-
 .radial-dial-btn--global:hover {
-  border-color: rgba(251, 191, 36, 0.5);
-  box-shadow: 0 0 10px rgba(251, 191, 36, 0.12);
+  background: rgba(251, 191, 36, 0.20);
+  border-color: rgba(251, 191, 36, 0.58);
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.22);
 }
-
 .radial-dial-btn--system:hover {
-  border-color: rgba(88, 166, 255, 0.45);
-  box-shadow: 0 0 10px rgba(88, 166, 255, 0.12);
+  background: rgba(88, 166, 255, 0.20);
+  border-color: rgba(88, 166, 255, 0.58);
+  box-shadow: 0 0 14px rgba(88, 166, 255, 0.22);
 }
 
 .radial-dial-btn-icon {

@@ -9,7 +9,7 @@ export interface ImageData {
   coordinates: [number, number] | [number, number, number];  // 2D or 3D coordinates
   parents: number[];
   children: number[];
-  generation_method: 'batch' | 'reference' | 'interpolation' | 'dataset' | 'auto-variation';
+  generation_method: 'batch' | 'reference' | 'interpolation' | 'dataset' | 'auto-variation' | 'agent';
   prompt: string;
   timestamp: string;
   visible: boolean;

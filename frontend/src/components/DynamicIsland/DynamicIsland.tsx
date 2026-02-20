@@ -1,6 +1,6 @@
 /**
  * Dynamic Island — 4 states:
- *  idle          → small pill: "· Companion"
+ *  idle          → small pill: "· AI Standby"
  *  working       → pulsing pill: "⟳ Analyzing..."  (driven by isAgentWorking)
  *  insight-ready → glowing pill with badge (non-sticky, hover to expand)
  *  expanded      → hover reveals full message + dismiss button
@@ -89,7 +89,7 @@ export const DynamicIsland: React.FC = () => {
         /* Idle: small dot + label */
         <div className="di-content">
           <span className="di-indicator di-dot" />
-          <span className="di-label">Companion</span>
+          <span className="di-label">AI Standby</span>
         </div>
       )}
     </div>

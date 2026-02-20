@@ -10,7 +10,7 @@
 }
 
 .bottom-drawer:not(.expanded) {
-  height: var(--drawer-collapsed, clamp(72px, 7vh, 96px));
+  height: 44px;
 }
 
 .bottom-drawer.expanded {
@@ -20,16 +20,72 @@
 .drawer-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 var(--fs-lg, 16px);
-  height: clamp(72px, 7vh, 96px);
+  gap: 8px;
+  padding: 0 12px;
+  height: 44px;
   flex-shrink: 0;
   cursor: pointer;
   user-select: none;
 }
 
+/* Compact section-header style when expanded — matches LayersPanel .lp-header */
+.drawer-bar--expanded {
+  height: 36px;
+  padding: 0 12px;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.drawer-bar--expanded:hover {
+  background: transparent;
+}
+
 .drawer-bar:hover {
   background: #21262d;
+}
+
+/* Section tabs (expanded state header) — match .lp-title style */
+.drawer-section-tabs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.drawer-section-tab {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(0, 210, 255, 0.32);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.12s;
+  white-space: nowrap;
+}
+
+.drawer-section-tab:hover {
+  color: rgba(0, 210, 255, 0.6);
+}
+
+.drawer-section-tab.active {
+  color: rgba(0, 210, 255, 0.75);
+}
+
+.drawer-section-sep {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.12);
+  user-select: none;
+}
+
+.drawer-stats--compact {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .drawer-toggle {
@@ -41,18 +97,24 @@
   padding: 2px;
 }
 
+/* Collapsed bar stats — matches section-tab style */
 .drawer-stats {
-  font-size: var(--fs-sm, 11px);
-  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(0, 210, 255, 0.45);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .drawer-thumbs {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   overflow-x: auto;
   flex: 1;
-  padding: 4px 0;
+  align-items: center;
+  padding: 0;
 }
 
 .drawer-batch-chip {
@@ -61,10 +123,11 @@
   cursor: pointer;
 }
 
+/* Smaller thumbnails to fit 44px compact bar */
 .drawer-thumb {
-  width: clamp(52px, 5vh, 72px);
-  height: clamp(52px, 5vh, 72px);
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 5px;
   object-fit: contain;
   background: #0d1117;
   flex-shrink: 0;
@@ -79,24 +142,28 @@
 
 .batch-count-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  background: var(--primary-blue);
+  bottom: 1px;
+  right: 1px;
+  top: auto;
+  background: rgba(0, 120, 200, 0.85);
   color: white;
-  font-size: 9px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 10px;
-  min-width: 18px;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 0 3px;
+  border-radius: 4px;
+  min-width: 14px;
   text-align: center;
   pointer-events: none;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  line-height: 14px;
+  height: 14px;
 }
 
 .drawer-content {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
-  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
 }
 
 .drawer-timeline {
@@ -104,14 +171,16 @@
   gap: 8px;
   padding: 10px var(--fs-lg, 16px);
   overflow-x: auto;
-  height: 100%;
-  align-items: flex-start;
+  overflow-y: hidden;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .drawer-group {
   flex-shrink: 0;
   width: clamp(140px, 10vw, 200px);
-  height: clamp(140px, 13vh, 190px);
+  min-height: clamp(120px, 10vh, 160px);
   background: #0d1117;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -271,4 +340,70 @@
 .group-deleted-overlay--all {
   background: rgba(180, 30, 30, 0.2);
   border-color: rgba(220, 60, 60, 0.4);
+}
+
+/* ── Tab bar styles removed — tabs now live in .drawer-bar--expanded ── */
+
+/* ── Lineage tree panel (fills expanded area below tab bar) ── */
+.drawer-tree-panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Genealogy tree scroll container ── */
+.drawer-tree-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a3142 transparent;
+}
+
+.drawer-tree-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.drawer-tree-scroll::-webkit-scrollbar-thumb {
+  background: #2a3142;
+  border-radius: 2px;
+}
+
+.drawer-tree-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-tree-empty {
+  color: #484f58;
+  font-size: 12px;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.drawer-tree-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 5px 16px 6px;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.tree-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  color: rgba(180, 192, 210, 0.6);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
 }

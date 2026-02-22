@@ -4,12 +4,14 @@
   height: 100%;
 }
 
-.lp-header {
+.lp-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 4px 10px;
+  justify-content: center;
+  padding: 8px 4px 2px;
   flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 4px;
 }
 
 .lp-title {
@@ -25,16 +27,17 @@
   border: 1px solid rgba(88, 166, 255, 0.4);
   border-radius: 5px;
   color: rgba(88, 166, 255, 0.85);
-  font-size: 18px;
+  font-size: 11px;
   line-height: 1;
-  width: 28px;
   height: 28px;
+  width: 100%;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 0 8px;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 
 .lp-add-btn:hover {

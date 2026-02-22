@@ -1,59 +1,109 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import "./HeaderBar.css";
 import { CanvasSwitcher } from "../CanvasSwitcher/CanvasSwitcher";
 import { apiClient } from "../../api/client";
+import { useAppStore } from "../../store/appStore";
 
 interface HeaderBarProps {
   imageCount: number;
   isInitialized: boolean;
   isAnalyzing: boolean;
   isLoadingAxes: boolean;
-  is3DMode: boolean;
-  onToggle3D: () => void;
+  is3DMode?: boolean;
+  onToggle3D?: () => void;
   onOpenSettings: () => void;
   onInsightClick?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
-  is3DMode,
-  onToggle3D,
   onOpenSettings,
 }) => {
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [importStatus, setImportStatus] = useState<'idle' | 'importing' | 'done'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const setImages = useAppStore((s) => s.setImages);
+  const setHistoryGroups = useAppStore((s) => s.setHistoryGroups);
+  const setAxisLabels = useAppStore((s) => s.setAxisLabels);
+  const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
+
+  const handleImportClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so same file can be re-selected later
+    e.target.value = '';
+
+    setImportStatus('importing');
+    try {
+      await apiClient.importZip(file);
+      // Reload full state from backend after import (necessary — replacing entire canvas)
+      const state = await apiClient.getState();
+      setImages(state.images ?? []);
+      setHistoryGroups(state.history_groups ?? []);
+      if (state.axis_labels) setAxisLabels(state.axis_labels);
+      resetCanvasBounds();
+      setImportStatus('done');
+      setTimeout(() => setImportStatus('idle'), 1800);
+    } catch (err) {
+      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setImportStatus('idle');
+    }
+  }, [setImages, setHistoryGroups, setAxisLabels, resetCanvasBounds]);
 
   const handleSave = useCallback(async () => {
-    if (saveStatus === 'saving') return;
     setSaveStatus('saving');
     try {
       await apiClient.saveSession();
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 1500);
+      setSaveStatus('done');
+      setTimeout(() => setSaveStatus('idle'), 1800);
     } catch {
-      setSaveStatus('idle');
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2500);
     }
-  }, [saveStatus]);
+  }, []);
 
   const handleExport = useCallback(() => {
-    const port = window.location.port || '8000';
-    window.open(`http://localhost:${port}/api/export-zip`, '_blank');
+    // Use relative URL so it works both locally and via ngrok
+    window.open('/api/export-zip', '_blank');
   }, []);
 
   return (
     <div className="header-bar">
+      {/* Hidden file input for ZIP import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".zip"
+        style={{ display: 'none' }}
+        onChange={handleFileSelected}
+      />
+
       <div className="header-left">
         <CanvasSwitcher />
         <button
           className="header-canvas-action"
+          onClick={handleImportClick}
+          title="Import canvas from ZIP file"
+          disabled={importStatus === 'importing'}
+        >
+          {importStatus === 'importing' ? '…' : importStatus === 'done' ? '✓ Imported' : '↑ Import'}
+        </button>
+        <button
+          className="header-canvas-action"
           onClick={handleSave}
-          title="Save canvas to disk"
+          title="Save canvas to server"
           disabled={saveStatus === 'saving'}
         >
-          {saveStatus === 'saving' ? '…' : saveStatus === 'saved' ? '✓ Saved' : '↑ Save'}
+          {saveStatus === 'saving' ? '…' : saveStatus === 'done' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : '↓ Save'}
         </button>
         <button
           className="header-canvas-action"
           onClick={handleExport}
-          title="Export canvas as ZIP"
+          title="Export canvas as ZIP download"
         >
           ↓ Export
         </button>
@@ -62,13 +112,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
       <div className="header-right">
         <button className="header-icon-btn" onClick={onOpenSettings} title="Settings">
           &#9881;
-        </button>
-        <button
-          className={`header-icon-btn mode-toggle ${is3DMode ? "active" : ""}`}
-          onClick={onToggle3D}
-          title={is3DMode ? "Switch to 2D" : "Switch to 3D"}
-        >
-          {is3DMode ? "3D" : "2D"}
         </button>
       </div>
     </div>

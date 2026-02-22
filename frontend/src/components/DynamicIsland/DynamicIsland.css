@@ -16,7 +16,7 @@
               border-color 0.3s ease,
               box-shadow 0.3s ease,
               opacity 0.2s ease;
-  overflow: hidden;
+  overflow: visible;
   white-space: nowrap;
   pointer-events: all;
 }
@@ -138,6 +138,18 @@
   line-height: 1.4;
 }
 
+/* ── Count badge (shows N when multiple insights pending) ── */
+.di-count-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 10px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
 /* ── Dismiss button ───────────────────────────────── */
 .di-dismiss-btn {
   background: transparent;
@@ -153,4 +165,17 @@
 
 .di-dismiss-btn:hover {
   color: rgba(200, 210, 220, 0.9);
+}
+
+/* ── Directional blobs ────────────────────────────── */
+.di-blob {
+  position: absolute;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 8px 3px rgba(168, 85, 247, 0.5);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: left 0.3s ease-out, top 0.3s ease-out, width 0.3s ease-out,
+              height 0.3s ease-out, opacity 0.3s ease-out;
+  z-index: -1;
 }

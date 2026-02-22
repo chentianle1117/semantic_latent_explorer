@@ -144,11 +144,6 @@ export const LayersPanel: React.FC = () => {
 
   return (
     <div className="layers-panel">
-      <div className="lp-header">
-        <span className="lp-title">LAYERS</span>
-        <button className="lp-add-btn" onClick={handleAddLayer} title="Add new layer">＋</button>
-      </div>
-
       <div className="lp-list">
         {layers.map((layer, index) => {
           const count = getLayerImageIds(layer.id).length;
@@ -252,6 +247,11 @@ export const LayersPanel: React.FC = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* Add layer button at the bottom */}
+      <div className="lp-footer">
+        <button className="lp-add-btn" onClick={handleAddLayer} title="Add new layer">＋ Layer</button>
       </div>
 
       <ConfirmDialog

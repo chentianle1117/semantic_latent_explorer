@@ -1,7 +1,7 @@
 /**
- * LayersSidebar — right-column panel in grid-row 3 (bottom row), flush with the inspector.
- * Collapses/expands in sync with the BottomDrawer.
- * Collapsed: shows clickable color dots to toggle visibility.
+ * LayersSidebar — right-column panel below the inspector.
+ * Collapses/expands independently from BottomDrawer.
+ * Collapsed: horizontal row of named layer dots (click to toggle visibility).
  * Expanded: shows full LayersPanel.
  */
 import React from "react";
@@ -10,12 +10,29 @@ import { LayersPanel } from "../LayersPanel/LayersPanel";
 import "./LayersSidebar.css";
 
 export const LayersSidebar: React.FC = () => {
-  const isExpanded = useAppStore((s) => s.isDrawerExpanded);
+  const isExpanded = useAppStore((s) => s.isLayersExpanded);
+  const setIsExpanded = useAppStore((s) => s.setIsLayersExpanded);
   const layers = useAppStore((s) => s.layers);
   const toggleLayerVisibility = useAppStore((s) => s.toggleLayerVisibility);
 
   return (
     <div className={`layers-sidebar ${isExpanded ? "expanded" : ""}`}>
+      {/* Clickable bar — always visible, click anywhere to toggle */}
+      <div
+        className="layers-sidebar-bar"
+        onClick={() => setIsExpanded(!isExpanded)}
+        title={isExpanded ? "Collapse layers" : "Expand layers"}
+      >
+        <span className="layers-sidebar-bar-label">Layers</span>
+        <button
+          className="layers-sidebar-toggle"
+          onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+          title={isExpanded ? "Collapse" : "Expand"}
+        >
+          {isExpanded ? "▼" : "▲"}
+        </button>
+      </div>
+
       {isExpanded ? (
         <div className="layers-sidebar-body">
           <LayersPanel />
@@ -27,7 +44,7 @@ export const LayersSidebar: React.FC = () => {
               key={layer.id}
               className={`ls-dot-btn ${!layer.visible ? "ls-dot-hidden" : ""}`}
               style={{ "--dot-color": layer.color } as React.CSSProperties}
-              onClick={() => toggleLayerVisibility(layer.id)}
+              onClick={(e) => { e.stopPropagation(); toggleLayerVisibility(layer.id); }}
               title={`${layer.name} — click to ${layer.visible ? "hide" : "show"}`}
             >
               <span className="ls-dot" />

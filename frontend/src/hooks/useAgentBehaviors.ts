@@ -33,7 +33,7 @@ export function useAgentBehaviors() {
     addGhostNode,
     setIsAgentWorking,
     setAgentStatus,
-    setAgentInsight,
+    addAgentInsight,
     resetExplorationCounter,
     addToExplorationCounter,
     resetAxisSuggestionCounter,
@@ -138,13 +138,20 @@ export function useAgentBehaviors() {
         parents: parentIds,
         source: 'concurrent',
         timestamp: Date.now(),
+        your_design_was: result.your_design_was,
+        this_explores: result.this_explores,
+        key_shifts: result.key_shifts,
       };
 
+      const insightMessage = result.your_design_was && result.this_explores
+        ? `Your design was ${result.your_design_was}. Exploring: ${result.this_explores}`
+        : `Generated an alternative: "${altPrompt.substring(0, 60)}..."`;
+
       addGhostNode(ghost);
-      setAgentInsight({
+      addAgentInsight({
         id: `b-${Date.now()}`,
         type: 'variation',
-        message: `Generated an alternative: "${altPrompt.substring(0, 60)}..."`,
+        message: insightMessage,
         data: { ghost },
         isRead: false,
         timestamp: Date.now(),
@@ -156,7 +163,7 @@ export function useAgentBehaviors() {
     } finally {
       setIsAgentWorking(false);
     }
-  }, [addGhostNode, setIsAgentWorking, setAgentStatus, setAgentInsight]);
+  }, [addGhostNode, setIsAgentWorking, setAgentStatus, addAgentInsight]);
 
   // ─────────────────────────────────────────────────────────────
   // BEHAVIOR C: Exploration Ghosts
@@ -222,6 +229,8 @@ export function useAgentBehaviors() {
             parents: [],
             source: 'exploration',
             timestamp: Date.now(),
+            target_region: (suggestion as any).target_region,
+            contrasts_with: (suggestion as any).contrasts_with,
           };
 
           addGhostNode(ghost);
@@ -233,10 +242,17 @@ export function useAgentBehaviors() {
       }
 
       if (addedGhosts.length > 0) {
-        setAgentInsight({
+        const regionLabels = addedGhosts
+          .map((g) => g.target_region)
+          .filter(Boolean)
+          .join(', ');
+        const explorationMessage = regionLabels
+          ? `Exploring ${regionLabels} — check the canvas`
+          : `Explored ${addedGhosts.length} canvas gap${addedGhosts.length > 1 ? 's' : ''} — check the canvas for suggestions`;
+        addAgentInsight({
           id: `c-${Date.now()}`,
           type: 'gap',
-          message: `Explored ${addedGhosts.length} canvas gap${addedGhosts.length > 1 ? 's' : ''} — check the canvas for suggestions`,
+          message: explorationMessage,
           data: { ghosts: addedGhosts },
           isRead: false,
           timestamp: Date.now(),
@@ -248,7 +264,7 @@ export function useAgentBehaviors() {
     } finally {
       setIsAgentWorking(false);
     }
-  }, [addGhostNode, setIsAgentWorking, setAgentStatus, setAgentInsight]);
+  }, [addGhostNode, setIsAgentWorking, setAgentStatus, addAgentInsight]);
 
   // ─────────────────────────────────────────────────────────────
   // BEHAVIOR D: Axis Suggestions (session clock, 2-min interval)

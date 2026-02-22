@@ -10,6 +10,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../store/appStore';
+import { useProgressStore } from '../../store/progressStore';
 import { apiClient } from '../../api/client';
 import './CanvasSwitcher.css';
 
@@ -71,8 +72,24 @@ export const CanvasSwitcher: React.FC = () => {
     if (canvasId === currentCanvasId || isSwitching) return;
     setIsOpen(false);
     setIsSwitching(true);
+    const ps = useProgressStore.getState();
+    ps.showProgress('loading', 'Switching canvas…', false);
+    ps.setSteps([
+      { id: 'save',   label: 'Saving current canvas',   status: 'active' },
+      { id: 'load',   label: 'Loading target canvas',   status: 'pending' },
+      { id: 'render', label: 'Updating canvas view',    status: 'pending' },
+    ]);
+    ps.updateProgress(10);
     try {
+      ps.addLogLine('Serializing current canvas to disk…');
+      ps.updateStepStatus('save', 'done');
+      ps.updateStepStatus('load', 'active');
+      ps.updateProgress(35);
       const result = await apiClient.loadSession(canvasId);
+      ps.addLogLine(`Loaded "${result.canvasName}" — ${result.state.images?.length ?? 0} images`);
+      ps.updateStepStatus('load', 'done');
+      ps.updateStepStatus('render', 'active');
+      ps.updateProgress(80);
       const s = result.state;
       setImages(s.images ?? []);
       setHistoryGroups(s.history_groups ?? []);
@@ -82,10 +99,14 @@ export const CanvasSwitcher: React.FC = () => {
       setCanvasName(result.canvasName);
       resetCanvasBounds();
       await refreshList();
+      ps.updateStepStatus('render', 'done');
+      ps.updateProgress(100);
+      ps.addLogLine('Canvas ready.');
     } catch (e) {
       alert(`Failed to load canvas: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       setIsSwitching(false);
+      setTimeout(() => ps.hideProgress(), 800);
     }
   };
 
@@ -225,7 +246,7 @@ export const CanvasSwitcher: React.FC = () => {
                   )}
                 </div>
               )))
-            )}
+            }
           </div>
 
           <div className="cs-sep" />

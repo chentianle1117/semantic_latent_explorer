@@ -9,7 +9,7 @@ export interface ImageData {
   coordinates: [number, number] | [number, number, number];  // 2D or 3D coordinates
   parents: number[];
   children: number[];
-  generation_method: 'batch' | 'reference' | 'interpolation' | 'dataset' | 'auto-variation' | 'agent';
+  generation_method: 'batch' | 'reference' | 'interpolation' | 'dataset' | 'auto-variation' | 'agent' | 'external';
   prompt: string;
   timestamp: string;
   visible: boolean;
@@ -72,8 +72,18 @@ export interface AppState {
   // UI layout state
   isInspectorCollapsed: boolean;
   isDrawerExpanded: boolean;
+  isHistoryExpanded: boolean;
+  isLayersExpanded: boolean;
   activeToolbarFlyout: string | null; // 'generate' | 'batch' | 'analyze' | 'axes' | null
   flyToImageId: number | null;
+
+  // Minimap data (published by SemanticCanvas)
+  minimapDots: MinimapDot[];
+  minimapGhostDots: MinimapDot[];  // ghost-only positions for DI blobs
+  minimapViewport: ViewportRect | null;
+  minimapCanvasSize: { w: number; h: number } | null;
+  // Pan request: Minimap drag sets this; SemanticCanvas applies and clears
+  minimapPanRequest: { centerX: number; centerY: number; id: number } | null;
 
   // Cluster data for edge bundling
   clusterCentroids: number[][]; // [[x,y], [x,y], ...]
@@ -81,7 +91,7 @@ export interface AppState {
 
   // Agent state
   agentStatus: AgentStatus;
-  agentInsight: AgentInsight | null;
+  agentInsights: AgentInsight[];
   isAgentWorking: boolean;
   imagesSinceLastExploration: number;
   agentMode: AgentMode; // kept for SettingsModal compat
@@ -121,6 +131,12 @@ export interface AppState {
 
   // Design brief glow: true when Gemini is actively referencing the brief
   isAgentUsingBrief: boolean;
+
+  // Structured brief interpretation (AI-extracted fields + suggestions)
+  briefFields: BriefField[];
+  briefSuggestedParams: BriefSuggestedParam[];
+  briefInterpretation: string | null;
+  briefLoading: boolean;
 
   // Session / Multi-Canvas
   currentCanvasId: string | null;
@@ -212,6 +228,12 @@ export interface GhostNode {
   parents: number[];              // same parents as user's gen (B) or [] (C)
   source: 'concurrent' | 'exploration';
   timestamp: number;
+  // Structured reasoning (optional, backwards-compatible)
+  your_design_was?: string;       // Behavior B: description of user's design direction
+  this_explores?: string;         // Behavior B: description of what this alternative explores
+  key_shifts?: string[];          // Behavior B: e.g. ["leather → mesh", "muted → neon"]
+  target_region?: string;         // Behavior C: e.g. "formal + dark"
+  contrasts_with?: string;        // Behavior C: what cluster this contrasts with
 }
 
 // ─── Session / Multi-Canvas ───────────────────────────────────────────────────
@@ -231,3 +253,64 @@ export interface EventLogEntry {
   timestamp: string;
   data?: Record<string, any>;
 }
+
+// ─── Structured Design Brief ──────────────────────────────────────────────────
+
+export interface BriefField {
+  key: string;      // e.g. "shoe_type"
+  label: string;    // e.g. "Shoe Type"
+  value: string;    // e.g. "Basketball shoe"
+}
+
+export interface BriefSuggestedParam {
+  key: string;      // e.g. "material"
+  label: string;    // e.g. "Material"
+  hint: string;     // e.g. "leather, mesh, suede, synthetic"
+}
+
+// ─── Prompt Builder (SuggestionsPanel) ────────────────────────────────────────
+
+export interface TagCategory {
+  name: string;      // e.g. "Material"
+  tags: string[];    // e.g. ["leather", "suede", "mesh"]
+}
+
+export interface FullPromptSuggestion {
+  prompt: string;
+  reasoning: string;
+}
+
+// ─── Minimap ──────────────────────────────────────────────────────────────────
+
+export interface MinimapDot {
+  id: number;
+  x: number;   // base screen X (pre-zoom)
+  y: number;   // base screen Y (pre-zoom)
+  category: 'ref_image' | 'ref_shoe' | 'user' | 'agent';
+}
+
+export interface ViewportRect {
+  x1: number; y1: number; x2: number; y2: number; // base screen coords
+}
+
+/** Feature values are short comma-separated tags from the backend (split client-side) — legacy */
+export type ReferenceFeatures = Record<string, string | string[]>;
+
+export interface ReferenceImageAnalysis {
+  image_id: number;
+  label: string;       // "A", "B", "C"...
+  summary?: string;
+  /** New: flat list of 5-6 key design descriptors */
+  descriptors?: string[];
+  /** Legacy: categorized feature map */
+  features?: ReferenceFeatures;
+}
+
+export interface CombinationPrompt {
+  prompt: string;
+  reasoning: string;
+}
+
+export type SuggestTagsResponse =
+  | { mode: 'text'; categories: TagCategory[]; full_prompts: FullPromptSuggestion[] }
+  | { mode: 'reference'; reference_analysis: ReferenceImageAnalysis[]; combination_prompts: CombinationPrompt[] };

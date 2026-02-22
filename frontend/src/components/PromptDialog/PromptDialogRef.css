@@ -1,0 +1,309 @@
+/* ─── Reference Dialog: Thumbnail labels + @mention system ─────────────────── */
+
+/* Thumbnail with @A/@B label overlay */
+.ref-thumb-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.ref-thumb-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+/* Color legend block */
+.ref-mention-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+}
+
+.ref-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ref-mention-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ref-mention-code {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: monospace;
+  min-width: 24px;
+}
+
+.ref-mention-desc {
+  font-size: 11px;
+  color: rgba(150, 160, 175, 0.65);
+}
+
+/* Textarea wrapper with relative positioning for dropdown */
+.ref-textarea-wrapper {
+  position: relative;
+}
+
+.ref-textarea-wrapper textarea {
+  width: 100%;
+}
+
+/* @mention dropdown */
+.ref-mention-drop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: #161b22;
+  border: 1px solid rgba(48, 54, 61, 0.8);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 160px;
+}
+
+.ref-mention-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(48, 54, 61, 0.4);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: monospace;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.ref-mention-opt:last-child {
+  border-bottom: none;
+}
+
+.ref-mention-opt:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ref-mention-opt-desc {
+  font-size: 11px;
+  font-weight: 400;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: rgba(150, 165, 180, 0.7);
+}
+
+/* ─── Chip-based prompt area (shared with TextToImageDialog) ────────────── */
+
+.ttd-prompt-area {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(48, 54, 61, 0.7);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+  margin-bottom: 14px;
+}
+
+.ttd-prompt-area:focus-within {
+  border-color: rgba(0, 210, 255, 0.5);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.15);
+}
+
+.ttd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ttd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 3px 4px 3px 9px;
+  cursor: default;
+  line-height: 1.3;
+}
+
+.ttd-chip-remove {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.55;
+  color: inherit;
+  transition: opacity 0.1s;
+  display: flex;
+  align-items: center;
+}
+
+.ttd-chip-remove:hover {
+  opacity: 1;
+}
+
+/* ─── Textarea (plain visible text) ────────────────────────────────────── */
+
+.ttd-textarea {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  width: 100%;
+  border: none !important;
+  background: transparent !important;
+  color: rgba(200, 210, 220, 0.9) !important;
+  caret-color: rgba(200, 210, 220, 0.9);
+  resize: none !important;
+  margin-bottom: 0 !important;
+  min-height: 0 !important;
+  outline: none;
+}
+
+.ttd-textarea::placeholder {
+  color: rgba(120, 135, 150, 0.6);
+}
+
+.ttd-textarea::selection {
+  background: rgba(88, 166, 255, 0.3);
+}
+
+/* ─── Background pill (suggestions panel, combinations, quick prompts) ─── */
+/* No border — just colored text on a tinted background, clean and readable */
+
+.prompt-pill {
+  display: inline;
+  background: color-mix(in srgb, var(--pill-color) 18%, transparent);
+  color: var(--pill-color);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: inherit;
+}
+
+/* ─── Refine preview strip (shared between TextToImage & PromptDialog) ───── */
+
+.ttd-refine-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ttd-refine-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(200, 100, 255, 0.1);
+  border: 1px solid rgba(200, 100, 255, 0.35);
+  border-radius: 6px;
+  color: rgba(200, 100, 255, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ttd-refine-btn:hover:not(:disabled) {
+  background: rgba(200, 100, 255, 0.2);
+  border-color: rgba(200, 100, 255, 0.55);
+  color: #c864ff;
+}
+
+.ttd-refine-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.ttd-refine-btn.loading {
+  animation: sp-spin 1s linear infinite;
+}
+
+.ttd-preview-strip {
+  background: rgba(200, 100, 255, 0.05);
+  border: 1px solid rgba(200, 100, 255, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 0 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttd-preview-text {
+  font-size: 12px;
+  color: rgba(210, 220, 230, 0.9);
+  line-height: 1.5;
+}
+
+.ttd-preview-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ttd-preview-accept {
+  background: rgba(63, 185, 80, 0.12);
+  border: 1px solid rgba(63, 185, 80, 0.4);
+  border-radius: 5px;
+  color: rgba(63, 185, 80, 0.9);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ttd-preview-accept:hover {
+  background: rgba(63, 185, 80, 0.22);
+}
+
+.ttd-preview-dismiss {
+  background: transparent;
+  border: 1px solid rgba(150, 165, 180, 0.2);
+  border-radius: 5px;
+  color: rgba(150, 165, 180, 0.6);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.ttd-preview-dismiss:hover {
+  color: rgba(200, 215, 230, 0.8);
+}
+
+/* Hint text */
+.ref-hint {
+  font-size: 10px;
+  color: rgba(130, 145, 160, 0.5);
+  margin: 2px 0 6px;
+  font-style: italic;
+}
+

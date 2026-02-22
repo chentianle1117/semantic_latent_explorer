@@ -9,6 +9,7 @@ import type {
   HistoryGroup,
   AxisLabels,
   WebSocketMessage,
+  SuggestTagsResponse,
 } from '../types';
 
 const API_BASE = '/api';
@@ -78,7 +79,8 @@ class APIClient {
     generation_method: string;
     remove_background?: boolean;
     parent_ids?: number[];
-  }): Promise<{ status: string; images: ImageData[] }> {
+    precomputed_coordinates?: [number, number];
+  }): Promise<{ status: string; images: ImageData[]; history_group?: HistoryGroup }> {
     const response = await axios.post(`${API_BASE}/add-external-images`, request);
     return response.data;
   }
@@ -156,7 +158,7 @@ class APIClient {
   async suggestAxes(brief: string, currentXAxis: string, currentYAxis: string): Promise<{
     suggestions: Array<{ x_axis: string; y_axis: string; reasoning: string }>;
   }> {
-    const response = await axios.post('http://localhost:8000/api/agent/suggest-axes', {
+    const response = await axios.post(`${API_BASE}/agent/suggest-axes`, {
       brief,
       current_x_axis: currentXAxis,
       current_y_axis: currentYAxis
@@ -170,6 +172,21 @@ class APIClient {
     return response.data;
   }
 
+  // Interpret brief — Gemini extracts structured design parameters
+  async interpretBrief(brief: string): Promise<{
+    interpretation: string;
+    extracted: Array<{ key: string; label: string; value: string }>;
+    unmentioned: Array<{ key: string; label: string; hint: string }>;
+  }> {
+    const response = await axios.post(`${API_BASE}/agent/interpret-brief`, { brief });
+    return response.data;
+  }
+
+  // Update structured brief fields (user edits)
+  async updateBriefFields(fields: Array<{ key: string; label: string; value: string }>): Promise<void> {
+    await axios.post(`${API_BASE}/agent/update-brief-fields`, { fields });
+  }
+
   // Get ghost node suggestions for unexplored gaps
   async suggestGhosts(brief: string, numSuggestions: number = 3): Promise<{
     ghosts: Array<{
@@ -180,7 +197,7 @@ class APIClient {
       is_ghost: boolean;
     }>;
   }> {
-    const response = await axios.post('http://localhost:8000/api/agent/suggest-ghosts', {
+    const response = await axios.post(`${API_BASE}/agent/suggest-ghosts`, {
       brief,
       num_suggestions: numSuggestions
     });
@@ -188,10 +205,48 @@ class APIClient {
   }
 
   // Get AI-generated prompt suggestions based on current canvas context + brief
-  async getContextPrompts(brief: string): Promise<{
+  async getContextPrompts(brief: string, referencePrompts?: string[]): Promise<{
     prompts: Array<{ prompt: string; reasoning: string }>;
   }> {
-    const response = await axios.post(`${API_BASE}/agent/context-prompts`, { brief });
+    const response = await axios.post(`${API_BASE}/agent/context-prompts`, {
+      brief,
+      reference_prompts: referencePrompts ?? [],
+    });
+    return response.data;
+  }
+
+  // Get categorized design tags (text mode) or reference image analysis (reference mode)
+  async getSuggestTags(brief: string, referenceImageIds?: number[], mode?: string): Promise<SuggestTagsResponse> {
+    const response = await axios.post(`${API_BASE}/agent/suggest-tags`, {
+      brief,
+      reference_image_ids: referenceImageIds ?? [],
+      mode: mode ?? 'text',
+    });
+    return response.data;
+  }
+
+  // Compose a natural-language prompt from selected tags + brief
+  async composePrompt(selectedTags: string[], brief: string): Promise<{ prompt: string }> {
+    const response = await axios.post(`${API_BASE}/agent/compose-prompt`, {
+      selected_tags: selectedTags,
+      brief,
+    });
+    return response.data;
+  }
+
+  // Refine a prompt using AI — keeps tag phrases intact for pill rendering
+  async refinePrompt(
+    prompt: string,
+    tags: { text: string; source: string; color: string }[],
+    referenceImageIds: number[],
+    brief: string
+  ): Promise<{ prompt: string }> {
+    const response = await axios.post(`${API_BASE}/agent/refine-prompt`, {
+      prompt,
+      tags,
+      reference_image_ids: referenceImageIds,
+      brief,
+    });
     return response.data;
   }
 
@@ -208,6 +263,9 @@ class APIClient {
   async getConcurrentPrompt(userPrompt: string, brief: string | null, referenceImageUrls: string[]): Promise<{
     prompt: string;
     reasoning: string;
+    your_design_was?: string;
+    this_explores?: string;
+    key_shifts?: string[];
   }> {
     const response = await axios.post(`${API_BASE}/agent/concurrent-prompt`, {
       user_prompt: userPrompt,

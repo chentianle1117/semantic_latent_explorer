@@ -1,54 +1,101 @@
-/* LayersSidebar — grid-row 3, grid-column 3 — flush with inspector */
+/* LayersSidebar — flex child inside .right-column, stacked below inspector */
 .layers-sidebar {
-  grid-row: 3;
-  grid-column: 3;
   background: #161b22;
   border-top: 1px solid var(--border);
-  border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 50;
-  /* Collapsed height matches BottomDrawer collapsed (44px) */
+  /* Collapsed: bar-only height — match BottomDrawer bar height */
   height: 44px;
+  flex-shrink: 0;
+  transition: height 0.25s ease;
 }
 
 .layers-sidebar.expanded {
-  height: var(--drawer-expanded, clamp(330px, 36vh, 520px));
+  /* Compact: layers only needs space for 2-4 rows + add button.
+     Stays well below history panel height to preserve inspector space. */
+  height: 200px;
+}
+
+/* ── Toggle bar — mirrors BottomDrawer .drawer-bar style ── */
+.layers-sidebar-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 44px;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+
+.layers-sidebar-bar:hover {
+  background: #21262d;
+}
+
+.layers-sidebar-bar-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(150, 165, 180, 0.55);
+  flex: 1;
+}
+
+/* Expanded state: add bottom border like drawer-bar--expanded */
+.layers-sidebar.expanded .layers-sidebar-bar {
+  height: 36px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.layers-sidebar-toggle {
+  background: none;
+  border: none;
+  color: var(--text-secondary, rgba(140, 155, 170, 0.5));
+  font-size: var(--fs-sm, 10px);
+  cursor: pointer;
+  padding: 2px;
+  line-height: 1;
+}
+
+.layers-sidebar-toggle:hover {
+  color: rgba(200, 215, 230, 0.8);
 }
 
 /* Collapsed state — horizontal row of named layer dots */
 .layers-sidebar-collapsed {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 4px;
-  padding: 6px 12px;
-  height: 100%;
-  overflow-y: auto;
+  padding: 4px 12px 6px;
+  overflow: hidden;
 }
 
 .ls-dot-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   background: none;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
   cursor: pointer;
-  padding: 3px 2px;
-  border-radius: 4px;
-  transition: background 0.12s;
-  width: 100%;
-  text-align: left;
+  padding: 2px 7px 2px 5px;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
 }
 
 .ls-dot-btn:hover {
   background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .ls-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--dot-color, #58a6ff);
   flex-shrink: 0;
@@ -60,7 +107,7 @@
 }
 
 .ls-dot-label {
-  font-size: 11px;
+  font-size: 10px;
   color: rgba(200, 215, 230, 0.7);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -76,8 +123,9 @@
 /* Expanded state — full layers panel */
 .layers-sidebar-body {
   flex: 1;
-  overflow: hidden;
-  padding: 10px 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
 }

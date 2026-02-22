@@ -10,7 +10,9 @@ import { useProgressStore } from "../../store/progressStore";
 import { AxisEditor } from "../AxisEditor/AxisEditor";
 import { AxisScaleSlider } from "../AxisScaleSlider/AxisScaleSlider";
 import { DeletedImagesPanel } from "../DeletedImagesPanel/DeletedImagesPanel";
+import { Minimap } from "../Minimap/Minimap";
 import { apiClient } from "../../api/client";
+import { getDisplayCategory } from "../../utils/generationCategories";
 
 
 // ─── Ghost node rendering helper ─────────────────────────────────────────────
@@ -60,22 +62,50 @@ function _renderGhostNodes(
     const btnH = 22, btnW = 56, gap = 6;
     const btnY = parentStripBottom + 4;
 
-    const reasoningText = d.reasoning || d.prompt || '';
-    const ttLineH = 13, ttPad = 10;
-    const ttLines: string[] = [];
-    if (reasoningText) {
-      const words = reasoningText.split(/\s+/);
+    // ── Structured hover card ──────────────────────────────────────────────
+    type _CardRow = { type: 'header' | 'value' | 'shift' | 'spacer'; text: string };
+    const ttPad = 8;
+    const cardRows: _CardRow[] = [];
+    const _wrap = (text: string, maxLen: number): string[] => {
+      const words = text.split(/\s+/);
+      const lines: string[] = [];
       let cur = '';
       for (const w of words) {
         const cand = cur ? `${cur} ${w}` : w;
-        if (cand.length > 34 && cur) { ttLines.push(cur); cur = w; }
+        if (cand.length > maxLen && cur) { lines.push(cur); cur = w; }
         else cur = cand;
       }
-      if (cur) ttLines.push(cur);
-      ttLines.splice(5);
+      if (cur) lines.push(cur);
+      return lines;
+    };
+
+    if (d.source === 'concurrent' && d.your_design_was && d.this_explores) {
+      cardRows.push({ type: 'header', text: 'Your design was:' });
+      _wrap(d.your_design_was, 28).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
+      cardRows.push({ type: 'spacer', text: '' });
+      cardRows.push({ type: 'header', text: 'This explores:' });
+      _wrap(d.this_explores, 28).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
+      if (d.key_shifts && d.key_shifts.length > 0) {
+        cardRows.push({ type: 'spacer', text: '' });
+        (d.key_shifts as string[]).slice(0, 3).forEach((s: string) => cardRows.push({ type: 'shift', text: s }));
+      }
+    } else if (d.source === 'exploration') {
+      if (d.target_region) cardRows.push({ type: 'header', text: `Exploring: ${d.target_region}` });
+      if (d.contrasts_with) {
+        cardRows.push({ type: 'spacer', text: '' });
+        _wrap(d.contrasts_with, 30).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
+      } else if (d.reasoning && !d.target_region) {
+        _wrap(d.reasoning, 30).slice(0, 4).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
+      }
+    } else {
+      const reasoningText = d.reasoning || d.prompt || '';
+      if (reasoningText) {
+        _wrap(reasoningText, 34).slice(0, 5).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
+      }
     }
-    const ttW = Math.max(ghostSize + 24, 200);
-    const ttH = ttLines.length > 0 ? ttLines.length * ttLineH + ttPad * 2 + 2 : 0;
+    const _rowH = (row: _CardRow) => row.type === 'spacer' ? 5 : row.type === 'shift' ? 15 : 14;
+    const ttW = Math.max(ghostSize + 24, 210);
+    const ttH = cardRows.length > 0 ? cardRows.reduce((acc, r) => acc + _rowH(r), 0) + ttPad * 2 + 2 : 0;
     const ttY = ttH > 0 ? -ghostSize / 2 - ttH - 10 : -ghostSize / 2;
 
     const hitTop = ttH > 0 ? ttY - 8 : -ghostSize / 2;
@@ -88,26 +118,34 @@ function _renderGhostNodes(
       .attr("rx", 8).attr("fill", "transparent")
       .attr("pointer-events", "all");
 
-    const shortLabel = (() => {
-      const words = (d.prompt || 'AI suggestion').trim().split(/\s+/);
-      let result = '';
-      for (const w of words) {
-        const candidate = result ? `${result} ${w}` : w;
-        if (candidate.length > 28 && result) break;
-        result = candidate;
-      }
-      return result.charAt(0).toUpperCase() + result.slice(1);
-    })();
+    // Label pill — exploration ghosts show region; concurrent show truncated prompt
+    const isExplorationWithRegion = d.source === 'exploration' && d.target_region;
+    const shortLabel = isExplorationWithRegion
+      ? `→ ${d.target_region}`
+      : (() => {
+          const words = (d.prompt || 'AI suggestion').trim().split(/\s+/);
+          let result = '';
+          for (const w of words) {
+            const candidate = result ? `${result} ${w}` : w;
+            if (candidate.length > 28 && result) break;
+            result = candidate;
+          }
+          return result.charAt(0).toUpperCase() + result.slice(1);
+        })();
 
     el.append("rect")
       .attr("x", -ghostSize / 2).attr("y", labelY)
       .attr("width", ghostSize).attr("height", labelH)
-      .attr("rx", labelH / 2).attr("fill", "rgba(13,17,23,0.88)")
+      .attr("rx", labelH / 2)
+      .attr("fill", isExplorationWithRegion ? `${haloColor}22` : "rgba(13,17,23,0.88)")
+      .attr("stroke", isExplorationWithRegion ? `${haloColor}66` : "none")
+      .attr("stroke-width", isExplorationWithRegion ? 0.8 : 0)
       .style("pointer-events", "none");
     el.append("text")
       .attr("x", 0).attr("y", labelY + 11)
       .attr("text-anchor", "middle").attr("font-size", 9)
-      .attr("fill", "rgba(200,210,220,0.95)").style("pointer-events", "none")
+      .attr("fill", isExplorationWithRegion ? haloColor : "rgba(200,210,220,0.95)")
+      .style("pointer-events", "none")
       .text(shortLabel);
 
     if (hasParents) {
@@ -158,17 +196,39 @@ function _renderGhostNodes(
       .attr("opacity", 0.55).style("pointer-events", "none");
 
     const actionGroup = el.append("g").attr("class", "ghost-actions").attr("display", "none");
-    if (ttLines.length > 0) {
+    if (cardRows.length > 0) {
       actionGroup.append("rect")
         .attr("x", -ttW / 2).attr("y", ttY).attr("width", ttW).attr("height", ttH)
         .attr("rx", 8).attr("fill", "rgba(13,17,23,0.95)")
         .attr("stroke", `${haloColor}44`).attr("stroke-width", 1)
         .style("pointer-events", "none");
-      ttLines.forEach((line, i) => {
-        actionGroup.append("text")
-          .attr("x", -ttW / 2 + ttPad + 2).attr("y", ttY + ttPad + (i + 1) * ttLineH - 1)
-          .attr("font-size", 11).attr("fill", "rgba(195,212,230,0.93)")
-          .style("pointer-events", "none").text(line);
+      let cy = ttY + ttPad;
+      cardRows.forEach((row: _CardRow) => {
+        const rh = _rowH(row);
+        if (row.type === 'spacer') { cy += rh; return; }
+        if (row.type === 'header') {
+          actionGroup.append("text")
+            .attr("x", -ttW / 2 + ttPad).attr("y", cy + 10)
+            .attr("font-size", 9).attr("font-weight", "700")
+            .attr("fill", haloColor).attr("opacity", 0.9)
+            .style("pointer-events", "none").text(row.text.toUpperCase());
+        } else if (row.type === 'shift') {
+          actionGroup.append("rect")
+            .attr("x", -ttW / 2 + ttPad - 2).attr("y", cy + 1)
+            .attr("width", ttW - ttPad * 2 + 4).attr("height", 12)
+            .attr("rx", 3).attr("fill", `${haloColor}18`)
+            .style("pointer-events", "none");
+          actionGroup.append("text")
+            .attr("x", -ttW / 2 + ttPad + 2).attr("y", cy + 10)
+            .attr("font-size", 10).attr("fill", haloColor).attr("opacity", 0.9)
+            .style("pointer-events", "none").text(row.text);
+        } else {
+          actionGroup.append("text")
+            .attr("x", -ttW / 2 + ttPad).attr("y", cy + 11)
+            .attr("font-size", 11).attr("fill", "rgba(195,212,230,0.93)")
+            .style("pointer-events", "none").text(row.text);
+        }
+        cy += rh;
       });
     }
 
@@ -191,34 +251,38 @@ function _renderGhostNodes(
     acceptBg.on("click", async function(event: any) {
       event.stopPropagation();
       el.style("pointer-events", "none");
-      useProgressStore.getState().showProgress("loading", "Adding shoe to canvas…");
+
+      // Optimistic: remove ghost immediately so the canvas feels instantaneous
+      useAppStore.getState().removeGhostNode(d.id);
+
+      const ps = useProgressStore.getState();
+      const taskId = ps.showProgress("loading", "Accepting suggestion…", true);
+      // Immediately minimize — this is a background task
+      ps.minimizeTask?.(taskId);
       try {
         const result = await apiClient.addExternalImages({
           images: [{ url: d.base64_image }],
           prompt: d.prompt || 'AI suggested shoe',
           generation_method: 'agent',
-          remove_background: true,  // ensure BG removed whether or not embed-ghost succeeded
+          remove_background: true,
           parent_ids: d.parents || [],
+          // Pass ghost's precomputed coordinates to skip re-projection (no camera jump)
+          precomputed_coordinates: d.coordinates as [number, number],
         });
         if (result?.images?.length > 0) {
-          const updatedState = await apiClient.getState();
           const newIds = result.images.map((img: any) => img.id);
-          useAppStore.getState().removeGhostNode(d.id);
-          useAppStore.getState().setImages(updatedState.images);
-          useAppStore.getState().setHistoryGroups(updatedState.history_groups);
+          useAppStore.getState().mergeImages(result.images);
+          if (result.history_group) useAppStore.getState().addHistoryGroup(result.history_group);
           useAppStore.getState().setImagesLayer(newIds, 'default');
           const curIsolated = useAppStore.getState().isolatedImageIds;
           if (curIsolated !== null) {
             useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
           }
-        } else {
-          useAppStore.getState().removeGhostNode(d.id);
         }
       } catch (err) {
         console.error('[Ghost accept] Failed to add image:', err);
-        el.style("pointer-events", "all");
       } finally {
-        useProgressStore.getState().hideProgress();
+        ps.completeTask?.(taskId);
       }
     });
 
@@ -320,6 +384,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const brushActiveRef = useRef(false);
   const brushRectRef = useRef<{ x: number; y: number; w: number; h: number; mode: 'window' | 'crossing' } | null>(null);
   const brushStartXRef = useRef<number | null>(null); // raw start X for direction detection
+  const minimapThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null); // throttle minimap viewport updates
 
   // Get functions directly from store without subscribing to state changes
   const toggleImageSelection = React.useCallback(
@@ -496,6 +561,22 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const visualSettingsRef = React.useRef(visualSettings);
   React.useEffect(() => { visualSettingsRef.current = visualSettings; }, [visualSettings]);
 
+  // ResizeObserver: force a re-render when the SVG container gains non-zero size.
+  // This recovers the canvas if the initial render fired while the container had width=0.
+  const [resizeTick, setResizeTick] = React.useState(0);
+  React.useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry && entry.contentRect.width > 0 && entry.contentRect.height > 0) {
+        setResizeTick(t => t + 1);
+      }
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   // Track previous values to see what changed
   const prevImagesRef = React.useRef(images);
   const prevVisualSettingsRef = React.useRef(visualSettings);
@@ -658,14 +739,28 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           d3.select(this).attr("transform", `translate(${xs(sx)}, ${ys(sy)})`);
         });
 
-        // Reposition ghost nodes
+        // Reposition ghost nodes + collect updated ghost dot positions
+        const fastGhostDots: { id: number; x: number; y: number; category: 'agent' }[] = [];
         svg.selectAll(".ghost-node").each(function(d: any) {
           const bx = (d.coordinates[0] + co[0]) * cs;
           const by = (d.coordinates[1] + co[1]) * cs;
           const sx = pivotX + (bx - pivotX) * axScaleX;
           const sy = pivotY + (by - pivotY) * axScaleY;
           d3.select(this).attr("transform", `translate(${xs(sx)}, ${ys(sy)})`);
+          fastGhostDots.push({ id: d.id, x: xs(sx), y: ys(sy), category: 'agent' });
         });
+
+        // Publish updated minimap dots + ghost dots for the scale change
+        const fastMinimapDots = images.map((d) => {
+          const bx = (d.coordinates[0] + co[0]) * cs;
+          const by = (d.coordinates[1] + co[1]) * cs;
+          const sx = pivotX + (bx - pivotX) * axScaleX;
+          const sy = pivotY + (by - pivotY) * axScaleY;
+          return { id: d.id, x: xs(sx), y: ys(sy),
+            category: getDisplayCategory(d.generation_method) as 'ref_image' | 'ref_shoe' | 'user' | 'agent' };
+        });
+        useAppStore.getState().setMinimapDots(fastMinimapDots);
+        useAppStore.getState().setMinimapGhostDots(fastGhostDots);
 
         // Update grid stretch group transform (pivot in screen coords)
         if (gridStretchRef.current) {
@@ -714,6 +809,14 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const svg = d3.select(svgRef.current);
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
+
+    // Safety guard: skip render if container has no size (e.g. during CSS layout transitions).
+    // Rendering with width=0 collapses all x-positions to a single point, causing
+    // shoes to "disappear" and only horizontal grid lines to remain visible.
+    if (width === 0 || height === 0) {
+      console.warn("⚠️ SVG has no size yet, skipping render (will retry on resize)");
+      return;
+    }
 
     console.log("🎨 Full canvas render:", {
       width,
@@ -851,6 +954,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
         zoomTransformRef.current = event.transform;
+        // Throttled minimap viewport update (80ms)
+        if (minimapThrottleRef.current) clearTimeout(minimapThrottleRef.current);
+        minimapThrottleRef.current = setTimeout(() => {
+          const T = event.transform;
+          const w = svgRef.current?.clientWidth ?? 800;
+          const h = svgRef.current?.clientHeight ?? 600;
+          useAppStore.getState().setMinimapViewport({
+            x1: -T.x / T.k, y1: -T.y / T.k,
+            x2: (w - T.x) / T.k, y2: (h - T.y) / T.k,
+          });
+        }, 80);
       });
 
     svg.call(zoom as any).on("dblclick.zoom", null);   // disable double-click-to-zoom
@@ -924,6 +1038,20 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     xScaleRef.current = xScale;
     yScaleRef.current = yScale;
+
+    // Publish canvas size + initial viewport for Minimap and DI blobs
+    useAppStore.getState().setMinimapCanvasSize({ w: width, h: height });
+    {
+      const T0 = zoomTransformRef.current;
+      if (T0) {
+        useAppStore.getState().setMinimapViewport({
+          x1: -T0.x / T0.k, y1: -T0.y / T0.k,
+          x2: (width - T0.x) / T0.k, y2: (height - T0.y) / T0.k,
+        });
+      } else {
+        useAppStore.getState().setMinimapViewport({ x1: 0, y1: 0, x2: width, y2: height });
+      }
+    }
 
     // Store data-space center and coord params in refs (used by fast path)
     dataCenterXRef.current = centerX;
@@ -1013,6 +1141,29 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const [sx, sy] = toStretched(bx, by);
         return `translate(${xScale(sx)}, ${yScale(sy)})`;
       });
+
+    // Publish minimap dots (base screen positions, pre-zoom)
+    const minimapDots = images.map((d) => {
+      const bx = (d.coordinates[0] + coordOffset[0]) * coordScale;
+      const by = (d.coordinates[1] + coordOffset[1]) * coordScale;
+      const [sx, sy] = toStretched(bx, by);
+      return {
+        id: d.id,
+        x: xScale(sx),
+        y: yScale(sy),
+        category: getDisplayCategory(d.generation_method) as 'ref_image' | 'ref_shoe' | 'user' | 'agent',
+      };
+    });
+    useAppStore.getState().setMinimapDots(minimapDots);
+
+    // Publish ghost dots for DI blobs (only unaccepted ghost nodes)
+    const ghostDots = ghostNodes.map((g) => {
+      const bx = (g.coordinates[0] + coordOffset[0]) * coordScale;
+      const by = (g.coordinates[1] + coordOffset[1]) * coordScale;
+      const [sx, sy] = toStretched(bx, by);
+      return { id: g.id, x: xScale(sx), y: yScale(sy), category: 'agent' as const };
+    });
+    useAppStore.getState().setMinimapGhostDots(ghostDots);
 
     console.log("🎯 Attaching click handlers to", images.length, "image nodes");
 
@@ -1178,6 +1329,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     axisLabels,
     canvasBounds,
     ghostNodes,
+    resizeTick, // Re-fire when SVG gains non-zero size after a zero-size render
     // Note: Excluded selectedImageIds and hoveredGroupId to prevent full redraws on selection/hover changes
     // These are handled in a separate effect below
   ]);
@@ -1398,6 +1550,27 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     useAppStore.getState().setFlyToImageId(null);
   }, [flyToImageId, images, visualSettings]);
 
+  // Minimap pan effect: smoothly pan canvas so given base-coord center appears at screen center
+  const minimapPanRequest = useAppStore((s) => s.minimapPanRequest);
+  const prevPanReqId = useRef<number | null>(null);
+  useEffect(() => {
+    if (!minimapPanRequest || minimapPanRequest.id === prevPanReqId.current) return;
+    if (!svgRef.current || !zoomRef.current) return;
+    prevPanReqId.current = minimapPanRequest.id;
+
+    const { centerX, centerY } = minimapPanRequest;
+    const svgEl = svgRef.current;
+    const w = svgEl.clientWidth;
+    const h = svgEl.clientHeight;
+    const t = d3.zoomTransform(svgEl as unknown as Element);
+    const tx = w / 2 - centerX * t.k;
+    const ty = h / 2 - centerY * t.k;
+    const targetTransform = d3.zoomIdentity.translate(tx, ty).scale(t.k);
+
+    d3.select(svgEl)
+      .call(zoomRef.current.transform as any, targetTransform);
+  }, [minimapPanRequest]);
+
   return (
     <div style={{
       position: "relative", width: "100%", height: "100%",
@@ -1424,6 +1597,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           />
         </svg>
       )}
+
+      {/* Minimap — bottom-left corner */}
+      <Minimap />
 
       {/* Star Filter — top-right corner */}
       <div style={{

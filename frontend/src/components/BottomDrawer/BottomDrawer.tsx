@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../store/appStore";
 import type { ImageData } from "../../types";
+import { getCategoryColor, CATEGORY_COLORS, CATEGORY_LABELS, getDisplayCategory } from "../../utils/generationCategories";
+import type { DisplayCategory } from "../../utils/generationCategories";
 import "./BottomDrawer.css";
 
 // ─── Tapered Bézier helper ────────────────────────────────────────────────────
@@ -47,8 +49,13 @@ function computeTreeLayout(
 
   const idSet = new Set(images.map(img => img.id));
 
-  // Assign depth: longest path from roots
+  // Assign depth using parent-based propagation:
+  // Children look at their parents' depth rather than parents pushing to children.
+  // This works correctly even when img.children arrays are stale/empty, since
+  // img.parents is always populated from the server response.
   const depths = new Map<number, number>();
+
+  // Roots: images whose parents are all outside the loaded set (or have no parents)
   images.forEach(img => {
     if (!img.parents.some(p => idSet.has(p))) depths.set(img.id, 0);
   });
@@ -58,17 +65,23 @@ function computeTreeLayout(
   while (changed) {
     changed = false;
     images.forEach(img => {
-      if (!depths.has(img.id)) return;
-      const d = depths.get(img.id)!;
-      img.children.forEach(cid => {
-        if (!idSet.has(cid)) return;
-        if ((depths.get(cid) ?? -1) < d + 1) {
-          depths.set(cid, d + 1);
+      // Find the maximum depth among this image's parents that are in the loaded set
+      let maxParentDepth = -1;
+      img.parents.forEach(pid => {
+        if (!idSet.has(pid)) return;
+        const pd = depths.get(pid) ?? -1;
+        if (pd > maxParentDepth) maxParentDepth = pd;
+      });
+      if (maxParentDepth >= 0) {
+        const newDepth = maxParentDepth + 1;
+        if ((depths.get(img.id) ?? -1) < newDepth) {
+          depths.set(img.id, newDepth);
           changed = true;
         }
-      });
+      }
     });
   }
+  // Fallback: anything still unassigned gets depth 0
   images.forEach(img => { if (!depths.has(img.id)) depths.set(img.id, 0); });
 
   // Group by depth, sort each column chronologically
@@ -106,11 +119,13 @@ function computeTreeLayout(
     img,
   }));
 
+  // Edges: draw from parent → child using the parents[] array (works even with stale children[])
   const edges: { key: string; px: number; py: number; cx: number; cy: number }[] = [];
   images.forEach(img => {
     const cp = posMap.get(img.id);
     if (!cp) return;
     img.parents.forEach(pid => {
+      if (!idSet.has(pid)) return;
       const pp = posMap.get(pid);
       if (!pp) return;
       edges.push({ key: `${pid}→${img.id}`, px: pp.x, py: pp.y, cx: cp.x, cy: cp.y });
@@ -120,25 +135,6 @@ function computeTreeLayout(
   return { nodes, edges, totalW, dotR };
 }
 
-const METHOD_COLOR: Record<string, string> = {
-  batch:           '#22c55e',   // user-generated — green
-  reference:       '#22c55e',   // user-generated with refs — same green
-  external:        '#f97316',   // loaded reference image — orange
-  dataset:         '#fbbf24',   // loaded dataset shoe — amber (orange family, distinct)
-  interpolation:   '#bc8cff',   // interpolated
-  'auto-variation':'#f59e0b',   // auto-variation
-  agent:           '#a855f7',   // agent-triggered — purple
-};
-
-const METHOD_LABELS: Record<string, string> = {
-  batch:           'Generated',
-  reference:       'Generated',
-  external:        'Ref Image',
-  dataset:         'Dataset Shoe',
-  interpolation:   'Interpolated',
-  'auto-variation':'Auto',
-  agent:           'Agent',
-};
 
 // ─── Genealogy SVG Tree ───────────────────────────────────────────────────────
 const GenealogyTree: React.FC = () => {
@@ -164,18 +160,11 @@ const GenealogyTree: React.FC = () => {
     [allImages, availH],
   );
 
-  // Collect unique methods actually used for legend — deduplicate by display label
-  const usedMethods = useMemo(() => {
-    const seenLabels = new Set<string>();
-    return nodes
-      .map(n => n.img.generation_method)
-      .filter(m => {
-        if (!METHOD_COLOR[m]) return false;
-        const label = METHOD_LABELS[m] || m;
-        if (seenLabels.has(label)) return false;
-        seenLabels.add(label);
-        return true;
-      });
+  // Collect unique display categories actually used for legend
+  const usedCategories = useMemo(() => {
+    const seen = new Set<DisplayCategory>();
+    nodes.forEach(n => seen.add(getDisplayCategory(n.img.generation_method)));
+    return Array.from(seen) as DisplayCategory[];
   }, [nodes]);
 
   return (
@@ -205,7 +194,7 @@ const GenealogyTree: React.FC = () => {
             {nodes.map(n => {
               const sel = selectedSet.has(n.id);
               const del = !n.img.visible;
-              const col = METHOD_COLOR[n.img.generation_method] ?? '#58a6ff';
+              const col = getCategoryColor(n.img.generation_method);
               const label = n.img.prompt
                 ? (n.img.prompt.length > 80 ? n.img.prompt.slice(0, 80) + '…' : n.img.prompt)
                 : `Image ${n.id}`;
@@ -242,14 +231,14 @@ const GenealogyTree: React.FC = () => {
       </div>
 
       {/* Legend */}
-      {usedMethods.length > 0 && (
+      {usedCategories.length > 0 && (
         <div className="drawer-tree-legend">
-          {usedMethods.map(method => (
-            <span key={method} className="tree-legend-item">
+          {usedCategories.map(cat => (
+            <span key={cat} className="tree-legend-item">
               <svg width={8} height={8} style={{ flexShrink: 0 }}>
-                <circle cx={4} cy={4} r={4} fill={METHOD_COLOR[method]} />
+                <circle cx={4} cy={4} r={4} fill={CATEGORY_COLORS[cat]} />
               </svg>
-              {METHOD_LABELS[method] || method}
+              {CATEGORY_LABELS[cat]}
             </span>
           ))}
         </div>
@@ -260,8 +249,7 @@ const GenealogyTree: React.FC = () => {
 
 // ─── Main BottomDrawer ────────────────────────────────────────────────────────
 export const BottomDrawer: React.FC = () => {
-  const isExpanded = useAppStore(s => s.isDrawerExpanded);
-  const setIsExpanded = useAppStore(s => s.setIsDrawerExpanded);
+  const setIsExpanded = useAppStore(s => s.setIsHistoryExpanded);
   const allImages = useAppStore(s => s.images);
   const images = allImages.filter(img => img.visible);
   const deletedIds = useMemo(
@@ -271,43 +259,67 @@ export const BottomDrawer: React.FC = () => {
   const historyGroups = useAppStore(s => s.historyGroups);
   const setSelectedImageIds = useAppStore(s => s.setSelectedImageIds);
 
-  const [expandedTab, setExpandedTab] = useState<'history' | 'tree'>('history');
+  // Exclusive tab: only one panel open at a time. null = drawer collapsed.
+  const [activeTab, setActiveTab] = useState<'history' | 'lineage' | null>(null);
+  const isExpanded = activeTab !== null;
+
+  // Sync global store so LayersSidebar + ProgressModal adjust their height
+  useEffect(() => {
+    setIsExpanded(isExpanded);
+  }, [isExpanded, setIsExpanded]);
+
+  const switchTab = (tab: 'history' | 'lineage') => {
+    setActiveTab(prev => prev === tab ? null : tab);
+  };
 
   return (
     <div className={`bottom-drawer ${isExpanded ? 'expanded' : ''}`}>
 
-      {/* ── Bar: compact section header when expanded, full chip bar when collapsed ── */}
+      {/* ── Compact bar: always visible — click anywhere to expand/collapse ── */}
       <div
         className={`drawer-bar${isExpanded ? ' drawer-bar--expanded' : ''}`}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => { isExpanded ? setActiveTab(null) : setActiveTab('history'); }}
+        style={{ cursor: 'pointer' }}
       >
+        {/* Left: collapse toggle */}
         <button
           className="drawer-toggle"
-          onClick={e => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
+          title={isExpanded ? "Collapse" : "Expand History"}
+          onClick={e => {
+            e.stopPropagation();
+            if (isExpanded) setActiveTab(null);
+            else setActiveTab('history');
+          }}
         >
           {isExpanded ? '▼' : '▲'}
         </button>
 
         {isExpanded ? (
-          /* Expanded: section-style tab toggle + stats on right */
+          /* Expanded bar: each tab button stops propagation so it switches tabs
+             without collapsing; clicking empty bar space collapses via bar onClick */
           <>
-            <div className="drawer-section-tabs" onClick={e => e.stopPropagation()}>
+            <div className="drawer-section-tabs">
               <button
-                className={`drawer-section-tab${expandedTab === 'history' ? ' active' : ''}`}
-                onClick={e => { e.stopPropagation(); setExpandedTab('history'); }}
-              >History</button>
-              <span className="drawer-section-sep">·</span>
+                className={`drawer-section-tab${activeTab === 'history' ? ' active' : ''}`}
+                onClick={e => { e.stopPropagation(); switchTab('history'); }}
+                title="History"
+              >
+                History
+              </button>
               <button
-                className={`drawer-section-tab${expandedTab === 'tree' ? ' active' : ''}`}
-                onClick={e => { e.stopPropagation(); setExpandedTab('tree'); }}
-              >Lineage Tree</button>
+                className={`drawer-section-tab${activeTab === 'lineage' ? ' active' : ''}`}
+                onClick={e => { e.stopPropagation(); switchTab('lineage'); }}
+                title="Lineage Tree"
+              >
+                Lineage Tree
+              </button>
             </div>
-            <span className="drawer-stats drawer-stats--compact">
+            <span className="drawer-stats drawer-stats--compact" onClick={e => e.stopPropagation()}>
               {historyGroups.length} batches · {images.length} images
             </span>
           </>
         ) : (
-          /* Collapsed: stats + batch chip thumbnails */
+          /* Collapsed: stats + batch chip thumbnails — clicking anywhere on bar expands */
           <>
             <span className="drawer-stats">
               {historyGroups.length} batches · {images.length} images
@@ -351,82 +363,88 @@ export const BottomDrawer: React.FC = () => {
         )}
       </div>
 
-      {/* ── Expanded area: tab content only (no separate tab bar) ── */}
+      {/* ── Single active panel: fills available space ── */}
       {isExpanded && (
-        <div className="drawer-content" onClick={e => e.stopPropagation()}>
-          {/* History tab */}
-          {expandedTab === 'history' && (
-            <div className="drawer-timeline">
-              {historyGroups.length === 0 ? (
-                <span className="drawer-empty">No history yet</span>
-              ) : (
-                historyGroups.map(group => {
-                  const thumbnailImage =
-                    group.thumbnail_id !== null
-                      ? allImages.find(img => img.id === group.thumbnail_id)
-                      : null;
-                  const allDeleted = group.image_ids.every(id => deletedIds.has(id));
-                  const someDeleted = !allDeleted && group.image_ids.some(id => deletedIds.has(id));
-                  return (
-                    <div
-                      key={group.id}
-                      className={`drawer-group${allDeleted ? ' highlighting' : ''}`}
-                      onClick={() =>
-                        setSelectedImageIds(group.image_ids.filter(id => !deletedIds.has(id)))
-                      }
-                      title={group.prompt || ''}
-                    >
-                      {thumbnailImage ? (
-                        <img
-                          className={`group-thumb-bg${allDeleted ? ' group-thumb-bg--deleted' : ''}`}
-                          src={`data:image/png;base64,${thumbnailImage.base64_image}`}
-                          alt=""
-                        />
-                      ) : (
-                        <div className="group-thumb-placeholder" />
-                      )}
-                      <div className="group-overlay">
-                        <div className="group-overlay-top">
-                          <span className="group-type-badge">
-                            {group.type?.toUpperCase() ?? 'BATCH'}
-                          </span>
-                          <span className="group-count">
-                            {group.image_ids.length}
-                            {someDeleted
-                              ? ` (−${group.image_ids.filter(id => deletedIds.has(id)).length})`
-                              : ''}
-                          </span>
-                        </div>
-                        <div className="group-overlay-bottom">
-                          {group.prompt && (
-                            <span className="group-prompt">{group.prompt}</span>
-                          )}
-                          <span className="group-time">
-                            {new Date(group.timestamp).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                      {(allDeleted || someDeleted) && (
-                        <div
-                          className={`group-deleted-overlay${allDeleted ? ' group-deleted-overlay--all' : ''}`}
-                        />
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
+        <div className="drawer-panels" onClick={e => e.stopPropagation()}>
 
-          {/* Lineage Tree tab */}
-          {expandedTab === 'tree' && (
-            <div className="drawer-tree-panel">
-              <GenealogyTree />
-            </div>
-          )}
+          {/* History section */}
+          <div className={`drawer-panel${activeTab === 'history' ? ' open' : ''}`}>
+            {activeTab === 'history' && (
+              <div className="drawer-timeline">
+                {historyGroups.length === 0 ? (
+                  <span className="drawer-empty">No history yet</span>
+                ) : (
+                  historyGroups.map(group => {
+                    const thumbnailImage =
+                      group.thumbnail_id !== null
+                        ? allImages.find(img => img.id === group.thumbnail_id)
+                        : null;
+                    const allDeleted = group.image_ids.every(id => deletedIds.has(id));
+                    const someDeleted = !allDeleted && group.image_ids.some(id => deletedIds.has(id));
+                    return (
+                      <div
+                        key={group.id}
+                        className={`drawer-group${allDeleted ? ' highlighting' : ''}`}
+                        onClick={() =>
+                          setSelectedImageIds(group.image_ids.filter(id => !deletedIds.has(id)))
+                        }
+                        title={group.prompt || ''}
+                      >
+                        {thumbnailImage ? (
+                          <img
+                            className={`group-thumb-bg${allDeleted ? ' group-thumb-bg--deleted' : ''}`}
+                            src={`data:image/png;base64,${thumbnailImage.base64_image}`}
+                            alt=""
+                          />
+                        ) : (
+                          <div className="group-thumb-placeholder" />
+                        )}
+                        <div className="group-overlay">
+                          <div className="group-overlay-top">
+                            <span className="group-type-badge">
+                              {group.type?.toUpperCase() ?? 'BATCH'}
+                            </span>
+                            <span className="group-count">
+                              {group.image_ids.length}
+                              {someDeleted
+                                ? ` (−${group.image_ids.filter(id => deletedIds.has(id)).length})`
+                                : ''}
+                            </span>
+                          </div>
+                          <div className="group-overlay-bottom">
+                            {group.prompt && (
+                              <span className="group-prompt">{group.prompt}</span>
+                            )}
+                            <span className="group-time">
+                              {new Date(group.timestamp).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                        {(allDeleted || someDeleted) && (
+                          <div
+                            className={`group-deleted-overlay${allDeleted ? ' group-deleted-overlay--all' : ''}`}
+                          />
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Lineage Tree section */}
+          <div className={`drawer-panel${activeTab === 'lineage' ? ' open' : ''}`}>
+            {activeTab === 'lineage' && (
+              <div className="drawer-tree-panel">
+                <GenealogyTree />
+              </div>
+            )}
+          </div>
+
         </div>
       )}
     </div>

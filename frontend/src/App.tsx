@@ -76,7 +76,9 @@ export const App: React.FC = () => {
   const is3DMode = useAppStore((state) => state.is3DMode);
 
   const setImages = useAppStore((state) => state.setImages);
+  const mergeImages = useAppStore((state) => state.mergeImages);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
+  const addHistoryGroup = useAppStore((state) => state.addHistoryGroup);
   const setIsInitialized = useAppStore((state) => state.setIsInitialized);
   const resetCanvasBounds = useAppStore((state) => state.resetCanvasBounds);
   const setIsGenerating = useAppStore((state) => state.setIsGenerating);
@@ -343,16 +345,15 @@ export const App: React.FC = () => {
         addToAxisSuggestionCounter(countPerPrompt);
         triggerConcurrentGhosts(prompt, [], []).catch(console.error);
 
-        // Fetch updated state after EACH prompt to update UI
+        // Merge only new images into store (avoids full state round-trip)
         useProgressStore
           .getState()
           .updateProgress(
             overallProgress + (100 / totalPrompts) * 0.5,
             "Updating canvas..."
           );
-        const state = await apiClient.getState();
-        setImages(state.images);
-        setHistoryGroups(state.history_groups);
+        mergeImages(batchResult.images);
+        if (batchResult.history_group) addHistoryGroup(batchResult.history_group);
       } catch (error) {
         console.error(`✗ Failed prompt ${i + 1}:`, error);
         failCount++;
@@ -402,12 +403,14 @@ export const App: React.FC = () => {
         const shoeResult = await apiClient.addExternalImages({
           images: shoes.map((url) => ({ url })),
           prompt: "Shoe images",
-          generation_method: "external",
+          generation_method: "dataset",
           remove_background: true,
         });
         if (shoeResult.images?.length) {
           const ids = shoeResult.images.map((img: any) => img.id);
           allNewIds.push(...ids);
+          mergeImages(shoeResult.images);
+          if (shoeResult.history_group) addHistoryGroup(shoeResult.history_group);
           useAppStore.getState().setImagesLayer(ids, "default");
           ps.addLogLine(`✓ ${ids.length} shoe image${ids.length > 1 ? 's' : ''} embedded (ids: ${ids.slice(0,4).join(', ')}${ids.length > 4 ? '…' : ''})`);
         }
@@ -429,6 +432,8 @@ export const App: React.FC = () => {
         if (refResult.images?.length) {
           const ids = refResult.images.map((img: any) => img.id);
           allNewIds.push(...ids);
+          mergeImages(refResult.images);
+          if (refResult.history_group) addHistoryGroup(refResult.history_group);
           useAppStore.getState().setImagesLayer(ids, "references");
           ps.addLogLine(`✓ ${ids.length} reference image${ids.length > 1 ? 's' : ''} embedded`);
         }
@@ -437,13 +442,11 @@ export const App: React.FC = () => {
         ps.updateStepStatus('project', 'active');
       }
 
-      ps.addLogLine('Projecting all embeddings to semantic axes...');
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
-
+      ps.addLogLine('All embeddings projected to semantic axes.');
       resetCanvasBounds();
-      if (allNewIds.length > 0) {
+      // Only auto-select if no generation dialog is open (guard against contaminating active selections)
+      const dialogOpen = showPromptDialog || showBatchPromptDialog || showExternalImageLoader;
+      if (allNewIds.length > 0 && !dialogOpen) {
         useAppStore.getState().setSelectedImageIds(allNewIds);
         const curIsolated = useAppStore.getState().isolatedImageIds;
         if (curIsolated !== null) {
@@ -571,10 +574,9 @@ export const App: React.FC = () => {
       addToAxisSuggestionCounter(numImages);
       triggerConcurrentGhosts(prompt, parentIds, imageUrls).catch(console.error);
 
-      ps.addLogLine('Projecting embeddings to semantic axes...');
-      const state = await apiClient.getState();
-      setImages(state.images);
-      setHistoryGroups(state.history_groups);
+      ps.addLogLine('Embeddings projected to semantic axes.');
+      mergeImages(addResult.images);
+      if (addResult.history_group) addHistoryGroup(addResult.history_group);
 
       if (addResult?.images?.length > 0) {
         const newIds = addResult.images.map((img: any) => img.id);
@@ -852,10 +854,9 @@ export const App: React.FC = () => {
                     ps.updateStepStatus('embed', 'done');
                     ps.updateStepStatus('project', 'active');
 
-                    ps.addLogLine('Projecting embeddings to semantic axes...');
-                    const state = await apiClient.getState();
-                    setImages(state.images);
-                    setHistoryGroups(state.history_groups);
+                    ps.addLogLine('Embeddings projected to semantic axes.');
+                    mergeImages(addResult.images);
+                    if (addResult.history_group) addHistoryGroup(addResult.history_group);
 
                     // Auto-select newly generated images + assign to shoes layer
                     if (addResult?.images?.length > 0) {
@@ -894,39 +895,40 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Inspector */}
-        <RightInspector
-          showLabels={showLabels}
-          showGrid={showGrid}
-          showClusters={showClusters}
-          backgroundColor={backgroundColor}
-          onToggleLabels={() => setShowLabels(!showLabels)}
-          onToggleGrid={() => setShowGrid(!showGrid)}
-          onToggleClusters={() => setShowClusters(!showClusters)}
-          onBackgroundColorChange={setBackgroundColor}
-          onGenerateFromReference={() => {
-            handleGenerateFromReferenceClick();
-          }}
-          onRemoveSelected={() => {
-            const ids = [...selectedImageIds];
-            showConfirm(
-              `Remove ${ids.length} selected image${ids.length !== 1 ? "s" : ""} from canvas?`,
-              () => {
-                ids.forEach((id) => {
-                  useAppStore.getState().removeImage(id);
-                  apiClient.deleteImage(id).catch(() => {});
-                });
-                clearSelection();
-              },
-              { confirmLabel: "Remove", danger: true }
-            );
-          }}
-        />
+        {/* Right column: Inspector + LayersSidebar stacked, independent expand */}
+        <div className="right-column">
+          <RightInspector
+            showLabels={showLabels}
+            showGrid={showGrid}
+            showClusters={showClusters}
+            backgroundColor={backgroundColor}
+            onToggleLabels={() => setShowLabels(!showLabels)}
+            onToggleGrid={() => setShowGrid(!showGrid)}
+            onToggleClusters={() => setShowClusters(!showClusters)}
+            onBackgroundColorChange={setBackgroundColor}
+            onGenerateFromReference={() => {
+              handleGenerateFromReferenceClick();
+            }}
+            onRemoveSelected={() => {
+              const ids = [...selectedImageIds];
+              showConfirm(
+                `Remove ${ids.length} selected image${ids.length !== 1 ? "s" : ""} from canvas?`,
+                () => {
+                  ids.forEach((id) => {
+                    useAppStore.getState().removeImage(id);
+                    apiClient.deleteImage(id).catch(() => {});
+                  });
+                  clearSelection();
+                },
+                { confirmLabel: "Remove", danger: true }
+              );
+            }}
+          />
+          <LayersSidebar />
+        </div>
 
         {/* Bottom Drawer */}
         <BottomDrawer />
-        {/* Layers Sidebar — grid-row 3, grid-col 3, flush with inspector */}
-        <LayersSidebar />
       </div>
 
       {/* Settings Modal */}

@@ -5,16 +5,32 @@ Write-Host "Starting Zappos Semantic Explorer" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Kill any existing processes on ports 8000, 8001, and 3000
+Write-Host "Cleaning up existing processes..." -ForegroundColor Yellow
+foreach ($port in @(8000, 8001, 3000)) {
+    $lines = netstat -ano | Select-String ":$port\s.*LISTENING"
+    foreach ($line in $lines) {
+        if ($line -match '\s(\d+)\s*$') {
+            $pid = $Matches[1]
+            if ($pid -and $pid -ne "0") {
+                Write-Host "  Killing PID $pid on port $port" -ForegroundColor DarkYellow
+                taskkill /PID $pid /F 2>$null | Out-Null
+            }
+        }
+    }
+}
+Start-Sleep -Seconds 1
+
 # Start backend in new PowerShell window
-Write-Host "Starting backend server..." -ForegroundColor Yellow
+Write-Host "Starting backend server on port 8000..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "conda activate semantic_explorer; cd backend; python api.py"
 
 # Wait for backend to start
 Write-Host "Waiting for backend to initialize..." -ForegroundColor Yellow
-Start-Sleep -Seconds 3
+Start-Sleep -Seconds 5
 
 # Start frontend in new PowerShell window
-Write-Host "Starting frontend server..." -ForegroundColor Yellow
+Write-Host "Starting frontend server on port 3000..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "conda activate semantic_explorer; cd frontend; npm run dev"
 
 Write-Host ""

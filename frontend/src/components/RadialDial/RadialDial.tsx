@@ -16,8 +16,8 @@ const CATEGORY_META: Record<RadialDialCategory, { color: string; label: string }
   system:  { color: '#58a6ff', label: 'Utility' },
 };
 
-const ARC_R = 70;   // inner arc radius (inside the button ring)
-const ARC_W = 15;   // background arc stroke width
+const ARC_R = 52;   // inner arc radius — kept well inside button ring (buttons at RADIUS=100, 48px wide → inner edge at 76px)
+const ARC_W = 11;   // background arc stroke width
 
 export interface RadialDialAction {
   id: string;
@@ -77,8 +77,8 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   const startAngle = -90;
 
   // ── Category arc decorations ─────────────────────────────────────────────
-  // 0.38 = ~76% of a step → leaves a 24% gap between adjacent groups
-  const halfStepDeg = (360 / n) * 0.38;
+  // 0.32 = ~64% of a step → leaves a 36% gap (wider gaps between color groups)
+  const halfStepDeg = (360 / n) * 0.32;
   const catGroups = new Map<RadialDialCategory, number[]>();
   actions.forEach((action, i) => {
     const deg = (360 / n) * i + startAngle;

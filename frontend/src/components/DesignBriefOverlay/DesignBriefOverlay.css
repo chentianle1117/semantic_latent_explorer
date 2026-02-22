@@ -25,25 +25,76 @@
   }
 }
 
-.dbo-read {
-  background: none;
-  border: none;
+/* ── Inline brief container ── */
+.dbo-brief-container {
   border-left: 3px solid rgba(0, 210, 255, 0.55);
   padding: 3px 0 4px 11px;
-  cursor: pointer;
-  transition: border-color 0.25s;
+  transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.dbo-read:hover {
-  border-left-color: rgba(0, 210, 255, 0.85);
+.dbo-brief-focused {
+  background: rgba(13, 17, 23, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 210, 255, 0.3) !important;
+  border-left-width: 1px !important;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.dbo-agent-active .dbo-brief-container {
+  border-left-color: rgba(0, 210, 255, 0.9);
+}
+
+.dbo-inline-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: rgba(210, 225, 240, 0.92);
+  font-size: 15px;
+  line-height: 1.45;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 200px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.dbo-brief-focused .dbo-inline-textarea {
+  cursor: text;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(48, 54, 61, 0.6);
+  border-radius: 6px;
+  padding: 7px 9px;
+  overflow: auto;
+}
+
+.dbo-inline-textarea::placeholder {
+  color: rgba(150, 165, 180, 0.45);
+  font-style: italic;
+}
+
+.dbo-edit-hint {
+  font-size: 9px;
+  color: rgba(120, 135, 150, 0.5);
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+/* Keep old read class as no-op for compatibility */
+.dbo-read {
+  display: none;
 }
 
 .dbo-agent-active .dbo-read {
-  border-left-color: rgba(0, 210, 255, 0.9);
-  border-left-width: 3px;
+  display: none;
 }
 
 /* Label row: label + "Using now" indicator */
@@ -132,71 +183,238 @@
   font-style: italic;
 }
 
-.dbo-edit {
-  background: rgba(13, 17, 23, 0.88);
+/* Legacy edit classes — kept as no-ops for safety */
+.dbo-edit, .dbo-textarea, .dbo-actions, .dbo-save, .dbo-cancel { display: none; }
+
+/* ── Structured fields section ────────────────────────────────────────────── */
+
+.dbo-fields-section {
+  background: rgba(13, 17, 23, 0.78);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 210, 255, 0.3);
-  border-radius: 8px;
-  padding: 8px;
+  border: 1px solid rgba(0, 210, 255, 0.18);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  padding: 6px 8px 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  max-width: 380px;
 }
 
-.dbo-textarea {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(48, 54, 61, 0.6);
-  border-radius: 6px;
-  color: rgba(200, 210, 220, 0.9);
-  font-size: 13px;
-  line-height: 1.45;
-  padding: 7px 9px;
-  resize: none;
-  outline: none;
-  box-sizing: border-box;
-  font-family: inherit;
-  min-width: 260px;
+/* Attach directly below .dbo-read */
+.dbo-read + .dbo-fields-section {
+  margin-top: -2px;
+  border-top: 1px solid rgba(0, 210, 255, 0.12);
+  border-radius: 0 0 8px 8px;
 }
 
-.dbo-textarea:focus {
-  border-color: rgba(0, 210, 255, 0.5);
-}
-
-.dbo-actions {
+.dbo-fields-header {
   display: flex;
-  gap: 6px;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.dbo-save {
-  background: rgba(0, 210, 255, 0.1);
-  border: 1px solid rgba(0, 210, 255, 0.4);
+.dbo-fields-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dbo-params-save {
+  background: rgba(0, 210, 255, 0.08);
+  border: 1px solid rgba(0, 210, 255, 0.3);
   border-radius: 5px;
-  color: #00d2ff;
-  font-size: 11px;
-  padding: 3px 10px;
+  color: rgba(0, 210, 255, 0.7);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s;
 }
 
-.dbo-save:hover {
-  background: rgba(0, 210, 255, 0.2);
+.dbo-params-save:hover {
+  background: rgba(0, 210, 255, 0.16);
+  color: rgba(0, 210, 255, 0.95);
 }
 
-.dbo-cancel {
+.dbo-params-save.saved {
+  background: rgba(64, 210, 90, 0.12);
+  border-color: rgba(64, 210, 90, 0.4);
+  color: rgba(64, 210, 90, 0.9);
+}
+
+.dbo-fields-toggle {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 5px;
-  color: rgba(200, 210, 220, 0.5);
-  font-size: 13px;
-  padding: 3px 8px;
+  border: none;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(0, 210, 255, 0.45);
   cursor: pointer;
+  padding: 0;
+  transition: color 0.12s;
+}
+
+.dbo-fields-toggle:hover {
+  color: rgba(0, 210, 255, 0.8);
+}
+
+.dbo-regen-btn {
+  background: transparent;
+  border: none;
+  color: rgba(150, 165, 180, 0.5);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s, transform 0.2s;
+}
+
+.dbo-regen-btn:hover:not(:disabled) {
+  color: rgba(0, 210, 255, 0.85);
+  transform: rotate(180deg);
+}
+
+.dbo-regen-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  animation: dbo-spin 1s linear infinite;
+}
+
+@keyframes dbo-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Loading skeletons */
+.dbo-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.dbo-skeleton {
+  height: 22px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(0, 210, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: dbo-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes dbo-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Field rows */
+.dbo-field-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dbo-field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dbo-field-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(0, 210, 255, 0.45);
+  width: 82px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dbo-field-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(210, 225, 240, 0.9);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 2px 4px;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+
+.dbo-field-input:focus {
+  border-bottom-color: rgba(0, 210, 255, 0.5);
+}
+
+.dbo-field-input::placeholder {
+  color: rgba(150, 165, 180, 0.35);
+  font-style: italic;
+}
+
+.dbo-field-remove {
+  background: transparent;
+  border: none;
+  color: rgba(150, 165, 180, 0.25);
+  font-size: 14px;
+  padding: 0 2px;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
   transition: color 0.15s;
 }
 
-.dbo-cancel:hover {
-  color: rgba(200, 210, 220, 0.9);
+.dbo-field-remove:hover {
+  color: rgba(240, 80, 80, 0.7);
+}
+
+/* Suggested params (chips) */
+.dbo-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dbo-suggestions-label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(150, 165, 180, 0.45);
+}
+
+.dbo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dbo-chip {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(160, 175, 195, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+
+.dbo-chip:hover {
+  color: rgba(0, 210, 255, 0.9);
+  border-color: rgba(0, 210, 255, 0.35);
+  background: rgba(0, 210, 255, 0.08);
 }

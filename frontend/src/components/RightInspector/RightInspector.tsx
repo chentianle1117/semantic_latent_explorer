@@ -97,6 +97,16 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
 
   const riverRef = useRef<HTMLDivElement>(null);
   const [lineSegments, setLineSegments] = useState<LineSegment[]>([]);
+  const [riverKey, setRiverKey] = useState(0);
+
+  // Recompute lines whenever the river container resizes (inspector height changes)
+  useEffect(() => {
+    const el = riverRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setRiverKey((k) => k + 1));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useLayoutEffect(() => {
     const el = riverRef.current;
@@ -148,7 +158,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     });
 
     return () => cancelAnimationFrame(raf);
-  }, [ancestors.length, children.length, inspectedImageId]);
+  }, [ancestors.length, children.length, inspectedImageId, riverKey]);
 
   // #region agent log
   useEffect(() => {

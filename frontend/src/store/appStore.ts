@@ -4,12 +4,13 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry, BriefField, BriefSuggestedParam, MinimapDot, ViewportRect } from '../types';
 
 interface AppStore extends AppState {
   // Actions
   setImages: (images: ImageData[]) => void;
   addImages: (images: ImageData[]) => void;
+  mergeImages: (newImages: ImageData[]) => void;
   updateImage: (id: number, updates: Partial<ImageData>) => void;
   removeImage: (id: number) => void;
   restoreImageLocally: (id: number) => void;
@@ -47,17 +48,28 @@ interface AppStore extends AppState {
   // UI layout
   setIsInspectorCollapsed: (collapsed: boolean) => void;
   setIsDrawerExpanded: (expanded: boolean) => void;
+  setIsHistoryExpanded: (expanded: boolean) => void;
+  setIsLayersExpanded: (expanded: boolean) => void;
   setActiveToolbarFlyout: (flyout: string | null) => void;
   setFlyToImageId: (id: number | null) => void;
 
+  // Minimap
+  setMinimapDots: (dots: MinimapDot[]) => void;
+  setMinimapGhostDots: (dots: MinimapDot[]) => void;
+  setMinimapViewport: (rect: ViewportRect | null) => void;
+  setMinimapCanvasSize: (size: { w: number; h: number } | null) => void;
+  setMinimapPanRequest: (req: { centerX: number; centerY: number } | null) => void;
+
   // Agent — DynamicIsland state
   agentStatus: AgentStatus;
-  agentInsight: AgentInsight | null;
+  agentInsights: AgentInsight[];
   isAgentWorking: boolean;
+  agentWorkingLabel: string;
   setAgentStatus: (status: AgentStatus) => void;
-  setAgentInsight: (insight: AgentInsight | null) => void;
-  dismissInsight: () => void;
+  addAgentInsight: (insight: AgentInsight) => void;
+  dismissInsight: () => void; // removes the oldest insight
   setIsAgentWorking: (v: boolean) => void;
+  setAgentWorkingLabel: (label: string) => void;
 
   // Agent — exploration accumulator (Behavior C trigger)
   imagesSinceLastExploration: number;
@@ -118,6 +130,15 @@ interface AppStore extends AppState {
   // Design brief glow
   setIsAgentUsingBrief: (v: boolean) => void;
 
+  // Structured brief fields
+  setBriefFields: (fields: BriefField[]) => void;
+  setBriefSuggestedParams: (params: BriefSuggestedParam[]) => void;
+  setBriefInterpretation: (text: string | null) => void;
+  setBriefLoading: (v: boolean) => void;
+  updateBriefFieldValue: (key: string, value: string) => void;
+  addBriefField: (param: BriefSuggestedParam) => void;
+  removeBriefField: (key: string) => void;
+
   // Session / Multi-Canvas
   setCurrentCanvasId: (id: string | null) => void;
   setCanvasName: (name: string) => void;
@@ -142,7 +163,7 @@ const initialState: AppState = {
     imageOpacity: 1.0,
     removeBackground: true,
     layoutPadding: 0.2, // 20% padding by default (reduces clutter)
-    coordinateScale: 1.0, // Scale multiplier for coordinates (affects spacing)
+    coordinateScale: 1.4, // Scale multiplier for coordinates (affects spacing — 1.4 spreads images further apart)
     coordinateOffset: [0, 0, 0], // Offset for recentering [x, y, z]
     axisScaleX: 1.0, // Stretch X from center (1 = no stretch)
     axisScaleY: 1.0, // Stretch Y from center (1 = no stretch)
@@ -163,13 +184,23 @@ const initialState: AppState = {
   // UI layout defaults
   isInspectorCollapsed: false,
   isDrawerExpanded: false,
+  isHistoryExpanded: false,
+  isLayersExpanded: false,
   activeToolbarFlyout: null,
   flyToImageId: null,
 
+  // Minimap
+  minimapDots: [] as MinimapDot[],
+  minimapGhostDots: [] as MinimapDot[],
+  minimapViewport: null as ViewportRect | null,
+  minimapCanvasSize: null as { w: number; h: number } | null,
+  minimapPanRequest: null as { centerX: number; centerY: number; id: number } | null,
+
   // Agent defaults
   agentStatus: 'idle' as AgentStatus,
-  agentInsight: null as AgentInsight | null,
+  agentInsights: [] as AgentInsight[],
   isAgentWorking: false,
+  agentWorkingLabel: 'Analyzing…',
   imagesSinceLastExploration: 0,
   imagesSinceLastAxisSuggestion: 0,
   agentMode: 'auto' as AgentMode, // kept for SettingsModal compat
@@ -209,6 +240,12 @@ const initialState: AppState = {
 
   // Design brief glow
   isAgentUsingBrief: false,
+
+  // Structured brief interpretation
+  briefFields: [] as BriefField[],
+  briefSuggestedParams: [] as BriefSuggestedParam[],
+  briefInterpretation: null as string | null,
+  briefLoading: false,
 
   // Deletion undo stack
   deletedImageStack: [] as ImageData[],
@@ -263,6 +300,12 @@ export const useAppStore = create<AppStore>((set) => ({
     })),
 
   clearDeletedStack: () => set({ deletedImageStack: [] }),
+
+  // Append-only image merge (used after generation to avoid full-state replacement)
+  mergeImages: (newImages) =>
+    set((state) => ({
+      images: [...state.images, ...newImages],
+    })),
 
   // History group actions
   setHistoryGroups: (groups) => set({ historyGroups: groups }),
@@ -354,22 +397,39 @@ export const useAppStore = create<AppStore>((set) => ({
   // UI layout
   setIsInspectorCollapsed: (collapsed) => set({ isInspectorCollapsed: collapsed }),
   setIsDrawerExpanded: (expanded) => set({ isDrawerExpanded: expanded }),
+  setIsHistoryExpanded: (expanded) => set({ isHistoryExpanded: expanded }),
+  setIsLayersExpanded: (expanded) => set({ isLayersExpanded: expanded }),
   setActiveToolbarFlyout: (flyout) => set((state) => ({
     activeToolbarFlyout: state.activeToolbarFlyout === flyout ? null : flyout,
   })),
   setFlyToImageId: (id) => set({ flyToImageId: id }),
 
+  // Minimap
+  setMinimapDots: (dots) => set({ minimapDots: dots }),
+  setMinimapGhostDots: (dots) => set({ minimapGhostDots: dots }),
+  setMinimapViewport: (rect) => set({ minimapViewport: rect }),
+  setMinimapCanvasSize: (size) => set({ minimapCanvasSize: size }),
+  setMinimapPanRequest: (req) => set((s) => ({
+    minimapPanRequest: req
+      ? { ...req, id: (s.minimapPanRequest?.id ?? 0) + 1 }
+      : null,
+  })),
+
   // Agent — DynamicIsland state
   agentStatus: 'idle',
-  agentInsight: null,
+  agentInsights: [],
   isAgentWorking: false,
   setAgentStatus: (status) => set({ agentStatus: status }),
-  setAgentInsight: (insight) => set({
-    agentInsight: insight,
-    agentStatus: insight ? 'insight-ready' : 'idle',
+  addAgentInsight: (insight) => set((state) => ({
+    agentInsights: [...state.agentInsights, insight],
+    agentStatus: 'insight-ready',
+  })),
+  dismissInsight: () => set((state) => {
+    const remaining = state.agentInsights.slice(1); // remove oldest
+    return { agentInsights: remaining, agentStatus: remaining.length > 0 ? 'insight-ready' : 'idle' };
   }),
-  dismissInsight: () => set({ agentInsight: null, agentStatus: 'idle' }),
   setIsAgentWorking: (v) => set({ isAgentWorking: v }),
+  setAgentWorkingLabel: (label) => set({ agentWorkingLabel: label }),
 
   // Agent — exploration accumulator
   imagesSinceLastExploration: 0,
@@ -503,6 +563,22 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // Design brief glow
   setIsAgentUsingBrief: (v) => set({ isAgentUsingBrief: v }),
+
+  // Structured brief fields
+  setBriefFields: (fields) => set({ briefFields: fields }),
+  setBriefSuggestedParams: (params) => set({ briefSuggestedParams: params }),
+  setBriefInterpretation: (text) => set({ briefInterpretation: text }),
+  setBriefLoading: (v) => set({ briefLoading: v }),
+  updateBriefFieldValue: (key, value) => set((s) => ({
+    briefFields: s.briefFields.map((f) => f.key === key ? { ...f, value } : f),
+  })),
+  addBriefField: (param) => set((s) => ({
+    briefFields: [...s.briefFields, { key: param.key, label: param.label, value: '' }],
+    briefSuggestedParams: s.briefSuggestedParams.filter((p) => p.key !== param.key),
+  })),
+  removeBriefField: (key) => set((s) => ({
+    briefFields: s.briefFields.filter((f) => f.key !== key),
+  })),
 
   // Session / Multi-Canvas actions
   setCurrentCanvasId: (id) => set({ currentCanvasId: id }),

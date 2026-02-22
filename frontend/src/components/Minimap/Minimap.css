@@ -1,0 +1,78 @@
+.minimap-wrap {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 800;
+  pointer-events: all;
+}
+
+/* Collapsed: just a small text button */
+.minimap-collapsed-btn {
+  background: rgba(13, 17, 23, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(48, 54, 61, 0.55);
+  border-radius: 8px;
+  color: rgba(170, 185, 200, 0.65);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.minimap-collapsed-btn:hover {
+  background: rgba(20, 26, 34, 0.92);
+  border-color: rgba(88, 166, 255, 0.3);
+  color: rgba(200, 215, 230, 0.85);
+}
+
+/* Expanded panel — width set dynamically by JS (matches computed mapW) */
+.minimap-panel {
+  background: rgba(13, 17, 23, 0.88);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(48, 54, 61, 0.55);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.minimap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.minimap-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(150, 165, 180, 0.55);
+}
+
+.minimap-collapse-btn {
+  background: transparent;
+  border: none;
+  color: rgba(140, 155, 170, 0.5);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.12s;
+}
+
+.minimap-collapse-btn:hover {
+  color: rgba(200, 215, 230, 0.8);
+}
+
+.minimap-svg {
+  display: block;
+  /* width/height set via SVG attributes in JSX */
+}

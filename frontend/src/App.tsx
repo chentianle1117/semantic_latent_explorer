@@ -19,6 +19,8 @@ import { DynamicIsland } from "./components/DynamicIsland/DynamicIsland";
 import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefOverlay";
 import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
+import { OnboardingTour } from "./components/OnboardingTour/OnboardingTour";
+import { TUTORIAL_STEPS } from "./components/OnboardingTour/steps";
 import { useAppStore } from "./store/appStore";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
 import { useAutoSave } from "./hooks/useAutoSave";
@@ -89,6 +91,9 @@ export const App: React.FC = () => {
   const addToExplorationCounter = useAppStore((state) => state.addToExplorationCounter);
   const addToAxisSuggestionCounter = useAppStore((state) => state.addToAxisSuggestionCounter);
 
+  // Onboarding
+  const completeOnboardingStep = useAppStore((s) => s.completeOnboardingStep);
+
   const { triggerConcurrentGhosts, triggerExplorationGhosts, triggerAxisSuggestions } = useAgentBehaviors();
   useAutoSave();
   useEventLog();
@@ -158,11 +163,47 @@ export const App: React.FC = () => {
         return Promise.all([
           apiClient.getCurrentSession(),
           apiClient.listSessions(),
-        ]).then(([session, { sessions }]) => {
+        ]).then(async ([session, { sessions }]) => {
           useAppStore.getState().setCurrentCanvasId(session.canvasId);
           useAppStore.getState().setCanvasName(session.canvasName);
           useAppStore.getState().setParticipantId(session.participantId);
           useAppStore.getState().setCanvasList(sessions);
+
+          // Load per-canvas onboarding progress from localStorage
+          useAppStore.getState().loadOnboardingState(session.canvasId);
+
+          // Auto-import starter canvas if empty + not already done
+          const starterKey = `starterLoaded_${session.canvasId}`;
+          const currentImages = useAppStore.getState().images;
+          if (currentImages.length === 0 && !localStorage.getItem(starterKey)) {
+            try {
+              const res = await fetch('/api/import-starter', { method: 'POST' });
+              if (res.ok) {
+                const starterJson = await res.json().catch(() => null);
+                localStorage.setItem(starterKey, 'true');
+                const freshState = await apiClient.getState();
+                useAppStore.getState().setImages(freshState.images ?? []);
+                useAppStore.getState().setHistoryGroups(freshState.history_groups ?? []);
+                if (freshState.axis_labels) useAppStore.getState().setAxisLabels(freshState.axis_labels);
+                useAppStore.getState().resetCanvasBounds();
+                // Apply design_brief from starter if returned
+                if (starterJson?.design_brief) {
+                  useAppStore.getState().setDesignBrief(starterJson.design_brief);
+                }
+                console.log('[Onboarding] Starter canvas imported');
+              }
+            } catch {
+              // Starter not available — proceed with empty canvas
+            }
+          }
+
+          // Always start at step 1 on every page load/refresh
+          const { onboardingDismissed: dismissed } = useAppStore.getState();
+          if (!dismissed) {
+            setTimeout(() => {
+              useAppStore.getState().setOnboardingSpotlight(TUTORIAL_STEPS[0].id);
+            }, 1200);
+          }
         }).catch(() => {/* session endpoints optional */});
       })
       .catch((error) => {
@@ -717,6 +758,16 @@ export const App: React.FC = () => {
     }
   }, [selectedImageIds]);
 
+  // ─── Onboarding: radial dial opened → complete nav-radial ────────────────
+  useEffect(() => {
+    if (showRadialDial) completeOnboardingStep('nav-radial');
+  }, [showRadialDial, completeOnboardingStep]);
+
+  // ─── Onboarding: exploration tree opened → complete manip-tree ────────────
+  useEffect(() => {
+    if (showExplorationTreeModal) completeOnboardingStep('manip-tree');
+  }, [showExplorationTreeModal, completeOnboardingStep]);
+
   return (
     <>
       {/* Progress Modal */}
@@ -746,6 +797,7 @@ export const App: React.FC = () => {
 
           <div
             className="canvas-container"
+            data-tour="canvas"
           >
             {/* Dynamic Island — agent notifications, floats over canvas */}
             <DynamicIsland />
@@ -1074,6 +1126,9 @@ export const App: React.FC = () => {
         }}
         onCancel={() => setConfirmState(null)}
       />
+
+      {/* Onboarding Tutorial Overlay */}
+      <OnboardingTour />
     </>
   );
 };

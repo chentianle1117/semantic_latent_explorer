@@ -55,6 +55,11 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const [isRefining, setIsRefining] = useState(false);
   const designBrief = useAppStore((s) => s.designBrief);
 
+  // Tutorial guide
+  const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const showTutorialGuide = !guideDismissed && onboardingSpotlight === 'gen-ref';
+
   const labels = referenceImages.map((_, i) => String.fromCharCode(65 + i)); // A, B, C...
 
   // Composed prompt = chips (flat text) + free text, separated by commas
@@ -206,6 +211,54 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         <div className="dialog prompt-dialog-main">
           <h2>Generate from Reference{referenceImages.length > 1 ? 's' : ''}</h2>
 
+          {/* ── Tutorial guide banner ── */}
+          {showTutorialGuide && (
+            <div className="ttd-guide" role="note" aria-label="Tutorial: how to generate from references">
+              <div className="ttd-guide-header">
+                <span>🎓</span>
+                <strong>How to generate from references</strong>
+                <button className="ttd-guide-dismiss" onClick={() => setGuideDismissed(true)} title="Dismiss">×</button>
+              </div>
+              <ol className="ttd-guide-steps">
+                <li>
+                  <strong>Your reference shoes</strong> are shown above — each is labeled{' '}
+                  {labels.map((lbl, i) => (
+                    <span
+                      key={lbl}
+                      style={{
+                        display: 'inline-block',
+                        padding: '1px 6px',
+                        borderRadius: 3,
+                        fontSize: 9,
+                        fontWeight: 700,
+                        marginLeft: 3,
+                        background: `${REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length]}22`,
+                        border: `1px solid ${REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length]}88`,
+                        color: REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length],
+                      }}
+                    >@{lbl}</span>
+                  ))}.
+                </li>
+                <li>
+                  <strong>Right panel — Descriptor Tags</strong>: The AI has analyzed each shoe.
+                  Click colored descriptor tags to add them to your prompt as chips.
+                </li>
+                <li>
+                  <strong>Text box</strong>: Describe what you want. Type <code>@</code> to reference
+                  a specific shoe (e.g. <em>@A's sole with @B's colors</em>).
+                </li>
+                <li>
+                  Click <strong>Refine Prompt</strong> to let the AI weave your chips and text
+                  into a polished prompt.
+                </li>
+                <li>
+                  Click <strong>Generate</strong> — results may blend references in unexpected and
+                  creative ways!
+                </li>
+              </ol>
+            </div>
+          )}
+
           <div className="dialog-content">
             {/* Reference image thumbnails */}
             <div className="preview-section">
@@ -322,7 +375,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                 {composedPrompt && (
                   <div className="ttd-refine-row">
                     <button
-                      className="ttd-refine-btn"
+                      className={`ttd-refine-btn${showTutorialGuide ? ' ttd-btn-pulse' : ''}`}
                       onClick={handleRefine}
                       disabled={isRefining || !composedPrompt}
                       title="AI rewrites your prompt while keeping tag terms"
@@ -355,7 +408,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
           <div className="dialog-actions">
             <button onClick={onClose}>Cancel</button>
             <button
-              className="primary"
+              className={`primary${showTutorialGuide && freeText.trim() ? ' ttd-btn-pulse' : ''}`}
               onClick={handleGenerate}
               disabled={!freeText.trim()}
               title={!freeText.trim() ? 'Type a prompt or click Refine Prompt first' : undefined}

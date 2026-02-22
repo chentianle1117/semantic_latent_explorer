@@ -16,10 +16,11 @@ export const LayersSidebar: React.FC = () => {
   const toggleLayerVisibility = useAppStore((s) => s.toggleLayerVisibility);
 
   return (
-    <div className={`layers-sidebar ${isExpanded ? "expanded" : ""}`}>
+    <div className={`layers-sidebar ${isExpanded ? "expanded" : ""}`} data-tour="layers">
       {/* Clickable bar — always visible, click anywhere to toggle */}
       <div
         className="layers-sidebar-bar"
+        data-tour="layers-bar"
         onClick={() => setIsExpanded(!isExpanded)}
         title={isExpanded ? "Collapse layers" : "Expand layers"}
       >

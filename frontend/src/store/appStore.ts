@@ -145,6 +145,14 @@ interface AppStore extends AppState {
   setParticipantId: (id: string) => void;
   setCanvasList: (list: CanvasMeta[]) => void;
   addEventLogEntry: (entry: EventLogEntry) => void;
+
+  // Onboarding tutorial
+  setOnboardingActive: (active: boolean) => void;
+  setOnboardingSpotlight: (stepId: string | null) => void;
+  completeOnboardingStep: (stepId: string) => void;
+  dismissOnboarding: () => void;
+  resetOnboarding: (canvasId?: string) => void;
+  loadOnboardingState: (canvasId: string) => void;
 }
 
 const initialState: AppState = {
@@ -256,6 +264,12 @@ const initialState: AppState = {
   participantId: 'researcher',
   canvasList: [] as CanvasMeta[],
   eventLog: [] as EventLogEntry[],
+
+  // Onboarding tutorial
+  onboardingActive: false,
+  onboardingSpotlight: null as string | null,
+  completedSteps: [] as string[],
+  onboardingDismissed: false,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -586,4 +600,42 @@ export const useAppStore = create<AppStore>((set) => ({
   setParticipantId: (id) => set({ participantId: id }),
   setCanvasList: (list) => set({ canvasList: list }),
   addEventLogEntry: (entry) => set((s) => ({ eventLog: [...s.eventLog, entry] })),
+
+  // Onboarding tutorial actions
+  setOnboardingActive: (active) => set({ onboardingActive: active }),
+  setOnboardingSpotlight: (stepId) => set({ onboardingSpotlight: stepId }),
+  completeOnboardingStep: (stepId) => set((s) => {
+    if (s.completedSteps.includes(stepId)) return s;
+    const next = [...s.completedSteps, stepId];
+    // Persist per-canvas
+    if (s.currentCanvasId) {
+      try { localStorage.setItem(`onboarding_${s.currentCanvasId}`, JSON.stringify({ completed: next, dismissed: s.onboardingDismissed })); } catch {}
+    }
+    return { completedSteps: next };
+  }),
+  dismissOnboarding: () => set((s) => {
+    if (s.currentCanvasId) {
+      try { localStorage.setItem(`onboarding_${s.currentCanvasId}`, JSON.stringify({ completed: s.completedSteps, dismissed: true })); } catch {}
+    }
+    return { onboardingDismissed: true, onboardingActive: false, onboardingSpotlight: null };
+  }),
+  resetOnboarding: (canvasId?: string) => {
+    const id = canvasId ?? useAppStore.getState().currentCanvasId;
+    if (id) { try { localStorage.removeItem(`onboarding_${id}`); } catch {} }
+    set({ completedSteps: [], onboardingDismissed: false, onboardingActive: true, onboardingSpotlight: null });
+  },
+  loadOnboardingState: (canvasId) => {
+    try {
+      const raw = localStorage.getItem(`onboarding_${canvasId}`);
+      if (raw) {
+        const { completed, dismissed } = JSON.parse(raw);
+        set({ completedSteps: completed ?? [], onboardingDismissed: dismissed ?? false });
+      } else {
+        // First time on this canvas — show onboarding
+        set({ completedSteps: [], onboardingDismissed: false });
+      }
+    } catch {
+      set({ completedSteps: [], onboardingDismissed: false });
+    }
+  },
 }));

@@ -278,6 +278,7 @@ export const BottomDrawer: React.FC = () => {
       {/* ── Compact bar: always visible — click anywhere to expand/collapse ── */}
       <div
         className={`drawer-bar${isExpanded ? ' drawer-bar--expanded' : ''}`}
+        data-tour="bottom-drawer-bar"
         onClick={() => { isExpanded ? setActiveTab(null) : setActiveTab('history'); }}
         style={{ cursor: 'pointer' }}
       >
@@ -298,9 +299,10 @@ export const BottomDrawer: React.FC = () => {
           /* Expanded bar: each tab button stops propagation so it switches tabs
              without collapsing; clicking empty bar space collapses via bar onClick */
           <>
-            <div className="drawer-section-tabs">
+            <div className="drawer-section-tabs" data-tour="drawer-tabs">
               <button
                 className={`drawer-section-tab${activeTab === 'history' ? ' active' : ''}`}
+                data-tour="tab-history"
                 onClick={e => { e.stopPropagation(); switchTab('history'); }}
                 title="History"
               >
@@ -308,6 +310,7 @@ export const BottomDrawer: React.FC = () => {
               </button>
               <button
                 className={`drawer-section-tab${activeTab === 'lineage' ? ' active' : ''}`}
+                data-tour="tab-lineage"
                 onClick={e => { e.stopPropagation(); switchTab('lineage'); }}
                 title="Lineage Tree"
               >

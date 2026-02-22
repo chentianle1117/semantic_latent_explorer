@@ -214,7 +214,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   const isHeroSelected = inspectedImageId != null && selectedImageIds.includes(inspectedImageId);
 
   return (
-    <div className="ethereal-inspector">
+    <div className="ethereal-inspector" data-tour="inspector">
       <div className="inspector-header">
         <span className="inspector-title">INSPECTOR</span>
       </div>

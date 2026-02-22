@@ -231,11 +231,66 @@ def pil_to_base64(pil_image: Image.Image) -> str:
 
 # ─── Session helpers ──────────────────────────────────────────────────────────
 
-def _session_path(participant_id: str, canvas_id: str) -> Path:
-    """Return the path to a session JSON file, creating parent dirs as needed."""
-    p = DATA_DIR / participant_id / "sessions" / f"{canvas_id}.json"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    return p
+def _slugify(name: str) -> str:
+    """Convert a canvas name to a filesystem-safe slug.
+    e.g. 'My Canvas 1!' → 'my-canvas-1'
+    """
+    import re as _re
+    slug = name.lower().strip()
+    slug = _re.sub(r'[^\w\s-]', '', slug)   # strip non-alphanumeric (keep - and _)
+    slug = _re.sub(r'[\s_]+', '-', slug)     # spaces/underscores → hyphen
+    slug = _re.sub(r'-+', '-', slug)         # collapse multiple hyphens
+    slug = slug.strip('-')
+    return slug or 'canvas'
+
+
+def _session_path(participant_id: str, canvas_id: str, canvas_name: str = "") -> Path:
+    """Return the canonical path for a session file.
+
+    Filename format: {slug}_{canvas_id}.json
+    Falls back to bare {canvas_id}.json when canvas_name is empty (legacy).
+    Always creates parent dirs.
+    """
+    sessions_dir = DATA_DIR / participant_id / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    if canvas_name:
+        slug = _slugify(canvas_name)
+        return sessions_dir / f"{slug}_{canvas_id}.json"
+    return sessions_dir / f"{canvas_id}.json"
+
+
+def _find_session_file(participant_id: str, canvas_id: str) -> Optional[Path]:
+    """Locate the session JSON file for canvas_id regardless of its name slug.
+
+    Search order:
+    1. Any file matching *_{canvas_id}.json  (new descriptive format)
+    2. Bare {canvas_id}.json                 (legacy format)
+    3. Scan all participant dirs             (cross-participant fallback)
+    Returns None if not found.
+    """
+    sessions_dir = DATA_DIR / participant_id / "sessions"
+    if sessions_dir.exists():
+        # New descriptive format
+        matches = list(sessions_dir.glob(f"*_{canvas_id}.json"))
+        if matches:
+            return matches[0]
+        # Legacy bare UUID format
+        legacy = sessions_dir / f"{canvas_id}.json"
+        if legacy.exists():
+            return legacy
+    # Cross-participant fallback
+    if DATA_DIR.exists():
+        for pid_dir in DATA_DIR.iterdir():
+            if not pid_dir.is_dir():
+                continue
+            s_dir = pid_dir / "sessions"
+            matches = list(s_dir.glob(f"*_{canvas_id}.json"))
+            if matches:
+                return matches[0]
+            legacy = s_dir / f"{canvas_id}.json"
+            if legacy.exists():
+                return legacy
+    return None
 
 
 def _serialize_canvas() -> dict:
@@ -296,12 +351,23 @@ def _serialize_canvas() -> dict:
 
 
 def _save_canvas_to_disk() -> Path:
-    """Save current canvas state to disk and return the file path."""
+    """Save current canvas state to disk and return the file path.
+
+    Uses the descriptive {slug}_{canvas_id}.json filename.
+    If the canvas was renamed since the last save the old file is deleted.
+    """
     data = _serialize_canvas()
-    path = _session_path(state.participant_id, state.current_canvas_id)
-    with open(path, "w", encoding="utf-8") as f:
+    new_path = _session_path(state.participant_id, state.current_canvas_id, state.canvas_name)
+    # Delete old file if it exists under a different name (rename case)
+    old_path = _find_session_file(state.participant_id, state.current_canvas_id)
+    if old_path and old_path.resolve() != new_path.resolve():
+        try:
+            old_path.unlink()
+        except OSError:
+            pass
+    with open(new_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, cls=_NumpyEncoder)
-    return path
+    return new_path
 
 
 def _deserialize_canvas(data: dict) -> None:
@@ -2570,134 +2636,212 @@ async def sync_layers(request: Request):
     return {"status": "ok"}
 
 
+def _import_from_zip(zf: "zipfile.ZipFile") -> dict:
+    """Shared ZIP import logic — supports new unified format and legacy format.
+
+    New format (canvas.json present):
+      - canvas.json  — identical schema to local save, images have a `filename` field
+      - img_*.png    — image pixel data referenced by filename
+
+    Legacy format (export_summary.json present):
+      - export_summary.json  — canvas-level metadata
+      - img_*.png / img_*.json — per-image pixel + metadata pairs
+
+    Returns dict with keys: images_loaded, groups_loaded, design_brief.
+    """
+    import io as _io
+    from models.data_structures import HistoryGroup
+
+    namelist = zf.namelist()
+
+    # ── New unified canvas.json path ──────────────────────────────────────────
+    if "canvas.json" in namelist:
+        print("[import] Unified canvas.json format detected")
+        data = json.loads(zf.read("canvas.json"))
+        # Replace filename references with inline base64 so _deserialize_canvas works unchanged
+        valid_images = []
+        for img_data in data.get("images", []):
+            fname = img_data.get("filename", "")
+            if fname and fname in namelist:
+                png_bytes = zf.read(fname)
+                img_data["base64_image"] = (
+                    "data:image/png;base64," + base64.b64encode(png_bytes).decode()
+                )
+                valid_images.append(img_data)
+            else:
+                print(f"  [WARN] PNG '{fname}' not found in ZIP, skipping image {img_data.get('id')}")
+        data["images"] = valid_images
+        # Layer state lives outside _deserialize_canvas — restore it first
+        state.layer_definitions = data.get("layerDefinitions", state.layer_definitions)
+        state.image_layer_map = {int(k): v for k, v in data.get("imageLayerMap", {}).items()}
+        _deserialize_canvas(data)
+        # Re-project coordinates using restored axis labels if models are ready
+        if state.images_metadata and state.embedder and state.axis_builder:
+            state._axis_directions_cache = None
+            emb_matrix = np.array([img.embedding for img in state.images_metadata])
+            new_coords = project_embeddings_to_coordinates(emb_matrix, use_3d=False)
+            for i, img in enumerate(state.images_metadata):
+                img.coordinates = (float(new_coords[i][0]), float(new_coords[i][1]))
+        print(f"[OK] Import (canvas.json): {len(state.images_metadata)} images, {len(state.history_groups)} groups")
+        return {
+            "images_loaded": len(state.images_metadata),
+            "groups_loaded": len(state.history_groups),
+            "design_brief": state.design_brief,
+        }
+
+    # ── Legacy format ─────────────────────────────────────────────────────────
+    if "export_summary.json" not in namelist:
+        raise HTTPException(status_code=400, detail="ZIP must contain canvas.json or export_summary.json")
+
+    print("[import] Legacy export_summary.json format detected")
+    summary = json.loads(zf.read("export_summary.json"))
+
+    axis_raw = summary.get("axis_labels", {})
+    new_axis_labels = {k: tuple(v) if isinstance(v, list) else v for k, v in axis_raw.items()}
+    if not new_axis_labels:
+        new_axis_labels = state.axis_labels
+
+    history_groups_raw = summary.get("history_groups", [])
+    layer_defs = summary.get("layer_definitions", state.layer_definitions)
+    img_layer_map_raw = summary.get("image_layer_map", {})
+    design_brief = summary.get("design_brief", None)
+
+    # Build index of per-image JSON/PNG pairs
+    png_map: Dict[str, bytes] = {}
+    json_map: Dict[str, dict] = {}
+    for name in namelist:
+        stem, ext = name.rsplit(".", 1) if "." in name else (name, "")
+        if ext.lower() == "png" and stem.startswith("img_"):
+            png_map[stem] = zf.read(name)
+        elif ext.lower() == "json" and stem.startswith("img_"):
+            json_map[stem] = json.loads(zf.read(name))
+
+    new_images: List[ImageMetadata] = []
+    max_id = 0
+    for stem, meta in json_map.items():
+        if stem not in png_map:
+            print(f"  [WARN] No PNG for {stem}, skipping")
+            continue
+        img_id = meta.get("id", 0)
+        max_id = max(max_id, img_id)
+        pil_img = Image.open(_io.BytesIO(png_map[stem])).convert("RGBA")
+        embedding_list = meta.get("embedding", None)
+        embedding = np.array(embedding_list, dtype=np.float32) if embedding_list else np.zeros(1024, dtype=np.float32)
+        try:
+            ts = datetime.fromisoformat(meta.get("timestamp", datetime.now().isoformat()))
+        except Exception:
+            ts = datetime.now()
+        coord_raw = meta.get("coordinates", [0.0, 0.0])
+        coord = tuple(coord_raw[:2]) if len(coord_raw) >= 2 else (0.0, 0.0)
+        new_images.append(ImageMetadata(
+            id=img_id,
+            group_id=meta.get("group_id", ""),
+            pil_image=pil_img,
+            embedding=embedding,
+            coordinates=coord,
+            parents=meta.get("parents", []),
+            children=meta.get("children", []),
+            reference_ids=meta.get("reference_ids", []),
+            generation_method=meta.get("generation_method", "batch"),
+            prompt=meta.get("prompt", ""),
+            timestamp=ts,
+            visible=meta.get("visible", True),
+            is_ghost=meta.get("is_ghost", False),
+            suggested_prompt=meta.get("suggested_prompt", ""),
+            reasoning=meta.get("reasoning", ""),
+        ))
+
+    if not new_images:
+        raise HTTPException(status_code=400, detail="No valid images found in ZIP")
+
+    if state.embedder and state.axis_builder:
+        state.axis_labels = new_axis_labels
+        state._axis_directions_cache = None
+        emb_matrix = np.array([img.embedding for img in new_images])
+        new_coords = project_embeddings_to_coordinates(emb_matrix, use_3d=False)
+        for i, img in enumerate(new_images):
+            img.coordinates = (float(new_coords[i][0]), float(new_coords[i][1]))
+    else:
+        state.axis_labels = new_axis_labels
+
+    new_history: List[HistoryGroup] = []
+    for hg in history_groups_raw:
+        try:
+            ts_hg = datetime.fromisoformat(hg.get("timestamp", datetime.now().isoformat()))
+        except Exception:
+            ts_hg = datetime.now()
+        new_history.append(HistoryGroup(
+            id=hg["id"],
+            type=hg.get("type", "batch"),
+            image_ids=hg.get("image_ids", []),
+            prompt=hg.get("prompt", ""),
+            visible=hg.get("visible", True),
+            thumbnail_id=hg.get("thumbnail_id", None),
+            timestamp=ts_hg,
+        ))
+
+    state.images_metadata = sorted(new_images, key=lambda x: x.id)
+    state.history_groups = new_history
+    state.next_id = max_id + 1
+    state.image_layer_map = {int(k): v for k, v in img_layer_map_raw.items()}
+    state.layer_definitions = layer_defs
+    if design_brief is not None:
+        state.design_brief = design_brief
+
+    print(f"[OK] Import (legacy): {len(new_images)} images, {len(new_history)} groups")
+    return {
+        "images_loaded": len(new_images),
+        "groups_loaded": len(new_history),
+        "design_brief": state.design_brief,
+    }
+
+
 @app.post("/api/import-zip")
 async def import_zip_canvas(file: UploadFile = File(...)):
     """Restore a canvas from a previously exported ZIP file.
 
-    The ZIP must contain:
-      - export_summary.json  (axis_labels, history_groups, layer info, image list)
-      - img_{id}_*.png       (image files)
-      - img_{id}_*.json      (per-image metadata including embedding array)
-
-    Re-uses stored embeddings — no CLIP re-embedding needed.
+    Supports two formats:
+    - New unified format: canvas.json + img_*.png
+    - Legacy format: export_summary.json + img_*.png + img_*.json
     """
     import io as _io
     try:
         zip_bytes = await file.read()
         with zipfile.ZipFile(_io.BytesIO(zip_bytes)) as zf:
-            # ── 1. Parse summary ──────────────────────────────────────────
-            if "export_summary.json" not in zf.namelist():
-                raise HTTPException(status_code=400, detail="Missing export_summary.json in ZIP")
-            summary = json.loads(zf.read("export_summary.json"))
-
-            axis_raw = summary.get("axis_labels", {})
-            new_axis_labels = {}
-            for k, v in axis_raw.items():
-                new_axis_labels[k] = tuple(v) if isinstance(v, list) else v
-            if not new_axis_labels:
-                new_axis_labels = state.axis_labels  # keep current if absent
-
-            history_groups_raw = summary.get("history_groups", [])
-            layer_defs = summary.get("layer_definitions", state.layer_definitions)
-            img_layer_map_raw = summary.get("image_layer_map", {})
-
-            # ── 2. Build index of per-image JSON/PNG pairs ────────────────
-            # Filenames: img_{id}_{timestamp}.png / .json
-            png_map: Dict[str, bytes] = {}   # filename_stem -> png bytes
-            json_map: Dict[str, dict] = {}   # filename_stem -> metadata dict
-            for name in zf.namelist():
-                stem, ext = name.rsplit(".", 1) if "." in name else (name, "")
-                if ext.lower() == "png" and stem.startswith("img_"):
-                    png_map[stem] = zf.read(name)
-                elif ext.lower() == "json" and stem.startswith("img_"):
-                    json_map[stem] = json.loads(zf.read(name))
-
-            # ── 3. Rebuild images ─────────────────────────────────────────
-            new_images: List[ImageMetadata] = []
-            max_id = 0
-            for stem, meta in json_map.items():
-                if stem not in png_map:
-                    print(f"  [WARN] No PNG for {stem}, skipping")
-                    continue
-                img_id = meta.get("id", 0)
-                max_id = max(max_id, img_id)
-                pil_img = Image.open(_io.BytesIO(png_map[stem])).convert("RGBA")
-                embedding_list = meta.get("embedding", None)
-                if embedding_list:
-                    embedding = np.array(embedding_list, dtype=np.float32)
-                else:
-                    embedding = np.zeros(1024, dtype=np.float32)  # fallback
-                try:
-                    ts = datetime.fromisoformat(meta.get("timestamp", datetime.now().isoformat()))
-                except Exception:
-                    ts = datetime.now()
-                coord_raw = meta.get("coordinates", [0.0, 0.0])
-                coord = tuple(coord_raw[:2]) if len(coord_raw) >= 2 else (0.0, 0.0)
-                new_images.append(ImageMetadata(
-                    id=img_id,
-                    group_id=meta.get("group_id", ""),
-                    pil_image=pil_img,
-                    embedding=embedding,
-                    coordinates=coord,
-                    parents=meta.get("parents", []),
-                    children=meta.get("children", []),
-                    reference_ids=meta.get("reference_ids", []),
-                    generation_method=meta.get("generation_method", "batch"),
-                    prompt=meta.get("prompt", ""),
-                    timestamp=ts,
-                    visible=True,
-                    is_ghost=False,
-                    suggested_prompt="",
-                    reasoning="",
-                ))
-
-            if not new_images:
-                raise HTTPException(status_code=400, detail="No valid images found in ZIP")
-
-            # If embedder available, reproject to current axes
-            if state.embedder and state.axis_builder:
-                state.axis_labels = new_axis_labels
-                state._axis_directions_cache = None  # force recompute
-                embeddings_matrix = np.array([img.embedding for img in new_images])
-                new_coords = project_embeddings_to_coordinates(embeddings_matrix, use_3d=False)
-                for i, img in enumerate(new_images):
-                    img.coordinates = (float(new_coords[i][0]), float(new_coords[i][1]))
-            else:
-                state.axis_labels = new_axis_labels
-
-            # ── 4. Rebuild history groups ─────────────────────────────────
-            from models.data_structures import HistoryGroup
-            new_history: List[HistoryGroup] = []
-            for hg in history_groups_raw:
-                try:
-                    ts_hg = datetime.fromisoformat(hg.get("timestamp", datetime.now().isoformat()))
-                except Exception:
-                    ts_hg = datetime.now()
-                new_history.append(HistoryGroup(
-                    id=hg["id"],
-                    type=hg.get("type", "batch"),
-                    image_ids=hg.get("image_ids", []),
-                    prompt=hg.get("prompt", ""),
-                    visible=True,
-                    thumbnail_id=hg.get("thumbnail_id", None),
-                    timestamp=ts_hg,
-                ))
-
-            # ── 5. Commit to state ────────────────────────────────────────
-            state.images_metadata = sorted(new_images, key=lambda x: x.id)
-            state.history_groups = new_history
-            state.next_id = max_id + 1
-            state.image_layer_map = {int(k): v for k, v in img_layer_map_raw.items()}
-            state.layer_definitions = layer_defs
-
-            print(f"[OK] Import complete: {len(new_images)} images, {len(new_history)} groups")
-            await broadcast_state_update()
-            return {"status": "ok", "images_loaded": len(new_images), "groups_loaded": len(new_history)}
-
+            result = _import_from_zip(zf)
+        await broadcast_state_update()
+        return {"status": "ok", **result}
     except HTTPException:
         raise
     except Exception as e:
         print(f"ERROR in import-zip: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/import-starter")
+async def import_starter_canvas():
+    """Load the bundled starter.zip canvas for new participants.
+
+    Reads backend/data/starter/starter.zip and imports it exactly like /api/import-zip.
+    Supports both unified canvas.json format and legacy export_summary.json format.
+    Returns 404 if starter.zip hasn't been prepared yet (graceful fallback).
+    """
+    import io as _io
+    starter_path = Path(__file__).parent / "data" / "starter" / "starter.zip"
+    if not starter_path.exists():
+        raise HTTPException(status_code=404, detail="starter.zip not found")
+    try:
+        zip_bytes = starter_path.read_bytes()
+        with zipfile.ZipFile(_io.BytesIO(zip_bytes)) as zf:
+            result = _import_from_zip(zf)
+        await broadcast_state_update()
+        return {"status": "ok", **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"ERROR in import-starter: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -2729,10 +2873,13 @@ async def export_zip(ids: Optional[str] = None):
             # Save each image with timestamp-based filename
             print(f"Saving {len(visible_images)} images...")
             saved_count = 0
+            # img_id -> png filename stem (used when building canvas.json)
+            img_filename_map: Dict[int, str] = {}
             for img_meta in visible_images:
                 # Create timestamp-based filename
                 timestamp_str = img_meta.timestamp.strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Remove last 3 digits of microseconds
                 filename = f"img_{img_meta.id}_{timestamp_str}"
+                img_filename_map[img_meta.id] = filename
 
                 # Save image as PNG
                 img_path = temp_path / f"{filename}.png"
@@ -2741,8 +2888,8 @@ async def export_zip(ids: Optional[str] = None):
                 if saved_count % 10 == 0:
                     print(f"  Saved {saved_count}/{len(visible_images)} images...")
 
-                # Create metadata JSON
-                metadata = {
+                # Legacy per-image metadata JSON (kept for backward compat with old importers)
+                legacy_metadata = {
                     "id": img_meta.id,
                     "group_id": img_meta.group_id,
                     "prompt": img_meta.prompt,
@@ -2752,12 +2899,16 @@ async def export_zip(ids: Optional[str] = None):
                     "parents": img_meta.parents,
                     "children": img_meta.children,
                     "reference_ids": img_meta.reference_ids,
+                    "visible": img_meta.visible,
+                    "is_ghost": img_meta.is_ghost,
+                    "suggested_prompt": img_meta.suggested_prompt,
+                    "reasoning": img_meta.reasoning,
                     "embedding": img_meta.embedding.tolist(),
                 }
 
                 json_path = temp_path / f"{filename}.json"
                 with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(metadata, f, indent=2, ensure_ascii=False)
+                    json.dump(legacy_metadata, f, indent=2, ensure_ascii=False)
 
             print(f"Saved all {saved_count} images successfully")
 
@@ -2774,7 +2925,66 @@ async def export_zip(ids: Optional[str] = None):
                         "group_timestamp": g.timestamp.isoformat(),
                     }
 
-            # Create a summary metadata file
+            # ── Unified canvas.json (mirrors local save format, filename ref instead of base64) ──
+            canvas_images_data = []
+            for img_meta in visible_images:
+                ts = img_meta.timestamp.isoformat()
+                filename = img_filename_map[img_meta.id]
+                canvas_images_data.append({
+                    "id": img_meta.id,
+                    "group_id": img_meta.group_id,
+                    "filename": f"{filename}.png",  # PNG in same ZIP, no base64 here
+                    "embedding": img_meta.embedding.tolist(),
+                    "coordinates": [float(x) for x in img_meta.coordinates],
+                    "parents": img_meta.parents,
+                    "children": img_meta.children,
+                    "reference_ids": img_meta.reference_ids,
+                    "generation_method": img_meta.generation_method,
+                    "prompt": img_meta.prompt,
+                    "timestamp": ts,
+                    "visible": img_meta.visible,
+                    "is_ghost": img_meta.is_ghost,
+                    "suggested_prompt": img_meta.suggested_prompt,
+                    "reasoning": img_meta.reasoning,
+                })
+            canvas_history_data = []
+            for hg in state.history_groups:
+                ts = hg.timestamp.isoformat() if isinstance(hg.timestamp, datetime) else str(hg.timestamp)
+                canvas_history_data.append({
+                    "id": hg.id,
+                    "type": hg.type,
+                    "image_ids": hg.image_ids,
+                    "prompt": hg.prompt,
+                    "visible": hg.visible,
+                    "thumbnail_id": hg.thumbnail_id,
+                    "timestamp": ts,
+                })
+            canvas_doc = {
+                "id": state.current_canvas_id,
+                "name": state.canvas_name,
+                "participantId": state.participant_id,
+                "createdAt": state.canvas_created_at,
+                "updatedAt": datetime.now().isoformat(),
+                "parentCanvasId": state.parent_canvas_id,
+                "sharedImageIds": state.shared_image_ids,
+                "axisLabels": {k: list(v) for k, v in state.axis_labels.items()},
+                "designBrief": state.design_brief,
+                "briefFields": state.brief_fields,
+                "briefInterpretation": state.brief_interpretation,
+                "briefSuggestedParams": state.brief_suggested_params,
+                "nextId": state.next_id,
+                "layerDefinitions": state.layer_definitions,
+                "imageLayerMap": {str(k): v for k, v in state.image_layer_map.items()},
+                "images": canvas_images_data,
+                "historyGroups": canvas_history_data,
+                "eventLog": state.event_log,
+            }
+            canvas_path = temp_path / "canvas.json"
+            print("Writing unified canvas.json...")
+            with open(canvas_path, 'w', encoding='utf-8') as f:
+                json.dump(canvas_doc, f, ensure_ascii=False, cls=_NumpyEncoder)
+
+            # ── Legacy export_summary.json (kept for old importers / human inspection) ──
             summary = {
                 "export_timestamp": datetime.now().isoformat(),
                 "total_images": len(visible_images),
@@ -2789,6 +2999,7 @@ async def export_zip(ids: Optional[str] = None):
                         "type": g.type,
                         "image_ids": g.image_ids,
                         "prompt": g.prompt,
+                        "visible": g.visible,
                         "timestamp": g.timestamp.isoformat(),
                         "thumbnail_id": g.thumbnail_id,
                     }
@@ -2813,7 +3024,7 @@ async def export_zip(ids: Optional[str] = None):
             }
 
             summary_path = temp_path / "export_summary.json"
-            print("Writing summary JSON...")
+            print("Writing legacy export_summary.json...")
             with open(summary_path, 'w', encoding='utf-8') as f:
                 json.dump(summary, f, indent=2, ensure_ascii=False)
 
@@ -2908,18 +3119,9 @@ async def load_session(request: LoadSessionRequest):
         # Save current canvas first
         _save_canvas_to_disk()
         # Find and load the requested canvas
-        path = _session_path(state.participant_id, request.canvas_id)
-        if not path.exists():
-            # Also search other participant dirs for this canvas_id
-            found = None
-            for pid_dir in DATA_DIR.iterdir():
-                candidate = pid_dir / "sessions" / f"{request.canvas_id}.json"
-                if candidate.exists():
-                    found = candidate
-                    break
-            if not found:
-                raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
-            path = found
+        path = _find_session_file(state.participant_id, request.canvas_id)
+        if not path:
+            raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         _deserialize_canvas(data)
@@ -3057,18 +3259,9 @@ async def delete_canvas(request: DeleteCanvasRequest):
     """Delete a saved canvas from disk. Cannot delete the currently active canvas."""
     if request.canvas_id == state.current_canvas_id:
         raise HTTPException(status_code=400, detail="Cannot delete the active canvas. Switch to another canvas first.")
-    path = _session_path(state.participant_id, request.canvas_id)
-    if not path.exists():
-        # Search other participant dirs
-        found = None
-        for pid_dir in DATA_DIR.iterdir():
-            candidate = pid_dir / "sessions" / f"{request.canvas_id}.json"
-            if candidate.exists():
-                found = candidate
-                break
-        if not found:
-            raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
-        path = found
+    path = _find_session_file(state.participant_id, request.canvas_id)
+    if not path:
+        raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
     path.unlink()
     return {"success": True, "deleted": request.canvas_id}
 

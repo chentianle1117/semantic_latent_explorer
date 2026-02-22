@@ -192,6 +192,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
               <button
                 type="button"
                 className={`radial-dial-btn radial-dial-btn--${action.category}`}
+                data-tour={`dial-${action.id}`}
                 title={action.description ?? action.label}
                 onClick={() => {
                   action.onClick();

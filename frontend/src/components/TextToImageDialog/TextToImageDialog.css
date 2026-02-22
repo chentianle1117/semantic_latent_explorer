@@ -265,3 +265,100 @@
 .ttd-textarea::placeholder {
   color: rgba(120, 135, 150, 0.6);
 }
+
+/* ─── Tutorial Guide Banner ──────────────────────────────────────────────── */
+
+.ttd-guide {
+  background: rgba(0, 210, 255, 0.05);
+  border: 1px solid rgba(0, 210, 255, 0.22);
+  border-radius: 8px;
+  padding: 10px 12px 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ttd-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(0, 210, 255, 0.85);
+  letter-spacing: 0.04em;
+}
+
+.ttd-guide-header strong {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(0, 210, 255, 0.85);
+}
+
+.ttd-guide-dismiss {
+  background: transparent;
+  border: none;
+  color: rgba(100, 120, 140, 0.6);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  margin-left: auto;
+  transition: color 0.15s;
+}
+.ttd-guide-dismiss:hover { color: rgba(200, 215, 230, 0.85); }
+
+.ttd-guide-steps {
+  padding-left: 18px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ttd-guide-steps li {
+  font-size: 11px;
+  color: rgba(170, 188, 205, 0.85);
+  line-height: 1.5;
+}
+
+.ttd-guide-steps li strong {
+  color: rgba(215, 230, 245, 0.95);
+  font-weight: 600;
+}
+
+/* Inline category chip row */
+.ttd-cat-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.ttd-cat-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+}
+
+.ttd-cat-material  { background: rgba(88, 130, 255, 0.13);  border: 1px solid rgba(88, 130, 255, 0.45);  color: #8CB4FF; }
+.ttd-cat-color     { background: rgba(255, 160, 64, 0.13);  border: 1px solid rgba(255, 160, 64, 0.45);  color: #FFA040; }
+.ttd-cat-silhouette { background: rgba(64, 210, 180, 0.13); border: 1px solid rgba(64, 210, 180, 0.45); color: #40D2B4; }
+.ttd-cat-style     { background: rgba(200, 100, 255, 0.13); border: 1px solid rgba(200, 100, 255, 0.45); color: #C864FF; }
+.ttd-cat-details   { background: rgba(255, 100, 120, 0.13); border: 1px solid rgba(255, 100, 120, 0.45); color: #FF6478; }
+
+/* Pulse animation for tutorial-highlighted buttons */
+.ttd-btn-pulse {
+  animation: ttd-btn-pulse-anim 1.5s ease-in-out infinite;
+}
+
+@keyframes ttd-btn-pulse-anim {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 210, 255, 0.45); }
+  50%       { box-shadow: 0 0 0 5px rgba(0, 210, 255, 0); }
+}

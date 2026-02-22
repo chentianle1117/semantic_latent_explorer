@@ -150,6 +150,12 @@ export interface AppState {
 
   // Axis suggestion accumulator
   imagesSinceLastAxisSuggestion: number;
+
+  // Onboarding tutorial
+  onboardingActive: boolean;
+  onboardingSpotlight: string | null; // step ID currently spotlighted
+  completedSteps: string[];
+  onboardingDismissed: boolean;
 }
 
 export interface VisualSettings {

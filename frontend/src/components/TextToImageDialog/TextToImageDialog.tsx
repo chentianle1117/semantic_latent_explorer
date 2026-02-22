@@ -29,6 +29,12 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   const [isRefining, setIsRefining] = useState(false);
   const designBrief = useAppStore((s) => s.designBrief);
 
+  // Tutorial guide: show when the tutorial spotlight is on a generation step
+  const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const showTutorialGuide = !guideDismissed &&
+    (onboardingSpotlight === 'gen-text' || onboardingSpotlight === 'gen-ref');
+
   // The actual prompt composed from chips + free text
   const composedPrompt = [
     ...Array.from(selectedTags.keys()),
@@ -122,6 +128,40 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
         <div className="dialog prompt-dialog-main">
           <h2>Generate from Text</h2>
 
+          {/* ── Tutorial guide banner ── */}
+          {showTutorialGuide && (
+            <div className="ttd-guide" role="note" aria-label="Tutorial: how to generate">
+              <div className="ttd-guide-header">
+                <span>🎓</span>
+                <strong>How to use this dialog</strong>
+                <button className="ttd-guide-dismiss" onClick={() => setGuideDismissed(true)} title="Dismiss">×</button>
+              </div>
+              <ol className="ttd-guide-steps">
+                <li>
+                  <strong>Right panel — Tag Matrix</strong>: Click colored tags to build your prompt.
+                  Categories:
+                  <span className="ttd-cat-chips">
+                    <span className="ttd-cat-chip ttd-cat-material">Material</span>
+                    <span className="ttd-cat-chip ttd-cat-color">Color</span>
+                    <span className="ttd-cat-chip ttd-cat-silhouette">Shape</span>
+                    <span className="ttd-cat-chip ttd-cat-style">Style</span>
+                    <span className="ttd-cat-chip ttd-cat-details">Details</span>
+                  </span>
+                </li>
+                <li>
+                  <strong>Text box</strong>: Add any extra free-form details below the tags.
+                </li>
+                <li>
+                  Click <strong>Refine Prompt</strong> to let the AI polish and expand your description.
+                </li>
+                <li>
+                  Click <strong>Generate</strong> — the AI may produce surprisingly creative or
+                  unexpected interpretations!
+                </li>
+              </ol>
+            </div>
+          )}
+
           <div className="input-section" style={{ flex: 1 }}>
             <label>Prompt</label>
 
@@ -169,7 +209,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
               {composedPrompt && (
                 <div className="ttd-refine-row">
                   <button
-                    className="ttd-refine-btn"
+                    className={`ttd-refine-btn${showTutorialGuide ? ' ttd-btn-pulse' : ''}`}
                     onClick={handleRefine}
                     disabled={isRefining || !composedPrompt}
                     title="AI rewrites your prompt while keeping tag terms"
@@ -190,7 +230,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
           <div className="dialog-actions">
             <button onClick={onClose}>Cancel</button>
             <button
-              className="primary"
+              className={`primary${showTutorialGuide && composedPrompt ? ' ttd-btn-pulse' : ''}`}
               onClick={handleSubmit}
               disabled={!composedPrompt}
             >

@@ -41,6 +41,7 @@ export const DesignBriefOverlay: React.FC = () => {
   const [isFocused, setIsFocused] = useState(false);
   const [fieldsExpanded, setFieldsExpanded] = useState(true);
   const [paramsSaved, setParamsSaved] = useState(false); // flash on save
+  const [briefSaved, setBriefSaved] = useState(false);   // flash on brief save
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fieldSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,6 +98,13 @@ export const DesignBriefOverlay: React.FC = () => {
     }
   }, [setDesignBrief, runInterpretation]);
 
+  const handleManualSave = useCallback(() => {
+    commitBrief(localBrief);
+    textareaRef.current?.blur();
+    setBriefSaved(true);
+    setTimeout(() => setBriefSaved(false), 1600);
+  }, [commitBrief, localBrief]);
+
   const handleFocus = () => setIsFocused(true);
 
   const handleBlur = () => {
@@ -150,7 +158,7 @@ export const DesignBriefOverlay: React.FC = () => {
   const hasStructured = hasFields || hasSuggestions || briefLoading;
 
   return (
-    <div className={`design-brief-overlay ${isAgentUsingBrief ? "dbo-agent-active" : ""}`}>
+    <div className={`design-brief-overlay ${isAgentUsingBrief ? "dbo-agent-active" : ""}`} data-tour="brief">
 
       {/* ── Inline editable brief ── */}
       <div className={`dbo-brief-container${isFocused ? " dbo-brief-focused" : ""}`}>
@@ -176,8 +184,19 @@ export const DesignBriefOverlay: React.FC = () => {
           rows={isFocused ? 3 : 2}
         />
 
-        {isFocused && (
-          <span className="dbo-edit-hint">Ctrl+↵ to save · Esc to cancel</span>
+        {(isFocused || localBrief !== (designBrief || '')) && (
+          <div className="dbo-save-row">
+            {isFocused && (
+              <span className="dbo-edit-hint">Ctrl+↵ to save · Esc to cancel</span>
+            )}
+            <button
+              className={`dbo-save-btn${briefSaved ? ' dbo-save-btn--saved' : ''}`}
+              onClick={handleManualSave}
+              title="Save AI agent context"
+            >
+              {briefSaved ? '✓ Saved' : 'Save'}
+            </button>
+          </div>
         )}
       </div>
 

@@ -88,6 +88,37 @@
   letter-spacing: 0.02em;
 }
 
+/* Save row: hint text + Save button */
+.dbo-save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.dbo-save-btn {
+  padding: 3px 10px;
+  border-radius: 5px;
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  background: rgba(0, 210, 255, 0.1);
+  color: rgba(0, 210, 255, 0.85);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dbo-save-btn:hover {
+  background: rgba(0, 210, 255, 0.2);
+  border-color: rgba(0, 210, 255, 0.65);
+}
+.dbo-save-btn--saved {
+  background: rgba(0, 210, 100, 0.15);
+  border-color: rgba(0, 210, 100, 0.5);
+  color: rgba(0, 210, 100, 0.9);
+}
+
 /* Keep old read class as no-op for compatibility */
 .dbo-read {
   display: none;
@@ -193,8 +224,8 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(0, 210, 255, 0.18);
-  border-top: none;
-  border-radius: 0 0 8px 8px;
+  border-radius: 8px;
+  margin-top: 6px;
   padding: 6px 8px 8px;
   display: flex;
   flex-direction: column;
@@ -202,12 +233,6 @@
   max-width: 380px;
 }
 
-/* Attach directly below .dbo-read */
-.dbo-read + .dbo-fields-section {
-  margin-top: -2px;
-  border-top: 1px solid rgba(0, 210, 255, 0.12);
-  border-radius: 0 0 8px 8px;
-}
 
 .dbo-fields-header {
   display: flex;

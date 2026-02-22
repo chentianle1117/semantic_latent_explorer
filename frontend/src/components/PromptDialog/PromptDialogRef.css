@@ -108,6 +108,23 @@
   color: rgba(150, 165, 180, 0.7);
 }
 
+/* ─── Refine gate warning ────────────────────────────────────────────────── */
+
+.ref-refine-gate {
+  font-size: 11px;
+  color: rgba(255, 200, 80, 0.85);
+  background: rgba(255, 180, 40, 0.08);
+  border: 1px solid rgba(255, 180, 40, 0.25);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.ref-refine-gate strong {
+  color: rgba(255, 210, 100, 1);
+}
+
 /* ─── Chip-based prompt area (shared with TextToImageDialog) ────────────── */
 
 .ttd-prompt-area {

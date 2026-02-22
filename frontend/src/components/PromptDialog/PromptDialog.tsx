@@ -10,7 +10,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
-import type { ImageData } from '../../types';
+import type { ImageData, ReferenceImageAnalysis } from '../../types';
 import { useAppStore } from '../../store/appStore';
 import { apiClient } from '../../api/client';
 import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
@@ -48,6 +48,9 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   // All available pills from SuggestionsPanel (kept for future use)
   const [_availablePills, setAvailablePills] = useState<PillDef[]>([]);
 
+  // Reference analysis — loaded from SuggestionsPanel, used to expand @A/@B at generation time
+  const [refAnalysis, setRefAnalysis] = useState<ReferenceImageAnalysis[]>([]);
+
   // Refine state
   const [isRefining, setIsRefining] = useState(false);
   const designBrief = useAppStore((s) => s.designBrief);
@@ -61,16 +64,29 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   ].filter(Boolean).join(', ');
 
   const handleGenerate = () => {
-    if (!composedPrompt.trim()) {
-      alert('Please enter a prompt or select tags');
-      return;
+    // Require finalized prompt: tags alone are not enough — user must type or refine first
+    if (!freeText.trim()) {
+      return; // Generate button will be disabled; this is a safety guard
     }
-    // Resolve @A/@B/@C shorthand to plain text for the backend
-    const resolved = composedPrompt
+    if (!composedPrompt.trim()) return;
+
+    // Expand @A/@B/@C/@D using descriptor lists from the reference analysis,
+    // so the fal.ai model gets concrete visual descriptions instead of generic labels.
+    let resolved = composedPrompt;
+    for (const item of refAnalysis) {
+      const label = item.label; // 'A', 'B', 'C', 'D'
+      const descriptors = item.descriptors?.join(', ') || `reference image ${label}`;
+      resolved = resolved
+        .replace(new RegExp(`@${label}'s\\b`, 'gi'), `${descriptors}'s`)
+        .replace(new RegExp(`@${label}\\b`, 'gi'), descriptors);
+    }
+    // Fallback for any @A/@B not covered by analysis
+    resolved = resolved
       .replace(/@A\b/gi, 'the first reference image')
       .replace(/@B\b/gi, 'the second reference image')
       .replace(/@C\b/gi, 'the third reference image')
       .replace(/@D\b/gi, 'the fourth reference image');
+
     const referenceIds = referenceImages.map(img => img.id);
     onGenerate(referenceIds, resolved, numImages);
   };
@@ -146,9 +162,21 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         const color = REF_IMAGE_COLORS[labelIdx % REF_IMAGE_COLORS.length];
         return { text, source: imageLabel, color };
       });
+
+      // Pre-attribute chip tags with @A's/@B's notation BEFORE sending to Gemini.
+      // This guarantees @A/@B appear in the output — Gemini just polishes the sentence.
+      // e.g. chips "formal wear"→A, "platform sole"→B + freeText "minimalist" becomes:
+      //      "@A's formal wear, @B's platform sole, minimalist"
+      const preAttributedChips = Array.from(chipMap.entries()).map(
+        ([text, imageLabel]) => `@${imageLabel}'s ${text}`
+      );
+      const preAttributedPrompt = [...preAttributedChips, freeText.trim()]
+        .filter(Boolean)
+        .join(', ');
+
       const refIds = referenceImages.map(img => img.id);
       const result = await apiClient.refinePrompt(
-        composedPrompt,
+        preAttributedPrompt,
         tags,
         refIds,
         designBrief || ''
@@ -309,6 +337,13 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                 <p className="ref-hint">Click tags to add colored chips · type @ to reference a specific image</p>
               )}
 
+              {/* Refine gate: warn when user has chips but hasn't finalized prompt */}
+              {chipMap.size > 0 && !freeText.trim() && (
+                <p className="ref-refine-gate">
+                  Click <strong>Refine Prompt</strong> to build your prompt from the selected tags, or type directly in the field above.
+                </p>
+              )}
+
               <ImageCountSlider
                 value={numImages}
                 onChange={setNumImages}
@@ -322,7 +357,8 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
             <button
               className="primary"
               onClick={handleGenerate}
-              disabled={!composedPrompt.trim()}
+              disabled={!freeText.trim()}
+              title={!freeText.trim() ? 'Type a prompt or click Refine Prompt first' : undefined}
             >
               Generate
             </button>
@@ -336,6 +372,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
             referenceImages={referenceImages}
             onReferenceTagClick={handleReferenceTagClick}
             onTagsLoaded={handleTagsLoaded}
+            onRefAnalysisLoaded={setRefAnalysis}
           />
         </div>
 

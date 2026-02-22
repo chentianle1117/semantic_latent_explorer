@@ -1504,19 +1504,23 @@ async def refine_prompt(request: RefinePromptRequest):
                 tag_entries.append(f'"{txt}"')
         tag_list = "\nDESIGN TAGS in the prompt: " + ", ".join(tag_entries)
 
-    prompt_text = f"""You are a shoe design prompt refiner. The user has written a rough prompt with some design tags.
+    prompt_text = f"""You are a design prompt refiner. The user has selected descriptor tags from specific reference images and may have typed additional notes.
 
 DESIGN BRIEF: {brief}
 USER PROMPT: {request.prompt}{tag_list}
 
-Rewrite this into a polished, specific shoe design prompt (under 40 words).
+Rewrite this into a polished, specific design prompt (under 40 words).
 
 CRITICAL RULES:
-1. Keep ALL @A, @B, @C, @D references EXACTLY as-is (e.g. "@A's sole", "@B's upper"). These are image references the user typed — NEVER remove, rephrase, or replace them with generic text like "the first image".
-2. Keep the EXACT tag phrases intact. For example, if "white leather" is a tag, it must appear exactly as "white leather" — do NOT rephrase it.
-3. Keep the user's original language and intent as much as possible. Only polish grammar and add minor connecting words.
+1. When a tag has a source attribution in parentheses (e.g. "formal wear" (from A), "platform sole" (from B)), you MUST write "@A's formal wear" and "@B's platform sole" — use the @letter possessive form to attribute the tag to its source image. This is the most important rule.
+2. If the user already typed @A, @B, @C, @D references, keep them EXACTLY as-is — do NOT rephrase or remove them.
+3. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase or paraphrase them.
+4. Write a coherent, natural-sounding sentence that uses all the tags with their proper @A/@B attribution.
 
-You may add connecting words, adjectives, and structure around the preserved terms.
+EXAMPLE:
+Input prompt: "formal wear, platform sole"
+Tags: "formal wear" (from A), "platform sole" (from B)
+Output: "@A's formal wear aesthetic with @B's platform sole design"
 
 Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
 

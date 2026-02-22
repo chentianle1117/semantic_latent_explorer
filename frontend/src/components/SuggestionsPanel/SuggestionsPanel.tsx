@@ -55,6 +55,8 @@ export interface SuggestionsPanelProps {
   referenceImages?: ImageData[];
   /** Called when tag data loads — parent can use for pill rendering */
   onTagsLoaded?: (pills: PillDef[]) => void;
+  /** Called when reference analysis loads — parent can use descriptors for @A/@B resolution */
+  onRefAnalysisLoaded?: (analysis: ReferenceImageAnalysis[]) => void;
 }
 
 // ─── Inline @A/@B chip + descriptor tag renderer for combination prompts ─────
@@ -208,7 +210,7 @@ const RefMode: React.FC<{
               style={{ borderColor: hexToRgba(baseColor, 0.35) }}
             >
               <div className="sp-ref-img-label" style={{ color: baseColor }}>
-                Shoe {item.label}
+                Image {item.label}
               </div>
               <div className="sp-ref-feat-tags">
                 {tags.map((tag) => (
@@ -221,7 +223,7 @@ const RefMode: React.FC<{
                       background: hexToRgba(baseColor, 0.09),
                     }}
                     onClick={() => onReferenceTagClick?.(tag, item.label)}
-                    title={`Add from Shoe ${item.label}`}
+                    title={`Add from Image ${item.label}`}
                   >
                     {tag}
                   </button>
@@ -264,6 +266,7 @@ export const SuggestionsPanel: React.FC<SuggestionsPanelProps> = ({
   onReferenceTagClick,
   referenceImages,
   onTagsLoaded,
+  onRefAnalysisLoaded,
 }) => {
   const designBrief = useAppStore((s) => s.designBrief);
 
@@ -295,6 +298,8 @@ export const SuggestionsPanel: React.FC<SuggestionsPanelProps> = ({
       if (result.mode === "reference") {
         setRefAnalysis(result.reference_analysis);
         setCombinationPrompts(result.combination_prompts);
+        // Expose analysis to parent (for @A/@B resolution during generation)
+        onRefAnalysisLoaded?.(result.reference_analysis);
         // Notify parent of available pills for overlay rendering
         if (onTagsLoaded) {
           const pills: PillDef[] = [];

@@ -156,6 +156,8 @@ export const LayersPanel: React.FC = () => {
               key={layer.id}
               ref={isDragging ? (el) => { dragLayerRef.current = el; } : undefined}
               className={`lp-row ${!layer.visible ? "lp-row--hidden" : ""} ${isDragging ? "lp-row--dragging" : ""} ${isDropTarget ? "lp-row--drop-target" : ""}`}
+              onClick={() => toggleLayerVisibility(layer.id)}
+              style={{ cursor: "pointer" }}
             >
               {/* Drag handle */}
               <span
@@ -166,11 +168,10 @@ export const LayersPanel: React.FC = () => {
                 ⠿
               </span>
 
-              {/* Color dot — click to toggle visibility */}
+              {/* Color dot */}
               <span
                 className="lp-dot"
                 style={{ background: layer.color, boxShadow: `0 0 8px ${layer.color}88` }}
-                onClick={() => toggleLayerVisibility(layer.id)}
                 title={layer.visible ? "Hide layer" : "Show layer"}
               />
 
@@ -194,10 +195,6 @@ export const LayersPanel: React.FC = () => {
                 ) : (
                   <span
                     className="lp-name"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleLayerVisibility(layer.id);
-                    }}
                     onDoubleClick={(e) => {
                       e.stopPropagation();
                       handleDoubleClick(layer);
@@ -210,8 +207,8 @@ export const LayersPanel: React.FC = () => {
                 <span className="lp-count">{count}</span>
               </div>
 
-              {/* Right-side actions */}
-              <div className="lp-actions">
+              {/* Right-side actions — stopPropagation so row toggle doesn't fire */}
+              <div className="lp-actions" onClick={(e) => e.stopPropagation()}>
                 {/* Assign selected — shown when selection exists */}
                 {selectedImageIds.length > 0 && (
                   <button

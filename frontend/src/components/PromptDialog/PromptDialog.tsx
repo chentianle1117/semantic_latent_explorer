@@ -58,7 +58,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   // Tutorial guide
   const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
   const [guideDismissed, setGuideDismissed] = useState(false);
-  const showTutorialGuide = !guideDismissed && onboardingSpotlight === 'gen-ref';
+  const showTutorialGuide = !guideDismissed && onboardingSpotlight === 'b-gen-ref';
 
   const labels = referenceImages.map((_, i) => String.fromCharCode(65 + i)); // A, B, C...
 
@@ -205,7 +205,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
-      <div className="prompt-dialog-outer" onClick={(e) => e.stopPropagation()}>
+      <div className="prompt-dialog-outer" data-tour="gen-dialog-ref" onClick={(e) => e.stopPropagation()}>
 
         {/* Left panel: generate form */}
         <div className="dialog prompt-dialog-main">

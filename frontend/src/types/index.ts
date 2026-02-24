@@ -156,6 +156,7 @@ export interface AppState {
   onboardingSpotlight: string | null; // step ID currently spotlighted
   completedSteps: string[];
   onboardingDismissed: boolean;
+  onboardingSectionTransition: string | null; // section key shown in transition card
 }
 
 export interface VisualSettings {
@@ -293,6 +294,7 @@ export interface MinimapDot {
   x: number;   // base screen X (pre-zoom)
   y: number;   // base screen Y (pre-zoom)
   category: 'ref_image' | 'ref_shoe' | 'user' | 'agent';
+  color?: string; // optional — used by ghost dots for DI blob coloring
 }
 
 export interface ViewportRect {

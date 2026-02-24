@@ -26,24 +26,25 @@ interface BlobSpec {
   y: number;
   size: number;
   opacity: number;
+  color: string;
 }
 
 function computeBlobs(
-  agentDots: Array<{ id: number; x: number; y: number }>,
-  vpCenterX: number,
-  vpCenterY: number,
+  agentDots: Array<{ id: number; x: number; y: number; color?: string }>,
+  diScreenX: number,
+  diScreenY: number,
   rx: number, // half-width of DI + margin
   ry: number, // half-height of DI + margin
 ): BlobSpec[] {
   if (agentDots.length === 0) return [];
 
-  // Compute angle and distance from viewport center for each dot
+  // Compute angle and distance from DI's screen position to each ghost
   const items = agentDots.map((dot) => {
-    const dx = dot.x - vpCenterX;
-    const dy = dot.y - vpCenterY;
+    const dx = dot.x - diScreenX;
+    const dy = dot.y - diScreenY;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
     const angle = Math.atan2(dy, dx);
-    return { id: dot.id, angle, dist };
+    return { id: dot.id, angle, dist, color: dot.color || '#a855f7' };
   });
 
   // Normalize distances for size/opacity mapping
@@ -53,19 +54,20 @@ function computeBlobs(
   items.sort((a, b) => a.angle - b.angle);
 
   // Merge blobs within MERGE_ANGLE_RAD
-  const merged: { angle: number; weight: number; id: string }[] = [];
+  const merged: { angle: number; weight: number; id: string; color: string }[] = [];
   for (const item of items) {
     const normDist = item.dist / maxDist;
     const weight = 1 - normDist * 0.7; // closer = heavier
     const last = merged[merged.length - 1];
     if (last && Math.abs(item.angle - last.angle) < MERGE_ANGLE_RAD) {
-      // Merge: weighted average angle, sum weights
       const totalW = last.weight + weight;
       last.angle = (last.angle * last.weight + item.angle * weight) / totalW;
       last.weight = totalW;
       last.id += `_${item.id}`;
+      // Keep dominant color (heavier weight wins)
+      if (weight > last.weight - weight) last.color = item.color;
     } else {
-      merged.push({ angle: item.angle, weight, id: String(item.id) });
+      merged.push({ angle: item.angle, weight, id: String(item.id), color: item.color });
     }
   }
 
@@ -81,6 +83,7 @@ function computeBlobs(
       y: Math.sin(m.angle) * ry,
       size,
       opacity,
+      color: m.color,
     };
   });
 }
@@ -154,24 +157,27 @@ export const DynamicIsland: React.FC = () => {
     : "New insight";
 
   // Compute directional blobs — only for unaccepted ghost nodes
+  // Direction computed from DI's screen position (top-center of viewport)
   const blobs = useMemo(() => {
     const agentDots = minimapGhostDots;
     if (agentDots.length === 0) return [];
 
-    // Viewport center in base-screen coords
-    const vpCenterX = minimapViewport
+    // DI is positioned at top-center of canvas area
+    // Ghost dot coords are SVG screen-space, DI is at roughly (canvasCenter, ~30px from top)
+    const diScreenX = minimapViewport
       ? (minimapViewport.x1 + minimapViewport.x2) / 2
-      : 800 / 2;
-    const vpCenterY = minimapViewport
-      ? (minimapViewport.y1 + minimapViewport.y2) / 2
-      : 600 / 2;
+      : window.innerWidth / 2;
+    // DI is near the top of the viewport, not the center
+    const diScreenY = minimapViewport
+      ? minimapViewport.y1 + 30
+      : 30;
 
     // Ellipse radii: pill half-dimensions + margin
     const margin = 10;
     const rx = diSize.w / 2 + margin;
     const ry = diSize.h / 2 + margin;
 
-    return computeBlobs(agentDots, vpCenterX, vpCenterY, rx, ry);
+    return computeBlobs(agentDots, diScreenX, diScreenY, rx, ry);
   }, [minimapGhostDots, minimapViewport, diSize]);
 
   return (
@@ -192,6 +198,8 @@ export const DynamicIsland: React.FC = () => {
             width: b.size,
             height: b.size,
             opacity: b.opacity,
+            background: b.color,
+            boxShadow: `0 0 8px 3px ${b.color}80`,
           }}
         />
       ))}

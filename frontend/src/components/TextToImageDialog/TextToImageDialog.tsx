@@ -33,7 +33,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
   const [guideDismissed, setGuideDismissed] = useState(false);
   const showTutorialGuide = !guideDismissed &&
-    (onboardingSpotlight === 'gen-text' || onboardingSpotlight === 'gen-ref');
+    (onboardingSpotlight === 'b-gen-text' || onboardingSpotlight === 'b-gen-ref');
 
   // The actual prompt composed from chips + free text
   const composedPrompt = [
@@ -122,7 +122,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
 
   return (
     <div className="dialog-overlay" onClick={onClose}>
-      <div className="prompt-dialog-outer" onClick={(e) => e.stopPropagation()}>
+      <div className="prompt-dialog-outer" data-tour="gen-dialog-text" onClick={(e) => e.stopPropagation()}>
 
         {/* Left panel: chip prompt area + count */}
         <div className="dialog prompt-dialog-main">

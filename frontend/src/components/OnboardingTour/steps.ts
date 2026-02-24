@@ -1,18 +1,44 @@
 /**
- * Onboarding tutorial step definitions — v4
+ * Onboarding tutorial step definitions — v5
  *
- * Flow:
- *   1. UI Layout  → explore all panels first (header, history drawer, brief)
- *   2. Navigation → click a shoe, open the radial dial
- *   3. Generate   → text gen and variation gen via dial
- *   4. Manipulate → axes, isolate, layers, tree via dial
- *   5. AI Agent   → explore canvas, read insights
- *   6. Save       → persist your canvas
+ * 4 color-coded sections, 31 steps:
+ *   A  UI Layout   — 12 steps (includes Load Files)
+ *   B  Generation  — 5 steps
+ *   C  Utilities   — 10 steps
+ *   D  AI Agent    — 4 steps
  *
  * Steps with `dialButtonId` use two-phase spotlight:
  *   Phase A (dial closed) → spotlight canvas, instruction = "Press Space"
  *   Phase B (dial open)   → spotlight the dial button, instruction = dialInstruction
  */
+
+// ─── Section types ───────────────────────────────────────────────────────────
+
+export type SectionKey = 'a' | 'b' | 'c' | 'd';
+
+export interface TutorialSection {
+  key: SectionKey;
+  label: string;
+  color: string;
+  icon: string;
+  completionSummary: string;
+}
+
+/** Unified tutorial accent — bright orange for all sections. */
+export const OB_ACCENT = '#FF6B2B';
+
+export const TUTORIAL_SECTIONS: TutorialSection[] = [
+  { key: 'a', label: 'UI Layout',  color: OB_ACCENT, icon: '1', completionSummary: 'You now know where everything is — panels, layers, inspector, and the AI context.' },
+  { key: 'b', label: 'Generation', color: OB_ACCENT, icon: '2', completionSummary: 'You can generate shoes from text prompts and reference images.' },
+  { key: 'c', label: 'Utilities',  color: OB_ACCENT, icon: '3', completionSummary: 'You can isolate, delete, rate, filter, and explore the genealogy tree.' },
+  { key: 'd', label: 'AI Agent',   color: OB_ACCENT, icon: '4', completionSummary: 'You can ask the AI to explore gaps and suggest semantic axes.' },
+];
+
+export function getSectionByKey(key: SectionKey): TutorialSection {
+  return TUTORIAL_SECTIONS.find((s) => s.key === key)!;
+}
+
+// ─── Step types ──────────────────────────────────────────────────────────────
 
 export interface TutorialStep {
   id: string;
@@ -22,273 +48,516 @@ export interface TutorialStep {
   dialInstruction?: string;
   targetSelector: string;
   cardPosition: 'right' | 'left' | 'below' | 'above';
-  icon: string;
-  category: string;
-  /** ID of the radial dial button (action.id) to spotlight when dial is open. */
+  section: SectionKey;
+  /** Radial dial button action.id to spotlight in Phase B. */
   dialButtonId?: string;
+  /** Key for prerequisite check — if unmet, shows guidance card. */
   prerequisiteKey?: string;
-  setupHint?: string;
+  /** Active guidance text shown when prerequisite is not met. */
+  prerequisiteGuide?: string;
+  /** Step ID for auto-complete detection (matched in useAutoComplete). */
   completionKey?: string;
+  /** Label shown while async operation is in progress. */
   waitingLabel?: string;
+  /** If true, "Got it" is the only completion method (no auto-complete). */
   isInformational?: boolean;
+  /** Secondary selector for observation area (bright cutout where results appear). */
+  observationSelector?: string;
+  /** Selector for a dialog/modal that opens as a third phase (after dial click). */
+  dialogSelector?: string;
+  /** Instruction shown when the dialog is open. */
+  dialogInstruction?: string;
+  /** Atomic unit ID — Back button hidden at unit boundaries. */
+  atomicUnit: string;
 }
 
-export interface StepCategory {
-  key: string;
-  label: string;
-  icon: string;
-}
+// ─── Atomic unit definitions ─────────────────────────────────────────────────
+// Steps sharing an atomicUnit can navigate Back/Forward between each other.
+// Back is hidden at the first step of each unit.
 
-export const STEP_CATEGORIES: StepCategory[] = [
-  { key: 'ui-layout',    label: 'UI Layout',           icon: '🗂️' },
-  { key: 'navigation',   label: 'Canvas Navigation',   icon: '🖱️' },
-  { key: 'generating',   label: 'Generating Images',   icon: '✨' },
-  { key: 'manipulation', label: 'Canvas Manipulation', icon: '🔧' },
-  { key: 'ai-agent',     label: 'AI Agent',            icon: '🤖' },
-  { key: 'saving',       label: 'Save & Export',       icon: '💾' },
-];
+export const ATOMIC_UNITS = [
+  'ui-orientation',   // steps 1-9: all reversible panel exploration
+  'deselect-dial',    // steps 10-11: selection + dial intro
+  'gen-text',         // step 12: irreversible once generated
+  'gen-ref',          // step 13: irreversible once generated
+  'isolate-manage',   // steps 14-17: all reversible utilities
+  'ai-actions',       // steps 19-21: independent AI triggers
+] as const;
+
+// ─── 21 Tutorial Steps ──────────────────────────────────────────────────────
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
 
-  // ─── 1. UI Layout: explore all panels ────────────────────────────────────
+  // ═══ Section A: UI Layout (12 steps) ═══════════════════════════════════════
 
   {
-    id: 'ui-header',
-    category: 'ui-layout',
-    title: 'Header Bar',
-    description: 'The top bar holds **↑ Import / ↓ Save / ↓ Export** on the left and **Settings (⚙) / Tutorial (?)** on the right.',
-    instruction: 'Take a look at the header, then click **Got it ✓** to continue.',
-    targetSelector: '[data-tour="header"]',
-    cardPosition: 'below',
-    icon: '📌',
-    isInformational: true,
-  },
-
-  {
-    id: 'ui-panels',
-    category: 'ui-layout',
-    title: 'Expand the History Panel',
-    description: 'The **History** bar at the bottom shows all your generation batches. Click the bar (or ▲) to expand it — click again to collapse.',
-    instruction: 'Click the **▲ bar at the bottom** to expand the History panel.',
-    targetSelector: '[data-tour="bottom-drawer-bar"]',
-    cardPosition: 'above',
-    icon: '🗂️',
-    completionKey: 'ui-panels',
-  },
-
-  {
-    id: 'ui-tabs',
-    category: 'ui-layout',
-    title: 'Switch to Lineage Tree',
-    description: 'Two tabs are available: **History** (generation batches) and **Lineage Tree** (parent-child genealogy graph).',
-    instruction: 'Click the **Lineage Tree** tab. Click **History** to switch back.',
-    targetSelector: '[data-tour="tab-lineage"]',
-    cardPosition: 'above',
-    icon: '🌲',
-    prerequisiteKey: 'ui-tabs',
-    setupHint: 'First expand the History panel by clicking the ▲ bar at the bottom.',
-    completionKey: 'ui-tabs',
-  },
-
-  {
-    id: 'load-brief',
-    category: 'ui-layout',
-    title: 'Set the AI Agent Context',
-    description: 'The **AI Agent Context** box (top-left of canvas) gives every AI action context — generation prompts, axis suggestions, and canvas exploration all use it.',
-    instruction: 'Click the **AI Agent Context** box at the top-left and type a design direction — e.g. *"minimalist running shoe with bold color accents"*.',
+    id: 'a-canvas',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'AI Agent Context',
+    description: '',
+    instruction: '**Write a design prompt** — e.g. "minimalist running shoes with bold accents". Expand **Parameters** below to see how the AI interprets your prompt into structured categories (shoe type, material, color, etc.). You can **edit or add parameters** to refine exactly what the AI considers when suggesting designs.',
     targetSelector: '[data-tour="brief"]',
     cardPosition: 'below',
-    icon: '📝',
-    completionKey: 'load-brief',
+    completionKey: 'a-canvas',
+    observationSelector: '[data-tour="canvas"]',
   },
 
-  // ─── 2. Navigation ────────────────────────────────────────────────────────
-
   {
-    id: 'nav-canvas',
-    category: 'navigation',
+    id: 'a-select',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
     title: 'Select a Shoe',
-    description: '**Drag** to pan the canvas, **scroll** to zoom. The canvas is a semantic map — similar shoes cluster together.',
-    instruction: '**Click any shoe** on the canvas — ideally one with parent and child connections. It will glow cyan and the **Inspector** panel on the right will come alive.',
+    description: '',
+    instruction: '**Click any shoe** to select it — it gets a bright glow. **Click more shoes** to add them to the selection. You can also **drag** across the canvas to select multiple shoes at once.',
     targetSelector: '[data-tour="canvas"]',
     cardPosition: 'right',
-    icon: '🖱️',
-    prerequisiteKey: 'nav-canvas',
-    setupHint: 'Waiting for shoes to appear on the canvas…',
-    completionKey: 'nav-canvas',
+    completionKey: 'a-select',
+    observationSelector: '[data-tour="inspector"]',
   },
 
   {
-    id: 'nav-inspector',
-    category: 'navigation',
-    title: 'Inspector — Lineage & Genealogy',
-    description: 'The **Inspector** shows the selected shoe\'s full design lineage. **Ancestors** (cyan border, above) are the shoes it was generated from. **Children** (amber border, below) are designs created from it. Click any node to navigate the tree.',
-    instruction: 'Look at the **Inspector panel** on the right. The selected shoe is in the center — its **parent** is above (cyan) and its **children** are below (amber). This shows the full design genealogy.',
+    id: 'a-select-visual',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Selection Effects',
+    description: '',
+    instruction: 'Unselected shoes **fade to 30%** so you can focus on your selection. If a selected shoe has **parents or children**, they stay visible with **cyan connecting lines** showing the family tree. Click **empty canvas** to deselect all.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'right',
+    isInformational: true,
+    prerequisiteKey: 'a-select-visual',
+    prerequisiteGuide: '**Select a shoe** on the canvas first.',
+  },
+
+  {
+    id: 'a-history-expand',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'History Panel',
+    description: '',
+    instruction: '**Click the bottom bar** to expand the History panel.',
+    targetSelector: '[data-tour="bottom-drawer-bar"]',
+    cardPosition: 'right',
+    completionKey: 'a-history-expand',
+    observationSelector: '[data-tour="canvas"]',
+  },
+
+  {
+    id: 'a-history-browse',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Browse Batches',
+    description: '',
+    instruction: '**Browse the generation batches** in the History panel. Each batch is one generation run.',
+    targetSelector: '[data-tour="bottom-drawer-content"]',
+    cardPosition: 'above',
+    prerequisiteKey: 'a-history-browse',
+    prerequisiteGuide: '**Expand the History panel** first (click the bottom bar).',
+    isInformational: true,
+    observationSelector: '[data-tour="canvas"]',
+  },
+
+  {
+    id: 'a-lineage-tab',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Lineage Tree',
+    description: '',
+    instruction: '**Click the Lineage Tree tab** to see parent-child genealogy. Node colors: **orange** = reference shoes you loaded, **green** = AI-generated, **purple** = AI agent suggestions. Lines show which shoes were used as parents for each generation.',
+    targetSelector: '[data-tour="tab-lineage"]',
+    cardPosition: 'right',
+    prerequisiteKey: 'a-lineage-tab',
+    prerequisiteGuide: '**Expand the History panel** first (click the bottom bar).',
+    completionKey: 'a-lineage-tab',
+    observationSelector: '[data-tour="bottom-drawer-content"]',
+  },
+
+  {
+    id: 'a-layers-expand',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Layers Panel',
+    description: '',
+    instruction: '**Click the Layers bar** (bottom-right) to expand. Loaded reference images and shoes are **auto-sorted** into their own layers. **Click any layer row** to toggle its visibility on/off. Double-click a name to rename it.',
+    targetSelector: '[data-tour="layers-bar"]',
+    cardPosition: 'left',
+    completionKey: 'a-layers-expand',
+    observationSelector: '[data-tour="canvas"]',
+  },
+
+  {
+    id: 'a-layers-assign',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Assign to Layer',
+    description: '',
+    instruction: 'This dropdown shows the **current layer** of the selected shoe(s). If they\'re on different layers, it shows **"Multiple Layers"**. Use the dropdown to **assign all selected shoes** to a layer.',
+    targetSelector: '[data-tour="action-layer"]',
+    cardPosition: 'left',
+    prerequisiteKey: 'a-layers-assign',
+    prerequisiteGuide: '**Select a shoe** on the canvas first.',
+    completionKey: 'a-layers-assign',
+    observationSelector: '[data-tour="canvas"]',
+  },
+
+  {
+    id: 'a-inspector',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Inspector Panel',
+    description: '',
+    instruction: 'The **Inspector** (right) has two parts: the **top bar** shows all your selected shoes — these become **reference images** when you generate variations. Below is the **family tree** showing parents above and children below.',
     targetSelector: '[data-tour="inspector"]',
     cardPosition: 'left',
-    icon: '🔍',
+    prerequisiteKey: 'a-inspector',
+    prerequisiteGuide: '**Select a shoe that has parents or children** — generated shoes have lineage.',
+    isInformational: true,
+    observationSelector: '[data-tour="canvas"]',
+  },
+
+  {
+    id: 'a-inspector-actions',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Inspector Actions',
+    description: '',
+    instruction: 'Action buttons: **Generate**, **Isolate**, **Remove**, and **Deselect**.',
+    targetSelector: '[data-tour="action-bar"]',
+    cardPosition: 'left',
+    prerequisiteKey: 'a-inspector-actions',
+    prerequisiteGuide: '**Select a shoe** on the canvas first.',
     isInformational: true,
   },
 
   {
-    id: 'nav-radial',
-    category: 'navigation',
-    title: 'Open the Radial Dial',
-    description: 'The **Radial Dial** is your action hub — all major features live here: Generate, Explore, Suggest Axes, Exploration Tree, Isolate, and more.',
-    instruction: 'Press **Space** (or middle-click the canvas) to open the **Radial Dial**. Close it with Escape or by clicking outside.',
-    targetSelector: '[data-tour="canvas"]',
-    cardPosition: 'right',
-    icon: '⌨️',
-    completionKey: 'nav-radial',
+    id: 'a-topbar',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Top Bar',
+    description: '',
+    instruction: 'The header has **Import / Save / Export** and **Settings / Onboarding** buttons.',
+    targetSelector: '[data-tour="header"]',
+    cardPosition: 'below',
+    isInformational: true,
   },
 
-  // ─── 3. Generating Images ─────────────────────────────────────────────────
+  {
+    id: 'a-load',
+    section: 'a',
+    atomicUnit: 'ui-orientation',
+    title: 'Load Files',
+    description: '',
+    instruction: '**Space** or **middle-click** → **Load Files** to import external images. Choose **"Shoes"** for background removal, or **"References"** to keep backgrounds (mood boards, logos, etc.).',
+    dialInstruction: '**Click Load Files** to open the file loader.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'left',
+    dialButtonId: 'load',
+    isInformational: true,
+  },
+
+  // ═══ Section B: Generation (5 steps) ═══════════════════════════════════════
 
   {
-    id: 'gen-text',
-    category: 'generating',
+    id: 'b-deselect',
+    section: 'b',
+    atomicUnit: 'deselect-dial',
+    title: 'Clear Selection',
+    description: '',
+    instruction: '**Click an empty area** of the canvas to deselect all shoes.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'left',
+    completionKey: 'b-deselect',
+    observationSelector: '[data-tour="inspector"]',
+  },
+
+  {
+    id: 'b-dial-intro',
+    section: 'b',
+    atomicUnit: 'deselect-dial',
+    title: 'Radial Dial',
+    description: '',
+    instruction: '**Press Space** or **middle-click** to open the Radial Dial — your main action hub.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'left',
+    completionKey: 'b-dial-intro',
+  },
+
+  {
+    id: 'b-gen-text',
+    section: 'b',
+    atomicUnit: 'gen-text',
     title: 'Generate from Text',
-    description: 'When **no shoe is selected**, the Generate action creates designs from a text prompt. First click an empty area of the canvas to deselect, then open the Radial Dial.',
-    instruction: '**Click an empty area** of the canvas to deselect any shoes, then press **Space** to open the Radial Dial.',
-    dialInstruction: 'Click **Generate** — with nothing selected this opens the text prompt dialog. Type a description and generate!',
+    description: '',
+    instruction: '**Press Space** or **middle-click** → click **Generate**. With nothing selected, this creates shoes from a text prompt.',
+    dialInstruction: '**Click Generate** to open the text prompt dialog.',
+    dialogSelector: '[data-tour="gen-dialog-text"]',
+    dialogInstruction: 'Pick features from the **Tag Matrix** on the right, or type directly in the **text box** — or both! Click **Refine Prompt** to have Gemini combine everything into a polished description. Then click **Generate**.',
     targetSelector: '[data-tour="canvas"]',
-    cardPosition: 'right',
-    icon: '✨',
+    cardPosition: 'left',
     dialButtonId: 'generate',
-    prerequisiteKey: 'gen-text',
-    setupHint: 'Waiting for the app to finish loading…',
-    completionKey: 'gen-text',
-    waitingLabel: 'Generating your images… this usually takes 10–20 seconds.',
+    prerequisiteKey: 'b-gen-text',
+    prerequisiteGuide: '**Deselect all shoes** first (click an empty area).',
+    completionKey: 'b-gen-text',
+    waitingLabel: 'Generating... ~10-20 seconds.',
   },
 
   {
-    id: 'gen-ref',
-    category: 'generating',
-    title: 'Generate from References',
-    description: 'When **shoes are selected** (glowing cyan), Generate creates **variations** that blend or extend their design features — using the selected shoes as visual references.',
-    instruction: '**Click one or more shoes** on the canvas to select them (they glow cyan), then press **Space** to open the Radial Dial.',
-    dialInstruction: 'Click **Generate** — with shoes selected, this opens the reference dialog. Use the tag matrix and Refine to craft your prompt!',
+    id: 'b-gen-ref',
+    section: 'b',
+    atomicUnit: 'gen-ref',
+    title: 'Generate Variations',
+    description: '',
+    instruction: '**Select one or more shoes**, then **press Space** or **middle-click** → **Generate**. This creates variations blending their designs.',
+    dialInstruction: '**Click Generate** to open the reference dialog.',
+    dialogSelector: '[data-tour="gen-dialog-ref"]',
+    dialogInstruction: 'Pick **descriptor tags** on the right, or type directly — use **@A**, **@B** to reference specific shoes. Click **Refine Prompt** to have Gemini polish everything together. Then click **Generate**!',
     targetSelector: '[data-tour="canvas"]',
-    cardPosition: 'right',
-    icon: '🎨',
+    cardPosition: 'left',
     dialButtonId: 'generate',
-    prerequisiteKey: 'gen-ref',
-    setupHint: 'Click at least 1 shoe on the canvas to select it first (it will glow cyan).',
-    completionKey: 'gen-ref',
-    waitingLabel: 'Generating variations… please wait.',
-  },
-
-  // ─── 4. Canvas Manipulation ───────────────────────────────────────────────
-
-  {
-    id: 'manip-axes',
-    category: 'manipulation',
-    title: 'Suggest Semantic Axes',
-    description: 'Shoes are positioned along two **semantic dimensions** (e.g. casual ↔ formal). The AI suggests new axis pairs and reprojects all shoes.',
-    instruction: 'Press **Space** to open the Radial Dial, then click **Suggest Axes**.',
-    dialInstruction: 'Click **Suggest Axes** — the AI will propose new semantic dimensions based on your canvas.',
-    targetSelector: '[data-tour="canvas"]',
-    cardPosition: 'right',
-    icon: '📐',
-    dialButtonId: 'analyze-axis',
-    prerequisiteKey: 'manip-axes',
-    setupHint: 'Generate some shoes first so the AI has content to analyze.',
-    completionKey: 'manip-axes',
+    prerequisiteKey: 'b-gen-ref',
+    prerequisiteGuide: '**Select at least one shoe** on the canvas first.',
+    completionKey: 'b-gen-ref',
+    waitingLabel: 'Generating variations...',
+    observationSelector: '[data-tour="inspector"]',
   },
 
   {
-    id: 'manip-isolate',
-    category: 'manipulation',
-    title: 'Isolate Selected Shoes',
-    description: '**Isolate** hides all other shoes — great for focused comparison. Use **Unhide All** (same button) to restore.',
-    instruction: '**Click a shoe** to select it, then press **Space** to open the Radial Dial.',
-    dialInstruction: 'Click **Isolate** — all other shoes fade away so you can focus on your selection.',
-    targetSelector: '[data-tour="canvas"]',
-    cardPosition: 'right',
-    icon: '👁️',
-    dialButtonId: 'isolate',
-    prerequisiteKey: 'manip-isolate',
-    setupHint: 'Click one or more shoes on the canvas to select them first (they glow cyan).',
-    completionKey: 'manip-isolate',
-  },
-
-  {
-    id: 'manip-layers',
-    category: 'manipulation',
-    title: 'Use the Layers Panel',
-    description: '**Layers** let you color-code and group shoes for A/B comparisons. Toggle visibility with eye icons to isolate groups.',
-    instruction: 'Click the **▲ Layers bar** at the bottom-right to expand the panel. With a shoe selected, click a layer button to assign it — the shoe node will take that layer\'s color.',
-    targetSelector: '[data-tour="layers"]',
+    id: 'b-axes',
+    section: 'b',
+    atomicUnit: 'gen-ref',
+    title: 'Edit Axes',
+    description: '',
+    instruction: 'The **axis labels** (bottom + left) define how shoes are arranged. **Click a label** to type a new concept (e.g. "formal ↔ sporty"), then press **Enter**. All shoes reproject instantly along the new dimension.',
+    targetSelector: '[data-tour="axis-x"]',
     cardPosition: 'above',
-    icon: '📁',
-    prerequisiteKey: 'manip-layers',
-    setupHint: 'Click a shoe on the canvas to select it first (it will glow cyan), then expand the Layers panel.',
-    completionKey: 'manip-layers',
+    completionKey: 'b-axes',
+  },
+
+  // ═══ Section C: Utilities (10 steps) ═══════════════════════════════════════
+
+  {
+    id: 'c-isolate',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Isolate',
+    description: '',
+    instruction: '**Select a shoe** → **Space** or **middle-click** → **Isolate**. This hides everything else so you can focus.',
+    dialInstruction: '**Click Isolate** to hide all other shoes and focus on the selected one.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'left',
+    dialButtonId: 'isolate',
+    prerequisiteKey: 'c-isolate',
+    prerequisiteGuide: '**Select a shoe** on the canvas first.',
+    completionKey: 'c-isolate',
   },
 
   {
-    id: 'manip-tree',
-    category: 'manipulation',
+    id: 'c-unhide',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Unhide All',
+    description: '',
+    instruction: 'Click the **⊙ Unhide All** button (bottom-right) to restore all hidden shoes back to the canvas.',
+    targetSelector: '[data-tour="canvas-reset-buttons"]',
+    cardPosition: 'left',
+    completionKey: 'c-unhide',
+  },
+
+  {
+    id: 'c-delete',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Delete a Shoe',
+    description: '',
+    instruction: '**Select a shoe** → **Space** or **middle-click** → **Delete** to remove it from the canvas.',
+    dialInstruction: '**Click Delete** to remove the selected shoe.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'left',
+    dialButtonId: 'delete',
+    prerequisiteKey: 'c-delete',
+    prerequisiteGuide: '**Select a shoe** on the canvas first.',
+    completionKey: 'c-delete',
+  },
+
+  {
+    id: 'c-revert',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Restore Deleted',
+    description: '',
+    instruction: 'After deleting, a **↩ button** appears (bottom-right). Click it to see all deleted shoes and **Restore** any of them back to the canvas.',
+    targetSelector: '[data-tour="deleted-panel-trigger"]',
+    cardPosition: 'left',
+    prerequisiteKey: 'c-revert',
+    prerequisiteGuide: '**Delete a shoe** first so the restore button appears.',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-minimap',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Minimap Navigation',
+    description: '',
+    instruction: 'The **Minimap** (bottom-left) shows all shoes at a glance. **Drag the white rectangle** to pan the canvas, or **click anywhere** on the minimap to jump to that region.',
+    targetSelector: '[data-tour="minimap"]',
+    cardPosition: 'right',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-axis-scale',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Axis Stretch',
+    description: '',
+    instruction: 'The **axis scale sliders** (below X-axis and left of Y-axis) let you **stretch or compress** the canvas along each dimension to spread out clusters or tighten gaps.',
+    targetSelector: '[data-tour="axis-scale-x"]',
+    cardPosition: 'above',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-controls',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Visual Controls',
+    description: '',
+    instruction: 'Try the **Size/Opacity sliders** on the right edge. Use **Visual Reset** and **Recenter** buttons (bottom-right) to restore defaults.',
+    targetSelector: '[data-tour="canvas-sliders"]',
+    cardPosition: 'left',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-rate',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Rate a Shoe',
+    description: '',
+    instruction: '**Select a shoe**, then use the **star buttons** in the Inspector\'s action bar to give it a rating (1-5 stars). Click the same star again to clear.',
+    targetSelector: '[data-tour="action-stars"]',
+    cardPosition: 'left',
+    prerequisiteKey: 'c-rate',
+    prerequisiteGuide: '**Select a shoe** on the canvas first.',
+    completionKey: 'c-rate',
+  },
+
+  {
+    id: 'c-star-filter',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Star Filter',
+    description: '',
+    instruction: 'The **star filter** (top-right) lets you show only shoes with a specific rating. Click a star to filter — e.g. clicking **4★** shows only 4-star shoes. Click again to clear.',
+    targetSelector: '[data-tour="star-filter"]',
+    cardPosition: 'left',
+    completionKey: 'c-star-filter',
+  },
+
+  {
+    id: 'c-tree',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
     title: 'Exploration Tree',
-    description: 'The **Exploration Tree** shows the full genealogy of all generated images — every parent-child relationship by generation run.',
-    instruction: 'Press **Space** to open the Radial Dial, then click **Exploration Tree**.',
-    dialInstruction: 'Click **Exploration Tree** to open the full genealogy graph of your designs.',
+    description: '',
+    instruction: '**Space** or **middle-click** → **Exploration Tree** to see the full genealogy graph of all your shoes. **Click any node** to select it and fly to it on the canvas. Nodes are color-coded: **orange** = reference, **green** = generated, **purple** = AI agent.',
+    dialInstruction: '**Click Exploration Tree** to open the full genealogy view.',
     targetSelector: '[data-tour="canvas"]',
-    cardPosition: 'right',
-    icon: '🌳',
+    cardPosition: 'left',
     dialButtonId: 'exploration-tree',
-    prerequisiteKey: 'manip-tree',
-    setupHint: 'Generate at least 2 shoes first to see a meaningful genealogy tree.',
-    completionKey: 'manip-tree',
+    isInformational: true,
   },
 
-  // ─── 5. AI Agent ──────────────────────────────────────────────────────────
+  // ═══ Section D: AI Agent (4 steps) ═════════════════════════════════════════
 
   {
-    id: 'ai-explore',
-    category: 'ai-agent',
+    id: 'd-explore',
+    section: 'd',
+    atomicUnit: 'ai-actions',
     title: 'Explore Canvas',
-    description: 'The AI agent analyzes your canvas for **unexplored design regions** — gaps in the semantic space worth investigating.',
-    instruction: 'Press **Space** to open the Radial Dial, then click **Explore Canvas**.',
-    dialInstruction: 'Click **Explore Canvas** — the AI will find unexplored regions in your design space.',
+    description: '',
+    instruction: '**Space** or **middle-click** → **Explore Canvas**. The AI finds unexplored regions in your design space.',
+    dialInstruction: '**Click Explore Canvas** — the AI will analyze gaps in the semantic space.',
     targetSelector: '[data-tour="canvas"]',
-    cardPosition: 'right',
-    icon: '🔭',
+    cardPosition: 'left',
     dialButtonId: 'explore-canvas',
-    prerequisiteKey: 'ai-explore',
-    setupHint: 'Generate some shoes first so the AI has a canvas to explore.',
-    completionKey: 'ai-explore',
-    waitingLabel: 'AI is analyzing the canvas… this takes a few seconds.',
+    prerequisiteKey: 'd-explore',
+    prerequisiteGuide: '**Generate some shoes** first so the AI has content to analyze.',
+    completionKey: 'd-explore',
+    waitingLabel: 'AI is analyzing...',
   },
 
   {
-    id: 'ai-island',
-    category: 'ai-agent',
-    title: 'Read the AI Insight',
-    description: 'The **Dynamic Island** (top center) shows AI status. After Explore Canvas or Suggest Axes, hover it to read the AI insight.',
-    instruction: 'Hover the **Dynamic Island** at the top-center to read the AI insight.',
+    id: 'd-ghosts',
+    section: 'd',
+    atomicUnit: 'ai-actions',
+    title: 'AI Suggestions',
+    description: '',
+    instruction: 'After **Explore Canvas**, the AI analyzes gaps and generates **translucent ghost shoes** — this may take **20-30 seconds**. Watch for glowing shoes to appear on the canvas. **Hover** to see why it was suggested, then click **Keep** to add it or **Skip** to dismiss.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'left',
+    completionKey: 'd-ghosts',
+    isInformational: true,
+  },
+
+  {
+    id: 'd-insight',
+    section: 'd',
+    atomicUnit: 'ai-actions',
+    title: 'Dynamic Island',
+    description: '',
+    instruction: 'The **Dynamic Island** (top-center) shows the AI\'s status. When the AI is **working** it pulses; when it **spots something** — a gap, a suggestion — hover to read the insight. Think of it as a live status bar for background AI activity.',
     targetSelector: '.dynamic-island',
     cardPosition: 'below',
-    icon: '🤖',
-    prerequisiteKey: 'ai-island',
-    setupHint: 'Trigger an AI action first — press Space → Suggest Axes or Explore Canvas.',
-    completionKey: 'ai-island',
     isInformational: true,
+    observationSelector: '[data-tour="canvas"]',
   },
-
-  // ─── 6. Save & Export ─────────────────────────────────────────────────────
 
   {
-    id: 'save-export',
-    category: 'saving',
-    title: 'Save Your Canvas',
-    description: '**↓ Save** persists your canvas to the server. **↓ Export** downloads a ZIP you can re-import later on any machine.',
-    instruction: 'Click **↓ Save** in the header to save your canvas.',
-    targetSelector: '[data-tour="save"]',
-    cardPosition: 'below',
-    icon: '💾',
-    prerequisiteKey: 'save-export',
-    setupHint: 'Generate or load some shoes first, then save the canvas.',
-    completionKey: 'save-export',
+    id: 'd-axes',
+    section: 'd',
+    atomicUnit: 'ai-actions',
+    title: 'Suggest Axes',
+    description: '',
+    instruction: '**Space** or **middle-click** → **Suggest Axes**. The AI proposes semantic dimensions and reprojects all shoes.',
+    dialInstruction: '**Click Suggest Axes** — the AI will propose new axis pairs for your canvas.',
+    targetSelector: '[data-tour="canvas"]',
+    cardPosition: 'left',
+    dialButtonId: 'analyze-axis',
+    prerequisiteKey: 'd-axes',
+    prerequisiteGuide: '**Generate some shoes** first so the AI has content to analyze.',
+    completionKey: 'd-axes',
   },
 ];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Get all steps for a section. */
+export function getStepsForSection(key: SectionKey): TutorialStep[] {
+  return TUTORIAL_STEPS.filter((s) => s.section === key);
+}
+
+/** Get the section a step belongs to. */
+export function getStepSection(stepId: string): TutorialSection | undefined {
+  const step = TUTORIAL_STEPS.find((s) => s.id === stepId);
+  return step ? getSectionByKey(step.section) : undefined;
+}
+
+/** Check if a step is the first in its atomic unit. */
+export function isFirstInUnit(stepId: string): boolean {
+  const step = TUTORIAL_STEPS.find((s) => s.id === stepId);
+  if (!step) return true;
+  const unitSteps = TUTORIAL_STEPS.filter((s) => s.atomicUnit === step.atomicUnit);
+  return unitSteps[0]?.id === stepId;
+}
+
+/** Get the previous step within the same atomic unit (for Back navigation). */
+export function getPrevInUnit(stepId: string): TutorialStep | null {
+  const step = TUTORIAL_STEPS.find((s) => s.id === stepId);
+  if (!step) return null;
+  const unitSteps = TUTORIAL_STEPS.filter((s) => s.atomicUnit === step.atomicUnit);
+  const idx = unitSteps.findIndex((s) => s.id === stepId);
+  return idx > 0 ? unitSteps[idx - 1] : null;
+}

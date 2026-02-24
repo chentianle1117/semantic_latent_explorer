@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from "react";
 import "./HeaderBar.css";
 import { CanvasSwitcher } from "../CanvasSwitcher/CanvasSwitcher";
+import { ProgressBar } from "../OnboardingTour/ProgressBar";
 import { apiClient } from "../../api/client";
 import { useAppStore } from "../../store/appStore";
 import { TUTORIAL_STEPS } from "../OnboardingTour/steps";
@@ -29,30 +30,32 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
 
   const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
-  const onboardingActive = useAppStore((s) => s.onboardingActive);
   const completedSteps = useAppStore((s) => s.completedSteps);
   const onboardingDismissed = useAppStore((s) => s.onboardingDismissed);
   const setOnboardingSpotlight = useAppStore((s) => s.setOnboardingSpotlight);
-  const setOnboardingActive = useAppStore((s) => s.setOnboardingActive);
-  const completeOnboardingStep = useAppStore((s) => s.completeOnboardingStep);
-
-  const isIncomplete = !onboardingDismissed && completedSteps.length < TUTORIAL_STEPS.length;
+  const undismissOnboarding = useAppStore((s) => s.undismissOnboarding);
+  const setIsHistoryExpanded = useAppStore((s) => s.setIsHistoryExpanded);
+  const setIsLayersExpanded = useAppStore((s) => s.setIsLayersExpanded);
+  const isIncomplete = completedSteps.length < TUTORIAL_STEPS.length;
 
   const handleTutorialClick = useCallback(() => {
-    if (onboardingDismissed) return;
-    const allDone = completedSteps.length >= TUTORIAL_STEPS.length;
-    if (allDone) {
-      // Post-completion: toggle the checklist for step replay
-      setOnboardingActive(!onboardingActive);
-    } else if (onboardingSpotlight) {
-      // Active spotlight open: close it
-      setOnboardingSpotlight(null);
-    } else {
-      // Jump to first incomplete step
+    // Collapse bottom panels so onboarding starts with a clean canvas view
+    setIsHistoryExpanded(false);
+    setIsLayersExpanded(false);
+
+    // If dismissed, un-dismiss and resume where we left off (preserve progress)
+    if (onboardingDismissed) {
+      undismissOnboarding();
       const firstIncomplete = TUTORIAL_STEPS.find((s) => !completedSteps.includes(s.id));
       setOnboardingSpotlight(firstIncomplete?.id ?? TUTORIAL_STEPS[0].id);
+      return;
     }
-  }, [onboardingSpotlight, onboardingActive, completedSteps, onboardingDismissed, setOnboardingSpotlight, setOnboardingActive]);
+    // If tutorial already active, do nothing (user can navigate via progress dots)
+    if (onboardingSpotlight) return;
+    // Start or resume tutorial
+    const firstIncomplete = TUTORIAL_STEPS.find((s) => !completedSteps.includes(s.id));
+    setOnboardingSpotlight(firstIncomplete?.id ?? TUTORIAL_STEPS[0].id);
+  }, [onboardingSpotlight, completedSteps, onboardingDismissed, setOnboardingSpotlight, undismissOnboarding, setIsHistoryExpanded, setIsLayersExpanded]);
 
   const handleImportClick = useCallback(() => {
     fileInputRef.current?.click();
@@ -86,13 +89,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     try {
       await apiClient.saveSession();
       setSaveStatus('done');
-      completeOnboardingStep('save-export');
       setTimeout(() => setSaveStatus('idle'), 1800);
     } catch {
       setSaveStatus('error');
       setTimeout(() => setSaveStatus('idle'), 2500);
     }
-  }, [completeOnboardingStep]);
+  }, []);
 
   const handleExport = useCallback(() => {
     // Use relative URL so it works both locally and via ngrok
@@ -100,59 +102,63 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   }, []);
 
   return (
-    <div className="header-bar" data-tour="header">
-      {/* Hidden file input for ZIP import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".zip"
-        style={{ display: 'none' }}
-        onChange={handleFileSelected}
-      />
+    <>
+      <div className="header-bar" data-tour="header">
+        {/* Hidden file input for ZIP import */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".zip"
+          style={{ display: 'none' }}
+          onChange={handleFileSelected}
+        />
 
-      <div className="header-left">
-        <CanvasSwitcher />
-        <button
-          className="header-canvas-action"
-          data-tour="import"
-          onClick={handleImportClick}
-          title="Import canvas from ZIP file"
-          disabled={importStatus === 'importing'}
-        >
-          {importStatus === 'importing' ? '…' : importStatus === 'done' ? '✓ Imported' : '↑ Import'}
-        </button>
-        <button
-          className="header-canvas-action"
-          data-tour="save"
-          onClick={handleSave}
-          title="Save canvas to server"
-          disabled={saveStatus === 'saving'}
-        >
-          {saveStatus === 'saving' ? '…' : saveStatus === 'done' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : '↓ Save'}
-        </button>
-        <button
-          className="header-canvas-action"
-          onClick={handleExport}
-          title="Export canvas as ZIP download"
-        >
-          ↓ Export
-        </button>
+        <div className="header-left">
+          <CanvasSwitcher />
+          <button
+            className="header-canvas-action"
+            data-tour="import"
+            onClick={handleImportClick}
+            title="Import canvas from ZIP file"
+            disabled={importStatus === 'importing'}
+          >
+            {importStatus === 'importing' ? '…' : importStatus === 'done' ? '✓ Imported' : '↑ Import'}
+          </button>
+          <button
+            className="header-canvas-action"
+            data-tour="save"
+            onClick={handleSave}
+            title="Save canvas to server"
+            disabled={saveStatus === 'saving'}
+          >
+            {saveStatus === 'saving' ? '…' : saveStatus === 'done' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : '↓ Save'}
+          </button>
+          <button
+            className="header-canvas-action"
+            onClick={handleExport}
+            title="Export canvas as ZIP download"
+          >
+            ↓ Export
+          </button>
+        </div>
+        <div className="header-center" />
+        <div className="header-right">
+          {/* Inline tutorial progress */}
+          <ProgressBar />
+          {/* Tutorial button */}
+          <button
+            className={`header-canvas-action ob-header-btn${isIncomplete ? ' ob-incomplete' : ''}`}
+            onClick={handleTutorialClick}
+            title="Start or resume onboarding tutorial"
+          >
+            Onboarding
+            {isIncomplete && <span className="ob-btn-badge" />}
+          </button>
+          <button className="header-icon-btn" onClick={onOpenSettings} title="Settings">
+            &#9881;
+          </button>
+        </div>
       </div>
-      <div className="header-center" />
-      <div className="header-right">
-        {/* Tutorial button */}
-        <button
-          className={`header-icon-btn ob-header-btn${isIncomplete ? ' ob-incomplete' : ''}`}
-          onClick={handleTutorialClick}
-          title="Tutorial Guide"
-        >
-          ?
-          {isIncomplete && <span className="ob-btn-badge" />}
-        </button>
-        <button className="header-icon-btn" onClick={onOpenSettings} title="Settings">
-          &#9881;
-        </button>
-      </div>
-    </div>
+    </>
   );
 };

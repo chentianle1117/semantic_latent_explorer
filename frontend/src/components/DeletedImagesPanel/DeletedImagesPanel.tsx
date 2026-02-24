@@ -72,6 +72,7 @@ export const DeletedImagesPanel: React.FC = () => {
       )}
       <button
         className="deleted-panel-trigger"
+        data-tour="deleted-panel-trigger"
         onClick={() => setIsOpen((v) => !v)}
         title={`${deletedStack.length} deleted image${deletedStack.length !== 1 ? "s" : ""} — click to restore`}
       >

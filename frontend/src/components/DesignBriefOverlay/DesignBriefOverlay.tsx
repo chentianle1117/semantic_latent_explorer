@@ -85,12 +85,14 @@ export const DesignBriefOverlay: React.FC = () => {
   }, [setBriefLoading, setBriefInterpretation, setBriefFields, setBriefSuggestedParams,
       setIsAgentWorking, setIsAgentUsingBrief, setAgentWorkingLabel]);
 
-  // Save brief on blur — fire-and-forget to avoid freezing the UI
+  // Save brief on blur or Save click — fire-and-forget to avoid freezing the UI
   const commitBrief = useCallback((value: string) => {
     const trimmed = value.trim();
     // Update store immediately (no await)
     setDesignBrief(trimmed || null);
     apiClient.updateDesignBrief(trimmed || "").catch(() => {});
+    // Signal tutorial that brief was explicitly saved
+    window.dispatchEvent(new Event('ob-brief-edited'));
     // Only interpret if brief changed from last interpreted version
     if (trimmed && trimmed !== lastInterpretedRef.current) {
       lastInterpretedRef.current = trimmed;

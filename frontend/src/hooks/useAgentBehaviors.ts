@@ -316,7 +316,7 @@ export function useAgentBehaviors() {
   // AUTO-TRIGGER C: watch imagesSinceLastExploration
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (imagesSinceLastExploration >= 5) {
+    if (imagesSinceLastExploration >= 15) {
       console.log('[Agent C] Accumulator hit', imagesSinceLastExploration, '— auto-triggering exploration');
       resetExplorationCounter();
       triggerExplorationGhosts();

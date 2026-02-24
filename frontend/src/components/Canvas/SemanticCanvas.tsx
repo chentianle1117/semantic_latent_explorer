@@ -50,202 +50,235 @@ function _renderGhostNodes(
   ghostNodeElements.each(function(d: any) {
     const el = d3.select(this);
     const haloColor = d.source === 'concurrent' ? '#a855f7' : '#14b8a6';
-    const glowNormal = `drop-shadow(0 0 2px ${haloColor}99) drop-shadow(0 0 10px ${haloColor}88)`;
-    const glowHover  = `drop-shadow(0 0 3px #fff5) drop-shadow(0 0 16px ${haloColor}) drop-shadow(0 0 30px ${haloColor}77)`;
-    el.style("filter", glowNormal);
 
-    const hasParents = d.parents && d.parents.length > 0;
-    const labelY = ghostSize / 2 + 4;
-    const labelH = 16;
-    const parentStripH = hasParents ? 16 : 0;
-    const parentStripBottom = labelY + labelH + 2 + parentStripH;
-    const btnH = 22, btnW = 56, gap = 6;
-    const btnY = parentStripBottom + 4;
+    // ── Scale all sizes relative to ghostSize ────────────────────────────
+    const s = ghostSize;
+    const sc = Math.max(s / 80, 0.5);
+    const fs = {
+      label: Math.max(5.5 * sc, 3.5),
+      title: Math.max(7 * sc, 4.5),
+      body:  Math.max(6 * sc, 4),
+      shift: Math.max(5.5 * sc, 3.5),
+      btn:   Math.max(7.5 * sc, 5),
+    };
+    const labelH = Math.max(11 * sc, 7);
+    const btnH = Math.max(18 * sc, 11), btnW = Math.max(40 * sc, 24), gap = 4 * sc;
 
-    // ── Structured hover card ──────────────────────────────────────────────
-    type _CardRow = { type: 'header' | 'value' | 'shift' | 'spacer'; text: string };
-    const ttPad = 8;
-    const cardRows: _CardRow[] = [];
-    const _wrap = (text: string, maxLen: number): string[] => {
+    // ── Text wrapping helper — splits text into lines that fit maxW ────
+    const wrapLines = (text: string, fontSize: number, maxW: number): string[] => {
+      const charW = fontSize * 0.52;
+      const maxChars = Math.max(Math.floor(maxW / charW), 10);
       const words = text.split(/\s+/);
       const lines: string[] = [];
       let cur = '';
       for (const w of words) {
-        const cand = cur ? `${cur} ${w}` : w;
-        if (cand.length > maxLen && cur) { lines.push(cur); cur = w; }
-        else cur = cand;
+        const word = w.length > maxChars ? w.slice(0, maxChars - 1) + '…' : w;
+        const test = cur ? `${cur} ${word}` : word;
+        if (test.length > maxChars && cur) { lines.push(cur); cur = word; }
+        else cur = test;
       }
       if (cur) lines.push(cur);
-      return lines;
+      return lines.length > 0 ? lines : [text.slice(0, maxChars)];
     };
 
-    if (d.source === 'concurrent' && d.your_design_was && d.this_explores) {
-      cardRows.push({ type: 'header', text: 'Your design was:' });
-      _wrap(d.your_design_was, 28).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
-      cardRows.push({ type: 'spacer', text: '' });
-      cardRows.push({ type: 'header', text: 'This explores:' });
-      _wrap(d.this_explores, 28).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
-      if (d.key_shifts && d.key_shifts.length > 0) {
-        cardRows.push({ type: 'spacer', text: '' });
-        (d.key_shifts as string[]).slice(0, 3).forEach((s: string) => cardRows.push({ type: 'shift', text: s }));
+    // ── Build info card rows (with pre-computed wrapping) ─────────────
+    type WrapRow = { type: 'title' | 'body' | 'shift'; lines: string[]; lineH: number; totalH: number };
+    const cardMaxW = Math.max(s * 1.3, 90 * sc);
+    const ttPad = 4 * sc;
+    const innerW = cardMaxW - ttPad * 2;
+    const cardRows: WrapRow[] = [];
+
+    if (d.source === 'concurrent' && d.this_explores) {
+      const lines = wrapLines(d.this_explores, fs.title, innerW);
+      const lh = fs.title * 1.25;
+      cardRows.push({ type: 'title', lines, lineH: lh, totalH: lines.length * lh });
+      if (d.key_shifts?.length) {
+        (d.key_shifts as string[]).slice(0, 2).forEach((sh: string) => {
+          const sLines = wrapLines(`› ${sh}`, fs.shift, innerW);
+          const slh = fs.shift * 1.25;
+          cardRows.push({ type: 'shift', lines: sLines, lineH: slh, totalH: sLines.length * slh });
+        });
       }
     } else if (d.source === 'exploration') {
-      if (d.target_region) cardRows.push({ type: 'header', text: `Exploring: ${d.target_region}` });
+      if (d.target_region) {
+        const lines = wrapLines(d.target_region, fs.title, innerW);
+        const lh = fs.title * 1.25;
+        cardRows.push({ type: 'title', lines, lineH: lh, totalH: lines.length * lh });
+      }
       if (d.contrasts_with) {
-        cardRows.push({ type: 'spacer', text: '' });
-        _wrap(d.contrasts_with, 30).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
-      } else if (d.reasoning && !d.target_region) {
-        _wrap(d.reasoning, 30).slice(0, 4).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
+        const lines = wrapLines(d.contrasts_with, fs.body, innerW);
+        const lh = fs.body * 1.25;
+        cardRows.push({ type: 'body', lines, lineH: lh, totalH: lines.length * lh });
       }
     } else {
-      const reasoningText = d.reasoning || d.prompt || '';
-      if (reasoningText) {
-        _wrap(reasoningText, 34).slice(0, 5).forEach((l: string) => cardRows.push({ type: 'value', text: l }));
+      const txt = d.reasoning || d.prompt || '';
+      if (txt) {
+        const lines = wrapLines(txt, fs.body, innerW);
+        const lh = fs.body * 1.25;
+        cardRows.push({ type: 'body', lines, lineH: lh, totalH: lines.length * lh });
       }
     }
-    const _rowH = (row: _CardRow) => row.type === 'spacer' ? 5 : row.type === 'shift' ? 15 : 14;
-    const ttW = Math.max(ghostSize + 24, 210);
-    const ttH = cardRows.length > 0 ? cardRows.reduce((acc, r) => acc + _rowH(r), 0) + ttPad * 2 + 2 : 0;
-    const ttY = ttH > 0 ? -ghostSize / 2 - ttH - 10 : -ghostSize / 2;
 
-    const hitTop = ttH > 0 ? ttY - 8 : -ghostSize / 2;
-    const hitBottom = btnY + btnH + 8;
-    const hitWidth = Math.max(ghostSize + 16, btnW * 2 + gap + 20);
+    const ttH = cardRows.length > 0
+      ? cardRows.reduce((a, r) => a + r.totalH + 2 * sc, 0) + ttPad * 2
+      : 0;
+
+    // ── Vertical layout: shoe → label → parent → card → buttons ──────
+    const hasParents = d.parents && d.parents.length > 0;
+    let curY = s / 2 + 2 * sc;
+    const labelY = curY;
+    curY += labelH + 2 * sc;
+    const parentY = curY;
+    if (hasParents) curY += labelH + 2 * sc;
+    const cardY = curY;
+    if (ttH > 0) curY += ttH + 2 * sc;
+    const btnY = curY;
+
+    // ── Hit area ──────────────────────────────────────────────────────
+    const hitWidth = Math.max(cardMaxW, s + 8 * sc, btnW * 2 + gap + 8 * sc);
+    const hitTop = -s / 2 - s * 0.3;
+    const hitBottom = btnY + btnH + 4 * sc;
     el.append("rect")
       .attr("class", "ghost-hit")
       .attr("x", -hitWidth / 2).attr("y", hitTop)
       .attr("width", hitWidth).attr("height", hitBottom - hitTop)
-      .attr("rx", 8).attr("fill", "transparent")
+      .attr("rx", 6 * sc).attr("fill", "transparent")
       .attr("pointer-events", "all");
 
-    // Label pill — exploration ghosts show region; concurrent show truncated prompt
-    const isExplorationWithRegion = d.source === 'exploration' && d.target_region;
-    const shortLabel = isExplorationWithRegion
-      ? `→ ${d.target_region}`
-      : (() => {
-          const words = (d.prompt || 'AI suggestion').trim().split(/\s+/);
-          let result = '';
-          for (const w of words) {
-            const candidate = result ? `${result} ${w}` : w;
-            if (candidate.length > 28 && result) break;
-            result = candidate;
-          }
-          return result.charAt(0).toUpperCase() + result.slice(1);
-        })();
-
-    el.append("rect")
-      .attr("x", -ghostSize / 2).attr("y", labelY)
-      .attr("width", ghostSize).attr("height", labelH)
-      .attr("rx", labelH / 2)
-      .attr("fill", isExplorationWithRegion ? `${haloColor}22` : "rgba(13,17,23,0.88)")
-      .attr("stroke", isExplorationWithRegion ? `${haloColor}66` : "none")
-      .attr("stroke-width", isExplorationWithRegion ? 0.8 : 0)
+    // ── Soft radial glow BEHIND shoe (circle + CSS blur) ──────────────
+    // Subtle halo at rest; brightens on hover to reveal info/actions
+    el.append("circle")
+      .attr("class", "ghost-glow-bg")
+      .attr("cx", 0).attr("cy", 0)
+      .attr("r", s * 0.55)
+      .attr("fill", haloColor)
+      .attr("opacity", 0.12)
+      .style("filter", `blur(${Math.max(s * 0.2, 8)}px)`)
       .style("pointer-events", "none");
-    el.append("text")
-      .attr("x", 0).attr("y", labelY + 11)
-      .attr("text-anchor", "middle").attr("font-size", 9)
-      .attr("fill", isExplorationWithRegion ? haloColor : "rgba(200,210,220,0.95)")
+
+    // ── Shoe image — same opacity as regular canvas shoes ───────────
+    // Ghost sits quietly alongside real shoes; labels/buttons hidden until hover
+    el.append("image")
+      .attr("class", "ghost-shoe-img")
+      .attr("x", -s / 2).attr("y", -s / 2)
+      .attr("width", s).attr("height", s)
+      .attr("href", d.base64_image)
+      .attr("preserveAspectRatio", "xMidYMid meet")
+      .attr("opacity", 0.8).style("pointer-events", "none");
+
+    // ── Info group (hidden at rest, shown on hover) ───────────────────
+    // All labels, parent strips, cards, and action buttons live here
+    // so the ghost is just a subtle image+halo until the user hovers
+    const infoGroup = el.append("g").attr("class", "ghost-info").attr("display", "none");
+
+    // ── Label pill ──────────────────────────────────────────────────
+    const isExploration = d.source === 'exploration' && d.target_region;
+    const labelMaxW = s * 0.95;
+    const labelCharW = fs.label * 0.52;
+    const labelMaxChars = Math.max(Math.floor(labelMaxW / labelCharW), 8);
+    const rawLabel = isExploration ? d.target_region : (d.prompt || 'AI suggestion');
+    const shortLabel = rawLabel.length > labelMaxChars
+      ? rawLabel.slice(0, labelMaxChars - 1) + '…'
+      : rawLabel;
+
+    infoGroup.append("rect")
+      .attr("x", -labelMaxW / 2).attr("y", labelY)
+      .attr("width", labelMaxW).attr("height", labelH)
+      .attr("rx", labelH / 2)
+      .attr("fill", isExploration ? `${haloColor}22` : "rgba(13,17,23,0.85)")
+      .attr("stroke", `${haloColor}44`).attr("stroke-width", 0.6)
+      .style("pointer-events", "none");
+    infoGroup.append("text")
+      .attr("x", 0).attr("y", labelY + labelH * 0.72)
+      .attr("text-anchor", "middle").attr("font-size", fs.label)
+      .attr("fill", isExploration ? haloColor : "rgba(200,210,220,0.9)")
       .style("pointer-events", "none")
       .text(shortLabel);
 
+    // ── Parent reference strip ────────────────────────────────────────
     if (hasParents) {
       const parentLabel = `← ref ${d.parents.map((id: number) => `#${id}`).join(', ')}`;
-      const parentH = 14;
-      const parentY = labelY + labelH + 2;
-      el.append("rect")
-        .attr("x", -ghostSize / 2).attr("y", parentY)
-        .attr("width", ghostSize).attr("height", parentH)
-        .attr("rx", parentH / 2)
-        .attr("fill", `${haloColor}1a`)
-        .attr("stroke", `${haloColor}55`).attr("stroke-width", 0.8)
+      infoGroup.append("rect")
+        .attr("x", -labelMaxW / 2).attr("y", parentY)
+        .attr("width", labelMaxW).attr("height", labelH)
+        .attr("rx", labelH / 2)
+        .attr("fill", `${haloColor}15`)
+        .attr("stroke", `${haloColor}44`).attr("stroke-width", 0.6)
         .style("pointer-events", "none");
-      el.append("text")
-        .attr("x", 0).attr("y", parentY + 10)
-        .attr("text-anchor", "middle").attr("font-size", 8)
+      infoGroup.append("text")
+        .attr("x", 0).attr("y", parentY + labelH * 0.72)
+        .attr("text-anchor", "middle").attr("font-size", fs.shift)
         .attr("fill", haloColor).style("pointer-events", "none")
         .text(parentLabel);
 
+      // Dashed line to parent shoes (also hidden at rest via ghost-parent-lines group)
       const gbx = (d.coordinates[0] + coordOffset[0]) * coordScale;
       const gby = (d.coordinates[1] + coordOffset[1]) * coordScale;
       const [gsx, gsy] = toStretched(gbx, gby);
-      const gx = xScale(gsx);
-      const gy = yScale(gsy);
+      const gx = xScale(gsx), gy = yScale(gsy);
       d.parents.forEach((parentId: number) => {
         const parentImg = images.find((img: any) => img.id === parentId);
         if (!parentImg?.coordinates) return;
         const pbx = (parentImg.coordinates[0] + coordOffset[0]) * coordScale;
         const pby = (parentImg.coordinates[1] + coordOffset[1]) * coordScale;
         const [psx, psy] = toStretched(pbx, pby);
-        const px2 = xScale(psx);
-        const py2 = yScale(psy);
+        const px2 = xScale(psx), py2 = yScale(psy);
         const cmx = (gx + px2) / 2;
         const cmy = (gy + py2) / 2 - Math.abs(gy - py2) * 0.25 - 15;
         ghostParentLinesGroup.append("path")
           .attr("d", `M ${gx},${gy} Q ${cmx},${cmy} ${px2},${py2}`)
           .attr("fill", "none").attr("stroke", haloColor)
-          .attr("stroke-width", 1.5).attr("stroke-dasharray", "5,4")
-          .attr("opacity", 0.5).style("pointer-events", "none");
+          .attr("stroke-width", 1.2).attr("stroke-dasharray", "4,3")
+          .attr("opacity", 0.45).style("pointer-events", "none");
       });
     }
 
-    el.append("image")
-      .attr("x", -ghostSize / 2).attr("y", -ghostSize / 2)
-      .attr("width", ghostSize).attr("height", ghostSize)
-      .attr("href", d.base64_image)
-      .attr("preserveAspectRatio", "xMidYMid meet")
-      .attr("opacity", 0.55).style("pointer-events", "none");
+    // ── Action buttons (Keep / Skip) ────────────────────────────────
+    const actionGroup = infoGroup.append("g").attr("class", "ghost-actions");
 
-    const actionGroup = el.append("g").attr("class", "ghost-actions").attr("display", "none");
     if (cardRows.length > 0) {
       actionGroup.append("rect")
-        .attr("x", -ttW / 2).attr("y", ttY).attr("width", ttW).attr("height", ttH)
-        .attr("rx", 8).attr("fill", "rgba(13,17,23,0.95)")
-        .attr("stroke", `${haloColor}44`).attr("stroke-width", 1)
+        .attr("x", -cardMaxW / 2).attr("y", cardY)
+        .attr("width", cardMaxW).attr("height", ttH)
+        .attr("rx", 4 * sc).attr("fill", "rgba(13,17,23,0.92)")
+        .attr("stroke", `${haloColor}44`).attr("stroke-width", Math.max(0.6 * sc, 0.4))
         .style("pointer-events", "none");
-      let cy = ttY + ttPad;
-      cardRows.forEach((row: _CardRow) => {
-        const rh = _rowH(row);
-        if (row.type === 'spacer') { cy += rh; return; }
-        if (row.type === 'header') {
-          actionGroup.append("text")
-            .attr("x", -ttW / 2 + ttPad).attr("y", cy + 10)
-            .attr("font-size", 9).attr("font-weight", "700")
-            .attr("fill", haloColor).attr("opacity", 0.9)
-            .style("pointer-events", "none").text(row.text.toUpperCase());
-        } else if (row.type === 'shift') {
-          actionGroup.append("rect")
-            .attr("x", -ttW / 2 + ttPad - 2).attr("y", cy + 1)
-            .attr("width", ttW - ttPad * 2 + 4).attr("height", 12)
-            .attr("rx", 3).attr("fill", `${haloColor}18`)
-            .style("pointer-events", "none");
-          actionGroup.append("text")
-            .attr("x", -ttW / 2 + ttPad + 2).attr("y", cy + 10)
-            .attr("font-size", 10).attr("fill", haloColor).attr("opacity", 0.9)
-            .style("pointer-events", "none").text(row.text);
-        } else {
-          actionGroup.append("text")
-            .attr("x", -ttW / 2 + ttPad).attr("y", cy + 11)
-            .attr("font-size", 11).attr("fill", "rgba(195,212,230,0.93)")
-            .style("pointer-events", "none").text(row.text);
-        }
-        cy += rh;
+      let ty = cardY + ttPad;
+      cardRows.forEach((row) => {
+        const rowFs = fs[row.type] || fs.body;
+        const rowFill = row.type === 'title' ? haloColor
+          : row.type === 'shift' ? `${haloColor}cc`
+          : 'rgba(200,215,230,0.85)';
+        const textEl = actionGroup.append("text")
+          .attr("x", -cardMaxW / 2 + ttPad).attr("y", ty + rowFs)
+          .attr("font-size", rowFs).attr("fill", rowFill)
+          .style("pointer-events", "none");
+        if (row.type === 'title') textEl.attr("font-weight", "700");
+        row.lines.forEach((line, i) => {
+          textEl.append("tspan")
+            .attr("x", -cardMaxW / 2 + ttPad)
+            .attr("dy", i === 0 ? 0 : row.lineH)
+            .text(line);
+        });
+        ty += row.totalH + 2 * sc;
       });
     }
 
+    // Keep / Skip buttons
     const keepX = -(btnW + gap / 2), skipX = gap / 2;
     const acceptBg = actionGroup.append("rect")
       .attr("x", keepX).attr("y", btnY).attr("width", btnW).attr("height", btnH)
-      .attr("rx", 11).attr("fill", "rgba(34,197,94,0.95)").style("cursor", "pointer");
+      .attr("rx", btnH / 2).attr("fill", "rgba(34,197,94,0.88)").style("cursor", "pointer");
     actionGroup.append("text")
-      .attr("x", keepX + btnW / 2).attr("y", btnY + 15)
-      .attr("text-anchor", "middle").attr("font-size", 11).attr("font-weight", "700")
+      .attr("x", keepX + btnW / 2).attr("y", btnY + btnH * 0.68)
+      .attr("text-anchor", "middle").attr("font-size", fs.btn).attr("font-weight", "700")
       .attr("fill", "#0d1117").style("pointer-events", "none").text("✓ Keep");
     const discardBg = actionGroup.append("rect")
       .attr("x", skipX).attr("y", btnY).attr("width", btnW).attr("height", btnH)
-      .attr("rx", 11).attr("fill", "rgba(239,68,68,0.95)").style("cursor", "pointer");
+      .attr("rx", btnH / 2).attr("fill", "rgba(239,68,68,0.88)").style("cursor", "pointer");
     actionGroup.append("text")
-      .attr("x", skipX + btnW / 2).attr("y", btnY + 15)
-      .attr("text-anchor", "middle").attr("font-size", 11).attr("font-weight", "700")
+      .attr("x", skipX + btnW / 2).attr("y", btnY + btnH * 0.68)
+      .attr("text-anchor", "middle").attr("font-size", fs.btn).attr("font-weight", "700")
       .attr("fill", "white").style("pointer-events", "none").text("✕ Skip");
 
     acceptBg.on("click", async function(event: any) {
@@ -270,8 +303,13 @@ function _renderGhostNodes(
           precomputed_coordinates: d.coordinates as [number, number],
         });
         if (result?.images?.length > 0) {
-          const newIds = result.images.map((img: any) => img.id);
-          useAppStore.getState().mergeImages(result.images);
+          // Override coordinates with ghost's precomputed position to prevent canvas shift
+          const imagesWithGhostCoords = result.images.map((img: any) => ({
+            ...img,
+            coordinates: d.coordinates,
+          }));
+          const newIds = imagesWithGhostCoords.map((img: any) => img.id);
+          useAppStore.getState().mergeImages(imagesWithGhostCoords);
           if (result.history_group) useAppStore.getState().addHistoryGroup(result.history_group);
           useAppStore.getState().setImagesLayer(newIds, 'default');
           const curIsolated = useAppStore.getState().isolatedImageIds;
@@ -291,18 +329,26 @@ function _renderGhostNodes(
       useAppStore.getState().removeGhostNode(d.id);
     });
 
-    (this as any).__glowNormal = glowNormal;
-    (this as any).__glowHover = glowHover;
   });
 
   ghostNodeElements
     .on("mouseenter.ghost", function() {
-      d3.select(this).style("filter", (this as any).__glowHover);
-      d3.select(this).select(".ghost-actions").attr("display", null);
+      const node = d3.select(this);
+      // Brighten glow on hover; image already at full opacity
+      node.select(".ghost-glow-bg")
+        .attr("opacity", 0.32)
+        .style("filter", `blur(${Math.max(ghostSize * 0.25, 10)}px)`);
+      // Show label, info card, and action buttons
+      node.select(".ghost-info").attr("display", null);
     })
     .on("mouseleave.ghost", function() {
-      d3.select(this).style("filter", (this as any).__glowNormal);
-      d3.select(this).select(".ghost-actions").attr("display", "none");
+      const node = d3.select(this);
+      // Return glow to subtle resting state
+      node.select(".ghost-glow-bg")
+        .attr("opacity", 0.12)
+        .style("filter", `blur(${Math.max(ghostSize * 0.2, 8)}px)`);
+      // Hide label, info card, and action buttons
+      node.select(".ghost-info").attr("display", "none");
     });
 
   ghostNodeElements.on("click", function(event: any) { event.stopPropagation(); });
@@ -596,6 +642,28 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const axisLabelsChanged = prevAxisLabelsRef.current !== axisLabels;
     const canvasBoundsChanged = prevCanvasBoundsRef.current !== canvasBounds;
 
+    // Layer-reorder fast path: if only the sort order changed (same set of image IDs),
+    // skip full rebuild — the SVG nodes are already present, just in a different stacking order.
+    // This prevents camera jumps when assigning shoes to different layers.
+    if (imagesChanged && !visualSettingsChanged && !axisLabelsChanged && !canvasBoundsChanged && !ghostsChanged) {
+      const prevIds = new Set(prevImagesRef.current.map(i => i.id));
+      const currIds = new Set(images.map(i => i.id));
+      const sameSet = prevIds.size === currIds.size && [...currIds].every(id => prevIds.has(id));
+      if (sameSet) {
+        // Same images, different order → update SVG stacking without rebuild
+        prevImagesRef.current = images;
+        if (svgRef.current) {
+          const imagesGroup = d3.select(svgRef.current).select(".images");
+          // Reorder DOM nodes to match new sort order
+          images.forEach(img => {
+            const node = imagesGroup.select(`#image-${img.id}`);
+            if (!node.empty()) node.raise();
+          });
+        }
+        return;
+      }
+    }
+
     // Ghost-only fast path: only ghostNodes changed → update ghost section in-place, no full rebuild
     if (
       ghostsChanged && !imagesChanged && !visualSettingsChanged &&
@@ -740,14 +808,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         });
 
         // Reposition ghost nodes + collect updated ghost dot positions
-        const fastGhostDots: { id: number; x: number; y: number; category: 'agent' }[] = [];
+        const fastGhostDots: { id: number; x: number; y: number; category: 'agent'; color: string }[] = [];
         svg.selectAll(".ghost-node").each(function(d: any) {
           const bx = (d.coordinates[0] + co[0]) * cs;
           const by = (d.coordinates[1] + co[1]) * cs;
           const sx = pivotX + (bx - pivotX) * axScaleX;
           const sy = pivotY + (by - pivotY) * axScaleY;
           d3.select(this).attr("transform", `translate(${xs(sx)}, ${ys(sy)})`);
-          fastGhostDots.push({ id: d.id, x: xs(sx), y: ys(sy), category: 'agent' });
+          fastGhostDots.push({
+            id: d.id, x: xs(sx), y: ys(sy), category: 'agent',
+            color: d.source === 'concurrent' ? '#a855f7' : '#14b8a6',
+          });
         });
 
         // Publish updated minimap dots + ghost dots for the scale change
@@ -1161,7 +1232,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       const bx = (g.coordinates[0] + coordOffset[0]) * coordScale;
       const by = (g.coordinates[1] + coordOffset[1]) * coordScale;
       const [sx, sy] = toStretched(bx, by);
-      return { id: g.id, x: xScale(sx), y: yScale(sy), category: 'agent' as const };
+      return {
+        id: g.id, x: xScale(sx), y: yScale(sy), category: 'agent' as const,
+        color: g.source === 'concurrent' ? '#a855f7' : '#14b8a6',
+      };
     });
     useAppStore.getState().setMinimapGhostDots(ghostDots);
 
@@ -1298,25 +1372,16 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // Selection and parent/child highlighting uses CSS drop-shadow classes
     // applied to <g> groups — pulsing cyan glow for selection
 
-    // Click on canvas background to deselect
-    svg.on("click", (event) => {
+    // Click on canvas background to deselect — must NOT be on an image-node or ghost-node
+    const handleBackgroundClick = (event: any) => {
       const target = event.target as Element;
-      if (
-        target.tagName === "svg" ||
-        target.classList?.contains("main-group")
-      ) {
-        useAppStore.getState().clearSelection();
-        onSelectionChange(0, 0, 0);
-      }
-    });
-
-    g.on("click", (event) => {
-      const target = event.target as Element;
-      if (target === event.currentTarget) {
-        useAppStore.getState().clearSelection();
-        onSelectionChange(0, 0, 0);
-      }
-    });
+      // If click landed on an image node or ghost node, ignore (those have their own handlers)
+      if (target.closest(".image-node") || target.closest(".ghost-node")) return;
+      // Any other click inside the SVG = background click → deselect
+      useAppStore.getState().clearSelection();
+      onSelectionChange(0, 0, 0);
+    };
+    svg.on("click", handleBackgroundClick);
 
     // Ghost nodes always on top of regular images (raise to last child = highest z-order)
     ghostGroup.raise();
@@ -1324,7 +1389,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     images,
-    imageLayerMap,   // Needed so click-area shape (full vs cropped) updates when layer changes
+    // imageLayerMap removed: tracked via `images` memo; click-area uses imageLayerMapRef
     visualSettings,
     axisLabels,
     canvasBounds,
@@ -1372,7 +1437,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     }
 
     imagesGroup.selectAll(".image-node").each(function(d: any) {
-      const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) >= starFilterVal;
+      const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) === starFilterVal;
       const isolatePasses = isolateSet === null || isolateSet.has(d.id);
 
       // Compound: if fails any active filter, dim to near-invisible
@@ -1382,10 +1447,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       }
 
       // Both filters pass — apply selection cascade
+      // Only selected shoes get full opacity; everything else dims equally.
+      // Parent/child relationships are shown via genealogy lines, not opacity.
       if (selectedImageIds.length > 0) {
         const isSelected = selectedImageIds.includes(d.id);
-        const isRelated = relatedSet.has(d.id);
-        const opacity = isSelected ? 1.0 : (isRelated ? 0.8 : 0.3);
+        const opacity = isSelected ? 1.0 : 0.3;
         d3.select(this).transition().duration(200).attr("opacity", opacity);
       } else {
         d3.select(this).transition().duration(200).attr("opacity", visualSettings.imageOpacity);
@@ -1602,7 +1668,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       <Minimap />
 
       {/* Star Filter — top-right corner */}
-      <div style={{
+      <div data-tour="star-filter" style={{
         position: "absolute",
         top: 12,
         right: 16,
@@ -1624,7 +1690,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           <button
             key={n}
             onClick={() => useAppStore.getState().setStarFilter(starFilter === n ? null : n)}
-            title={starFilter === n ? "Clear filter" : `Show ≥ ${n} star${n > 1 ? "s" : ""}`}
+            title={starFilter === n ? "Clear filter" : `Show only ${n}-star shoes`}
             style={{
               background: "none",
               border: "none",
@@ -1632,17 +1698,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               cursor: "pointer",
               fontSize: 18,
               lineHeight: 1,
-              color: starFilter !== null && n <= starFilter ? "#f0c040" : "rgba(150,165,180,0.3)",
-              textShadow: starFilter !== null && n <= starFilter ? "0 0 8px rgba(240,192,64,0.6)" : "none",
+              color: starFilter === n ? "#f0c040" : "rgba(150,165,180,0.3)",
+              textShadow: starFilter === n ? "0 0 8px rgba(240,192,64,0.6)" : "none",
               transition: "color 0.15s, transform 0.1s",
             }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.color = "#f0c040"; }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1)";
-              e.currentTarget.style.color = starFilter !== null && n <= starFilter ? "#f0c040" : "rgba(150,165,180,0.3)";
+              e.currentTarget.style.color = starFilter === n ? "#f0c040" : "rgba(150,165,180,0.3)";
             }}
           >
-            {starFilter !== null && n <= starFilter ? "★" : "☆"}
+            {starFilter === n ? "★" : "☆"}
           </button>
         ))}
         {starFilter !== null && (
@@ -1668,7 +1734,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       </div>
 
       {/* X-Axis: label centred at bottom edge, slider directly below */}
-      <div style={{
+      <div data-tour="axis-x" style={{
         position: "absolute",
         bottom: 12,
         left: "50%",
@@ -1686,7 +1752,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           onUpdate={async (negative, positive) => {
             try {
               useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
-              useAppStore.getState().resetCanvasBounds();
               await apiClient.updateAxes({
                 x_negative: negative,
                 x_positive: positive,
@@ -1695,6 +1760,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               });
               useProgressStore.getState().updateProgress(70, "Updating canvas...");
               const state = await apiClient.getState();
+              // Reset bounds + set new data in same batch so bounds recalculate from NEW coordinates
+              useAppStore.getState().resetCanvasBounds();
               useAppStore.setState({ axisLabels: { ...axisLabels, x: [negative, positive] as [string, string] } });
               useAppStore.getState().setImages(state.images);
               if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
@@ -1708,15 +1775,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           expandedNegative={expandedConcepts?.x_negative}
           expandedPositive={expandedConcepts?.x_positive}
         />
-        <AxisScaleSlider
-          axis="x"
-          value={visualSettings.axisScaleX ?? 1}
-          onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleX: v })}
-        />
+        <div data-tour="axis-scale-x">
+          <AxisScaleSlider
+            axis="x"
+            value={visualSettings.axisScaleX ?? 1}
+            onChange={(v) => useAppStore.getState().updateVisualSettings({ axisScaleX: v })}
+          />
+        </div>
       </div>
 
       {/* Y-Axis scale slider: same fixed-size pattern as right-edge size slider, mirrored to left */}
-      <div style={{
+      <div data-tour="axis-scale-y" style={{
         position: "absolute",
         left: 12,
         top: "50%",
@@ -1760,7 +1829,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             onUpdate={async (negative, positive) => {
               try {
                 useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
-                useAppStore.getState().resetCanvasBounds();
                 await apiClient.updateAxes({
                   x_negative: axisLabels.x[0],
                   x_positive: axisLabels.x[1],
@@ -1769,6 +1837,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
                 });
                 useProgressStore.getState().updateProgress(70, "Updating canvas...");
                 const state = await apiClient.getState();
+                // Reset bounds + set new data in same batch so bounds recalculate from NEW coordinates
+                useAppStore.getState().resetCanvasBounds();
                 useAppStore.setState({ axisLabels: { ...axisLabels, y: [negative, positive] as [string, string] } });
                 useAppStore.getState().setImages(state.images);
                 if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
@@ -1786,7 +1856,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       </div>
 
       {/* Size + Opacity sliders: stacked vertically at right edge */}
-      <div style={{
+      <div data-tour="canvas-sliders" style={{
         position: "absolute",
         right: 12,
         top: "50%",
@@ -1866,7 +1936,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       </div>
 
       {/* Bottom-right buttons: Unhide (isolate) + Visual Reset + Recenter */}
-      <div style={{
+      <div data-tour="canvas-reset-buttons" style={{
         position: "absolute",
         bottom: 12,
         right: 12,

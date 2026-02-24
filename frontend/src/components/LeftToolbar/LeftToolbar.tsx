@@ -63,7 +63,6 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
       useAppStore.getState().setIsUpdatingAxes(true);
       useAppStore.getState().setAxisUpdateProgress(0);
       useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
-      useAppStore.getState().resetCanvasBounds();
 
       await apiClient.updateAxes({
         x_negative: axis === "x" ? negative : axisLabels.x[0],
@@ -79,6 +78,8 @@ export const LeftToolbar: React.FC<LeftToolbarProps> = ({
         ...axisLabels,
         [axis]: [negative, positive] as [string, string],
       };
+      // Reset bounds + set new data in same batch so bounds recalculate from NEW coordinates
+      useAppStore.getState().resetCanvasBounds();
       useAppStore.setState({ axisLabels: newLabels });
       useAppStore.getState().setImages(state.images);
       if (state.expanded_concepts) {

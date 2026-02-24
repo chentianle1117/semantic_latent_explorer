@@ -152,7 +152,7 @@ export const Minimap: React.FC = () => {
     : 0;
 
   return (
-    <div className="minimap-wrap">
+    <div className="minimap-wrap" data-tour="minimap">
       <div className="minimap-panel" style={{ width: mapW + 4 }}>
         <div className="minimap-header">
           <span className="minimap-title">Minimap</span>

@@ -302,29 +302,18 @@
   filter: saturate(0.2);
 }
 
-.drawer-thumb-cross {
+/* Red dot indicator for batches with deleted images */
+.drawer-deleted-dot {
   position: absolute;
-  inset: 0;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.6);
+  z-index: 2;
   pointer-events: none;
-}
-
-.drawer-thumb-cross::before,
-.drawer-thumb-cross::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 70%;
-  height: 1.5px;
-  background: rgba(240, 80, 80, 0.8);
-}
-
-.drawer-thumb-cross::before {
-  transform: translate(-50%, -50%) rotate(45deg);
-}
-
-.drawer-thumb-cross::after {
-  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 /* Deleted state for expanded history cards */
@@ -333,19 +322,25 @@
   filter: saturate(0.2);
 }
 
-.group-deleted-overlay {
+/* Red dot indicator for expanded history cards with deleted images */
+.group-deleted-dot {
   position: absolute;
-  inset: 0;
-  background: rgba(220, 40, 40, 0.1);
-  border: 1px solid rgba(220, 60, 60, 0.22);
-  border-radius: 8px;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 5px rgba(239, 68, 68, 0.6);
+  z-index: 2;
   pointer-events: none;
-  z-index: 1;
 }
 
-.group-deleted-overlay--all {
-  background: rgba(180, 30, 30, 0.2);
-  border-color: rgba(220, 60, 60, 0.4);
+.group-deleted-dot--all {
+  width: 9px;
+  height: 9px;
+  background: #dc2626;
+  box-shadow: 0 0 6px rgba(220, 38, 38, 0.7);
 }
 
 /* ── Independent collapsible panels (below the tab bar) ── */

@@ -79,7 +79,12 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   }, [images]);
 
   const inspectedImage = inspectedImageId != null ? imageMap.get(inspectedImageId) : null;
-  const selectedImages = images.filter((img) => selectedImageIds.includes(img.id));
+  // Order selected images by selection order, latest first (leftmost in deck)
+  const selectedImages = useMemo(() => {
+    const idSet = new Set(selectedImageIds);
+    const mapped = selectedImageIds.map((id) => imageMap.get(id)).filter(Boolean) as ImageData[];
+    return mapped.reverse();
+  }, [selectedImageIds, imageMap]);
 
   const ancestors = useMemo(() => {
     if (!inspectedImage) return [];
@@ -230,6 +235,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
         <>
           {/* The Deck - 12vh Selection Master */}
           <div className="selection-deck">
+            <span className="deck-label">Selected ({selectedImages.length})</span>
             <div className="deck-scroll">
               {selectedImages.map((img) => (
                 <div
@@ -386,10 +392,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
           </div>
 
           {/* Action Bar */}
-          <div className="action-bar">
+          <div className="action-bar" data-tour="action-bar">
             {/* Row 1: Rate + Layer side by side */}
             <div className="action-row">
-              <div className="action-star-row">
+              <div className="action-star-row" data-tour="action-stars">
                 <span className="action-star-label">Rate</span>
                 <div className="star-rating">
                   {[1, 2, 3, 4, 5].map((n) => {
@@ -419,14 +425,17 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 </div>
               </div>
               {(() => {
-                const lid = imageLayerMap[inspectedImage.id] ?? "default";
-                const layer = layers.find((l) => l.id === lid) ?? layers[0];
+                // Determine current layer(s) of selected shoes
+                const uniqueLayerIds = [...new Set(selectedImageIds.map((id) => imageLayerMap[id] ?? "default"))];
+                const isMixed = uniqueLayerIds.length > 1;
+                const currentLayerId = isMixed ? "" : uniqueLayerIds[0];
+                const currentLayer = layers.find((l) => l.id === currentLayerId) ?? layers[0];
                 return (
                   <div className="action-layer-wrap">
-                    <span className="action-layer-dot-inset" style={{ background: layer?.color }} />
+                    <span className="action-layer-dot-inset" style={{ background: isMixed ? "#888" : currentLayer?.color }} />
                     <select
                       className="action-layer-select-inline"
-                      value={selectedImageIds.length > 1 ? "" : lid}
+                      value={currentLayerId}
                       onChange={(e) => {
                         if (selectedImageIds.length > 1) {
                           setImagesLayer(selectedImageIds, e.target.value);
@@ -434,9 +443,10 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                           setImageLayer(inspectedImage.id, e.target.value);
                         }
                       }}
-                      title={selectedImageIds.length > 1 ? `Move ${selectedImageIds.length} selected to layer` : "Change layer"}
+                      title={isMixed ? "Multiple layers — select to move all" : currentLayer?.name ?? "Layer"}
+                      data-tour="action-layer"
                     >
-                      {selectedImageIds.length > 1 && <option value="" disabled>Move {selectedImageIds.length} to →</option>}
+                      {isMixed && <option value="" disabled>Multiple Layers</option>}
                       {layers.map((l) => (
                         <option key={l.id} value={l.id}>{l.name}</option>
                       ))}
@@ -449,12 +459,13 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
             {/* Row 2: Generate Variations + Isolate side by side */}
             <div className="action-row">
               {onGenerateFromReference && (
-                <button className="action-primary" onClick={onGenerateFromReference}>
+                <button className="action-primary" onClick={onGenerateFromReference} data-tour="action-generate">
                   Generate Variations
                 </button>
               )}
               <button
                 className={isolatedImageIds !== null ? "action-unhide" : "action-isolate"}
+                data-tour="action-isolate"
                 onClick={() => {
                   if (isolatedImageIds !== null) {
                     setIsolatedImageIds(null);
@@ -471,11 +482,11 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
             {/* Row 3: Remove + Deselect */}
             <div className="action-row">
               {onRemoveSelected && (
-                <button className="action-danger" onClick={onRemoveSelected}>
+                <button className="action-danger" onClick={onRemoveSelected} data-tour="action-remove">
                   Remove
                 </button>
               )}
-              <button className="action-secondary" onClick={clearSelection}>
+              <button className="action-secondary" onClick={clearSelection} data-tour="action-deselect">
                 Deselect
               </button>
             </div>

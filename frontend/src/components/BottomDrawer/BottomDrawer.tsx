@@ -351,7 +351,7 @@ export const BottomDrawer: React.FC = () => {
                           src={`data:image/png;base64,${thumbnailImage.base64_image}`}
                           alt=""
                         />
-                        {thumbDeleted && <div className="drawer-thumb-cross" />}
+                        {deletedCount > 0 && <span className="drawer-deleted-dot" />}
                       </div>
                     )}
                     <span className="batch-count-badge">
@@ -368,7 +368,7 @@ export const BottomDrawer: React.FC = () => {
 
       {/* ── Single active panel: fills available space ── */}
       {isExpanded && (
-        <div className="drawer-panels" onClick={e => e.stopPropagation()}>
+        <div className="drawer-panels" data-tour="bottom-drawer-content" onClick={e => e.stopPropagation()}>
 
           {/* History section */}
           <div className={`drawer-panel${activeTab === 'history' ? ' open' : ''}`}>
@@ -427,8 +427,9 @@ export const BottomDrawer: React.FC = () => {
                           </div>
                         </div>
                         {(allDeleted || someDeleted) && (
-                          <div
-                            className={`group-deleted-overlay${allDeleted ? ' group-deleted-overlay--all' : ''}`}
+                          <span
+                            className={`group-deleted-dot${allDeleted ? ' group-deleted-dot--all' : ''}`}
+                            title={allDeleted ? 'All images deleted' : 'Some images deleted'}
                           />
                         )}
                       </div>

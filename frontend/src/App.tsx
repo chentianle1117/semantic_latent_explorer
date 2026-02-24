@@ -20,7 +20,6 @@ import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefO
 import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { OnboardingTour } from "./components/OnboardingTour/OnboardingTour";
-import { TUTORIAL_STEPS } from "./components/OnboardingTour/steps";
 import { useAppStore } from "./store/appStore";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
 import { useAutoSave } from "./hooks/useAutoSave";
@@ -197,13 +196,7 @@ export const App: React.FC = () => {
             }
           }
 
-          // Always start at step 1 on every page load/refresh
-          const { onboardingDismissed: dismissed } = useAppStore.getState();
-          if (!dismissed) {
-            setTimeout(() => {
-              useAppStore.getState().setOnboardingSpotlight(TUTORIAL_STEPS[0].id);
-            }, 1200);
-          }
+          // Tutorial starts on-demand via "?" button — no auto-start on page load
         }).catch(() => {/* session endpoints optional */});
       })
       .catch((error) => {
@@ -758,14 +751,14 @@ export const App: React.FC = () => {
     }
   }, [selectedImageIds]);
 
-  // ─── Onboarding: radial dial opened → complete nav-radial ────────────────
+  // ─── Onboarding: radial dial opened → complete b-dial-intro ────────────────
   useEffect(() => {
-    if (showRadialDial) completeOnboardingStep('nav-radial');
+    if (showRadialDial) completeOnboardingStep('b-dial-intro');
   }, [showRadialDial, completeOnboardingStep]);
 
-  // ─── Onboarding: exploration tree opened → complete manip-tree ────────────
+  // ─── Onboarding: exploration tree opened → complete c-tree ────────────
   useEffect(() => {
-    if (showExplorationTreeModal) completeOnboardingStep('manip-tree');
+    if (showExplorationTreeModal) completeOnboardingStep('c-tree');
   }, [showExplorationTreeModal, completeOnboardingStep]);
 
   return (

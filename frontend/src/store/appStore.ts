@@ -123,6 +123,11 @@ interface AppStore extends AppState {
   // Isolate mode
   setIsolatedImageIds: (ids: number[] | null) => void;
 
+  // Shoe view filter toggles
+  setShowSideView: (v: boolean) => void;
+  setShow34Front: (v: boolean) => void;
+  setShow34Back: (v: boolean) => void;
+
   // Star ratings
   setImageRating: (imageId: number, rating: number) => void;
   setStarFilter: (n: number | null) => void;
@@ -239,6 +244,7 @@ const initialState: AppState = {
   // Layer system
   layers: [
     { id: 'default', name: 'Shoes', visible: true, color: '#58a6ff' },
+    { id: 'mood-boards', name: 'Mood Boards', visible: true, color: '#FF6B2B' },
     { id: 'references', name: 'References', visible: true, color: '#ff7b72' },
   ] as CanvasLayer[],
   imageLayerMap: {} as Record<number, string>,
@@ -266,6 +272,11 @@ const initialState: AppState = {
   participantId: 'researcher',
   canvasList: [] as CanvasMeta[],
   eventLog: [] as EventLogEntry[],
+
+  // Shoe view filter toggles
+  showSideView: true,
+  show34Front: false,
+  show34Back: false,
 
   // Onboarding tutorial
   onboardingActive: false,
@@ -572,6 +583,11 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // Isolate mode
   setIsolatedImageIds: (ids) => set({ isolatedImageIds: ids }),
+
+  // 3/4 satellite view filter toggles
+  setShowSideView: (v) => set({ showSideView: v }),
+  setShow34Front: (v) => set({ show34Front: v }),
+  setShow34Back: (v) => set({ show34Back: v }),
 
   // Star ratings
   setImageRating: (imageId, rating) =>

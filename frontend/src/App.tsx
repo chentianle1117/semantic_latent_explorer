@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
 import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
@@ -13,6 +13,7 @@ import { useProgressStore } from "./store/progressStore";
 import { BatchPromptDialog } from "./components/BatchPromptDialog/BatchPromptDialog";
 import { ExternalImageLoader } from "./components/ExternalImageLoader/ExternalImageLoader";
 import { TextToImageDialog } from "./components/TextToImageDialog/TextToImageDialog";
+import { MoodBoardDialog } from "./components/MoodBoardDialog/MoodBoardDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
 import { DynamicIsland } from "./components/DynamicIsland/DynamicIsland";
@@ -26,11 +27,13 @@ import { useAutoSave } from "./hooks/useAutoSave";
 import { useEventLog } from "./hooks/useEventLog";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
+import type { ShoeViewType } from "./types";
 import "./styles/app.css";
 
 export const App: React.FC = () => {
   // floatingPanelPos removed — actions now in RightInspector
   const [showTextToImageDialog, setShowTextToImageDialog] = useState(false);
+  const [showMoodBoardDialog, setShowMoodBoardDialog] = useState(false);
   const [showPromptDialog, setShowPromptDialog] = useState(false);
   const [promptDialogImageId, setPromptDialogImageId] = useState<number | null>(
     null
@@ -73,6 +76,19 @@ export const App: React.FC = () => {
   );
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
   const isInitialized = useAppStore((state) => state.isInitialized);
+
+  // Determine the dominant realm of currently selected images (for dial button labels)
+  // 'mixed' when both realms present, null when nothing selected
+  const selectedRealmContext = useMemo(() => {
+    if (selectedImageIds.length === 0) return null;
+    const imageMap = new Map(images.map(img => [img.id, img]));
+    const realms = selectedImageIds.map(id => imageMap.get(id)?.realm ?? 'shoe');
+    const hasMoodBoard = realms.includes('mood-board');
+    const hasShoe = realms.includes('shoe');
+    if (hasMoodBoard && hasShoe) return 'mixed' as const;
+    if (hasMoodBoard) return 'mood-board' as const;
+    return 'shoe' as const;
+  }, [selectedImageIds, images]);
   const removeBackground = useAppStore((state) => state.removeBackground);
   const is3DMode = useAppStore((state) => state.is3DMode);
 
@@ -502,12 +518,26 @@ export const App: React.FC = () => {
   };
 
   // Get all selected images for the prompt dialog
-  const promptDialogImages =
-    selectedImageIds.length > 0
-      ? images.filter((img) => selectedImageIds.includes(img.id))
+  // 3/4 satellite views resolve to their parent side view (side view is source of truth)
+  const promptDialogImages = useMemo(() => {
+    const sourceIds = selectedImageIds.length > 0
+      ? selectedImageIds
       : promptDialogImageId !== null
-      ? images.filter((img) => img.id === promptDialogImageId)
+      ? [promptDialogImageId]
       : [];
+    if (sourceIds.length === 0) return [];
+    const resolvedIds = new Set<number>();
+    for (const id of sourceIds) {
+      const img = images.find(i => i.id === id);
+      if (!img) continue;
+      if ((img.shoe_view === '3/4-front' || img.shoe_view === '3/4-back') && img.parent_side_id != null) {
+        resolvedIds.add(img.parent_side_id);
+      } else {
+        resolvedIds.add(id);
+      }
+    }
+    return images.filter(img => resolvedIds.has(img.id));
+  }, [selectedImageIds, promptDialogImageId, images]);
 
   const handleGenerateFromReferenceClick = () => {
     // Use selected images, or if none selected, single image ID will be set
@@ -552,9 +582,25 @@ export const App: React.FC = () => {
     ps.addLogLine(`Using ${referenceIds.length} reference image${referenceIds.length > 1 ? 's' : ''} as conditioning`);
 
     try {
-      const selectedImages = images.filter((img) =>
-        referenceIds.includes(img.id)
-      );
+      // Resolve 3/4 satellite views to their parent side views
+      // Side view is the source of truth; 3/4 views are only for visualization
+      const allImgs = useAppStore.getState().images;
+      const imgMap = new Map(allImgs.map(img => [img.id, img]));
+      const resolvedIds = new Set<number>();
+      for (const id of referenceIds) {
+        const img = imgMap.get(id);
+        if (!img) continue;
+        if ((img.shoe_view === '3/4-front' || img.shoe_view === '3/4-back') && img.parent_side_id != null) {
+          // Resolve to parent side view
+          resolvedIds.add(img.parent_side_id);
+          ps.addLogLine(`Resolved 3/4 view #${id} → side view #${img.parent_side_id}`);
+        } else {
+          resolvedIds.add(id);
+        }
+      }
+      const selectedImages = Array.from(resolvedIds)
+        .map(id => imgMap.get(id))
+        .filter(Boolean) as typeof images;
 
       if (selectedImages.length === 0) {
         throw new Error("No reference images found");
@@ -851,16 +897,18 @@ export const App: React.FC = () => {
             {showTextToImageDialog && (
               <TextToImageDialog
                 onClose={() => setShowTextToImageDialog(false)}
-                onGenerate={async (prompt, count) => {
+                onGenerate={async (prompt, count, also34Views) => {
                   setShowTextToImageDialog(false);
                   setIsGenerating(true);
                   const ps = useProgressStore.getState();
-                  ps.showProgress("generating", `Generating ${count} image${count > 1 ? "s" : ""}...`, true);
+                  const totalExpected = count + (also34Views ? count * 2 : 0);
+                  ps.showProgress("generating", `Generating ${totalExpected} image${totalExpected > 1 ? "s" : ""}...`, true);
                   ps.updateProgress(0);
                   ps.setSteps([
-                    { id: 'gen',     label: `Generate ${count} image${count > 1 ? 's' : ''} via fal.ai`, status: 'active' },
+                    { id: 'gen',     label: `Generate ${count} shoe${count > 1 ? 's' : ''} via fal.ai`, status: 'active' },
                     { id: 'embed',   label: `Embed with Jina CLIP v2`, status: 'pending' },
-                    { id: 'project', label: 'Project to semantic canvas', status: 'pending' },
+                    ...(also34Views ? [{ id: 'gen34', label: `Generate 3/4 satellites`, status: 'pending' as const }] : []),
+                    { id: 'project', label: 'Project to semantic canvas', status: 'pending' as const },
                   ]);
                   ps.addLogLine(`Prompt: "${prompt.substring(0, 60)}${prompt.length > 60 ? '…' : ''}"`);
 
@@ -874,52 +922,109 @@ export const App: React.FC = () => {
                       return;
                     }
 
-                    ps.addLogLine(`Requesting ${count} image${count > 1 ? 's' : ''} from fal.ai nano-banana...`);
+                    // ── 1. Generate side-view shoes ──────────────────────────
+                    ps.addLogLine(`Requesting ${count} shoe${count > 1 ? 's' : ''} from fal.ai nano-banana...`);
                     const result = await falClient.generateTextToImage({
                       prompt,
                       num_images: count,
-                      aspect_ratio: "1:1",
                       output_format: "jpeg",
+                      genConfig: { realm: 'shoe', shoeView: 'side' },
                     });
                     ps.addLogLine(`✓ fal.ai returned ${result.images.length} image${result.images.length > 1 ? 's' : ''}`);
-                    ps.updateProgress(40);
+                    ps.updateProgress(35);
                     ps.updateStepStatus('gen', 'done');
                     ps.updateStepStatus('embed', 'active');
 
-                    ps.addLogLine(`Embedding ${result.images.length} image${result.images.length > 1 ? 's' : ''} with Jina CLIP v2...`);
+                    ps.addLogLine(`Embedding with Jina CLIP v2...`);
                     if (removeBackground) ps.addLogLine('Background removal enabled — processing...');
                     const addResult = await apiClient.addExternalImages({
                       images: result.images.map((img) => ({ url: img.url })),
                       prompt: prompt,
                       generation_method: "batch",
                       remove_background: removeBackground,
+                      realm: 'shoe',
+                      shoe_view: 'side',
                     });
                     ps.addLogLine(`✓ CLIP embeddings computed (1024-dim)`);
-                    ps.updateProgress(75);
+                    ps.updateProgress(60);
                     ps.updateStepStatus('embed', 'done');
-                    ps.updateStepStatus('project', 'active');
 
-                    ps.addLogLine('Embeddings projected to semantic axes.');
                     mergeImages(addResult.images);
                     if (addResult.history_group) addHistoryGroup(addResult.history_group);
 
-                    // Auto-select newly generated images + assign to shoes layer
-                    if (addResult?.images?.length > 0) {
-                      const newIds = addResult.images.map((img: any) => img.id);
-                      useAppStore.getState().setSelectedImageIds(newIds);
-                      useAppStore.getState().setImagesLayer(newIds, 'default');
+                    const sideIds: number[] = addResult?.images?.length > 0
+                      ? addResult.images.map((img: any) => img.id)
+                      : [];
+
+                    if (sideIds.length > 0) {
+                      useAppStore.getState().setSelectedImageIds(sideIds);
+                      useAppStore.getState().setImagesLayer(sideIds, 'default');
                       const curIsolated = useAppStore.getState().isolatedImageIds;
                       if (curIsolated !== null) {
-                        useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
+                        useAppStore.getState().setIsolatedImageIds([...curIsolated, ...sideIds]);
                       }
-                      ps.addLogLine(`✓ ${newIds.length} image${newIds.length > 1 ? 's' : ''} placed on canvas`);
+                      ps.addLogLine(`✓ ${sideIds.length} shoe${sideIds.length > 1 ? 's' : ''} placed on canvas`);
                     }
-                    ps.updateStepStatus('project', 'done');
 
                     addToExplorationCounter(count);
                     addToAxisSuggestionCounter(count);
                     triggerConcurrentGhosts(prompt, [], []).catch(console.error);
 
+                    // ── 2. Generate 3/4 satellites (if requested) ────────────
+                    if (also34Views && sideIds.length > 0) {
+                      ps.updateStepStatus('gen34', 'active');
+                      ps.addLogLine(`Generating 3/4 satellites for ${sideIds.length} shoe${sideIds.length > 1 ? 's' : ''}...`);
+
+                      const allImages = images.concat(
+                        addResult.images.map((img: any) => img)
+                      );
+                      const imageMap = new Map(allImages.map((img: any) => [img.id, img]));
+
+                      for (const sideId of sideIds) {
+                        const sideImg = imageMap.get(sideId);
+                        if (!sideImg?.base64_image) continue;
+
+                        // Upload side view as reference for consistent 3/4 generation
+                        const blob = await (await fetch(`data:image/png;base64,${sideImg.base64_image}`)).blob();
+                        const file = new File([blob], `side-${sideId}.png`, { type: "image/png" });
+                        const sideUrl = await falClient.uploadFile(file);
+
+                        for (const view of ['3/4-front', '3/4-back'] as ShoeViewType[]) {
+                          ps.addLogLine(`  → ${view} for shoe ${sideId}...`);
+                          const viewResult = await falClient.generateImageEdit({
+                            prompt,
+                            image_urls: [sideUrl],
+                            num_images: 1,
+                            output_format: "jpeg",
+                            genConfig: { realm: 'shoe', shoeView: view },
+                          });
+
+                          if (viewResult.images.length > 0) {
+                            const satResult = await apiClient.addExternalImages({
+                              images: viewResult.images.map((img) => ({ url: img.url })),
+                              prompt,
+                              generation_method: "reference",
+                              remove_background: removeBackground,
+                              realm: 'shoe',
+                              shoe_view: view,
+                              parent_side_id: sideId,
+                              parent_ids: [sideId],
+                            });
+                            mergeImages(satResult.images);
+                            if (satResult.images.length > 0) {
+                              useAppStore.getState().setImagesLayer(
+                                satResult.images.map((img: any) => img.id),
+                                'default'
+                              );
+                            }
+                          }
+                        }
+                      }
+                      ps.updateStepStatus('gen34', 'done');
+                      ps.addLogLine(`✓ 3/4 satellites generated`);
+                    }
+
+                    ps.updateStepStatus('project', 'done');
                     ps.updateProgress(100);
                   } catch (error) {
                     console.error("Generation failed:", error);
@@ -929,6 +1034,133 @@ export const App: React.FC = () => {
                         error instanceof Error ? error.message : "Unknown error"
                       }`
                     );
+                  } finally {
+                    setIsGenerating(false);
+                    useProgressStore.getState().hideProgress();
+                  }
+                }}
+              />
+            )}
+
+            {/* Mood Board Dialog */}
+            {showMoodBoardDialog && (
+              <MoodBoardDialog
+                onClose={() => setShowMoodBoardDialog(false)}
+                referenceImages={selectedImageIds.length > 0
+                  ? (() => {
+                      // Resolve 3/4 views to parent side views
+                      const resolvedIds = new Set<number>();
+                      for (const id of selectedImageIds) {
+                        const img = images.find(i => i.id === id);
+                        if (!img) continue;
+                        if ((img.shoe_view === '3/4-front' || img.shoe_view === '3/4-back') && img.parent_side_id != null) {
+                          resolvedIds.add(img.parent_side_id);
+                        } else {
+                          resolvedIds.add(id);
+                        }
+                      }
+                      return images.filter(img => resolvedIds.has(img.id));
+                    })()
+                  : []}
+                selectedRealmContext={selectedRealmContext}
+                onGenerate={async (prompt, count, style, styleRefUrl) => {
+                  setShowMoodBoardDialog(false);
+                  setIsGenerating(true);
+                  const ps = useProgressStore.getState();
+                  ps.showProgress("generating", `Generating ${count} mood board${count > 1 ? "s" : ""}...`, true);
+                  ps.updateProgress(0);
+                  ps.setSteps([
+                    { id: 'gen',     label: `Generate ${count} board${count > 1 ? 's' : ''} via fal.ai`, status: 'active' },
+                    { id: 'embed',   label: 'Embed with Jina CLIP v2', status: 'pending' },
+                    { id: 'project', label: 'Project to semantic canvas', status: 'pending' },
+                  ]);
+                  ps.addLogLine(`Style: "${style}" | Prompt: "${prompt.substring(0, 50)}${prompt.length > 50 ? '…' : ''}"`);
+
+                  try {
+                    if (!falClient.isConfigured()) {
+                      alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY.");
+                      setIsGenerating(false);
+                      useProgressStore.getState().hideProgress();
+                      return;
+                    }
+
+                    const parentIds = selectedImageIds.length > 0 ? [...selectedImageIds] : [];
+
+                    // Upload reference images if selected
+                    let imageUrls: string[] = [];
+                    if (styleRefUrl) {
+                      imageUrls = [styleRefUrl];
+                    } else if (parentIds.length > 0) {
+                      ps.addLogLine(`Uploading ${parentIds.length} reference image${parentIds.length > 1 ? 's' : ''}...`);
+                      const refImgs = images.filter(img => parentIds.includes(img.id));
+                      for (const img of refImgs.slice(0, 4)) {
+                        const blob = await (await fetch(`data:image/png;base64,${img.base64_image}`)).blob();
+                        const file = new File([blob], `ref-${img.id}.png`, { type: "image/png" });
+                        imageUrls.push(await falClient.uploadFile(file));
+                      }
+                    }
+
+                    ps.addLogLine(`Requesting ${count} mood board${count > 1 ? 's' : ''} from fal.ai...`);
+                    const result = imageUrls.length > 0
+                      ? await falClient.generateImageEdit({
+                          prompt,
+                          image_urls: imageUrls,
+                          num_images: count,
+                          output_format: "jpeg",
+                          genConfig: { realm: 'mood-board', moodBoardStyle: style },
+                        })
+                      : await falClient.generateTextToImage({
+                          prompt,
+                          num_images: count,
+                          output_format: "jpeg",
+                          genConfig: { realm: 'mood-board', moodBoardStyle: style },
+                        });
+
+                    ps.addLogLine(`✓ fal.ai returned ${result.images.length} board${result.images.length > 1 ? 's' : ''}`);
+                    ps.updateProgress(50);
+                    ps.updateStepStatus('gen', 'done');
+                    ps.updateStepStatus('embed', 'active');
+
+                    ps.addLogLine('Embedding with Jina CLIP v2...');
+                    // Mood boards: never remove background
+                    const addResult = await apiClient.addExternalImages({
+                      images: result.images.map((img) => ({ url: img.url })),
+                      prompt,
+                      generation_method: parentIds.length > 0 ? "reference" : "batch",
+                      remove_background: false,
+                      realm: 'mood-board',
+                      ...(parentIds.length > 0 ? { parent_ids: parentIds } : {}),
+                    });
+                    ps.addLogLine(`✓ CLIP embeddings computed`);
+                    ps.updateProgress(80);
+                    ps.updateStepStatus('embed', 'done');
+                    ps.updateStepStatus('project', 'active');
+
+                    mergeImages(addResult.images);
+                    if (addResult.history_group) addHistoryGroup(addResult.history_group);
+
+                    if (addResult?.images?.length > 0) {
+                      const newIds = addResult.images.map((img: any) => img.id);
+                      useAppStore.getState().setSelectedImageIds(newIds);
+                      // Assign to mood-boards layer
+                      useAppStore.getState().setImagesLayer(newIds, 'mood-boards');
+                      const curIsolated = useAppStore.getState().isolatedImageIds;
+                      if (curIsolated !== null) {
+                        useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
+                      }
+                      ps.addLogLine(`✓ ${newIds.length} board${newIds.length > 1 ? 's' : ''} placed on canvas (Mood Boards layer)`);
+                    }
+                    ps.updateStepStatus('project', 'done');
+
+                    addToExplorationCounter(count);
+                    addToAxisSuggestionCounter(count);
+                    triggerConcurrentGhosts(prompt, parentIds, imageUrls).catch(console.error);
+
+                    ps.updateProgress(100);
+                  } catch (error) {
+                    console.error("Mood board generation failed:", error);
+                    useProgressStore.getState().hideProgress();
+                    alert(`Generation failed: ${error instanceof Error ? error.message : String(error)}`);
                   } finally {
                     setIsGenerating(false);
                     useProgressStore.getState().hideProgress();
@@ -1004,16 +1236,43 @@ export const App: React.FC = () => {
           {
             id: "generate",
             icon: "✨",
-            label: "Generate",
+            label: selectedRealmContext === 'mood-board'
+              ? "Render from Board"
+              : selectedRealmContext === 'mixed'
+              ? "Render from Board"
+              : selectedImageIds.length > 0
+              ? "Iterate Shoe"
+              : "New Shoe",
             description:
-              selectedImageIds.length > 0
-                ? `Generate from ${selectedImageIds.length} selected reference(s)`
-                : "Generate images from text",
+              selectedRealmContext === 'mood-board' || selectedRealmContext === 'mixed'
+                ? `Consolidate ${selectedImageIds.length} board(s) into a shoe render`
+                : selectedImageIds.length > 0
+                ? `Generate shoe variation from ${selectedImageIds.length} reference(s)`
+                : "Generate a new shoe render from text",
             category: "image",
             onClick: () =>
               selectedImageIds.length > 0
                 ? handleGenerateFromReferenceClick()
                 : setShowTextToImageDialog(true),
+          },
+          {
+            id: "mood-board",
+            icon: "🎨",
+            label: selectedRealmContext === 'shoe'
+              ? "Abstract from Shoes"
+              : selectedRealmContext === 'mixed'
+              ? "Abstract from Shoes"
+              : selectedImageIds.length > 0
+              ? "Iterate Board"
+              : "New Mood Board",
+            description:
+              selectedRealmContext === 'shoe' || selectedRealmContext === 'mixed'
+                ? `Abstract ${selectedImageIds.length} shoe(s) into a concept board`
+                : selectedImageIds.length > 0
+                ? "Iterate on selected mood board(s)"
+                : "Generate a concept sketch or mood board",
+            category: "image",
+            onClick: () => setShowMoodBoardDialog(true),
           },
           {
             id: "load",

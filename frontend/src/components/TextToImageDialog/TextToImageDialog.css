@@ -353,6 +353,31 @@
 .ttd-cat-style     { background: rgba(200, 100, 255, 0.13); border: 1px solid rgba(200, 100, 255, 0.45); color: #C864FF; }
 .ttd-cat-details   { background: rgba(255, 100, 120, 0.13); border: 1px solid rgba(255, 100, 120, 0.45); color: #FF6478; }
 
+/* ─── 3/4 views checkbox row ─────────────────────────────────────────────── */
+
+.ttd-also34-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: rgba(180, 195, 210, 0.85);
+  cursor: pointer;
+  user-select: none;
+  margin-top: 4px;
+}
+
+.ttd-also34-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #58a6ff;
+  cursor: pointer;
+}
+
+.ttd-also34-hint {
+  color: rgba(120, 140, 160, 0.55);
+  font-size: 11px;
+}
+
 /* Pulse animation for tutorial-highlighted buttons */
 .ttd-btn-pulse {
   animation: ttd-btn-pulse-anim 1.5s ease-in-out infinite;

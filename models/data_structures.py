@@ -42,6 +42,9 @@ class ImageMetadata:
     is_ghost: bool = False  # Whether this is a ghost/preview suggestion
     suggested_prompt: str = ''  # Suggested prompt for ghost nodes
     reasoning: str = ''  # Why this ghost was suggested
+    realm: str = 'shoe'        # 'shoe' or 'mood-board'
+    shoe_view: str = 'side'    # 'side', '3/4-front', '3/4-back'
+    parent_side_id: int = -1   # For 3/4 satellites: ID of parent side-view shoe (-1 = none)
     _cached_base64_url: Optional[str] = field(default=None, repr=False)
 
     def get_base64_url(self, size: Optional[Tuple[int, int]] = None) -> str:

@@ -32,6 +32,21 @@ export const CATEGORY_LABELS: Record<DisplayCategory, string> = {
   agent:     'Agent Generated',
 };
 
+/**
+ * Realm-aware display label for lineage tree and inspector.
+ * Combines generation_method + realm for richer context:
+ *   shoe + user → "User Shoe", mood-board + agent → "Agent Board", etc.
+ */
+export function getRealmAwareLabel(method: string, realm?: string): string {
+  const cat = getDisplayCategory(method);
+  if (cat === 'ref_image') return 'Ref Image';
+  if (cat === 'ref_shoe') return 'Ref Shoe';
+  const isMoodBoard = realm === 'mood-board';
+  if (cat === 'user') return isMoodBoard ? 'User Board' : 'User Shoe';
+  if (cat === 'agent') return isMoodBoard ? 'Agent Board' : 'Agent Shoe';
+  return isMoodBoard ? 'Board' : 'Shoe';
+}
+
 export function getCategoryColor(method: string): string {
   return CATEGORY_COLORS[getDisplayCategory(method)];
 }

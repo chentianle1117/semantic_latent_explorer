@@ -2,6 +2,9 @@
  * Type definitions matching the artifact interaction model
  */
 
+export type ImageRealm = 'mood-board' | 'shoe';
+export type ShoeViewType = 'side' | '3/4-front' | '3/4-back';
+
 export interface ImageData {
   id: number;
   group_id: string;
@@ -18,6 +21,9 @@ export interface ImageData {
   reasoning?: string;  // Why this ghost was suggested
   neighbors: number[];  // K-nearest semantic neighbors for physics simulation
   layerId?: string;  // undefined = 'default' layer
+  realm?: ImageRealm;           // 'shoe' (default) or 'mood-board'
+  shoe_view?: ShoeViewType;     // 'side' (default), '3/4-front', '3/4-back'
+  parent_side_id?: number;      // For 3/4 satellites: ID of parent side-view shoe (-1 or absent = none)
 }
 
 export interface CanvasLayer {
@@ -93,6 +99,7 @@ export interface AppState {
   agentStatus: AgentStatus;
   agentInsights: AgentInsight[];
   isAgentWorking: boolean;
+  agentWorkingLabel: string;
   imagesSinceLastExploration: number;
   agentMode: AgentMode; // kept for SettingsModal compat
   ghostNodes: GhostNode[];
@@ -150,6 +157,11 @@ export interface AppState {
 
   // Axis suggestion accumulator
   imagesSinceLastAxisSuggestion: number;
+
+  // Shoe view filter toggles
+  showSideView: boolean;   // default: true (can toggle off to show only 3/4)
+  show34Front: boolean;
+  show34Back: boolean;
 
   // Onboarding tutorial
   onboardingActive: boolean;
@@ -321,4 +333,5 @@ export interface CombinationPrompt {
 
 export type SuggestTagsResponse =
   | { mode: 'text'; categories: TagCategory[]; full_prompts: FullPromptSuggestion[] }
-  | { mode: 'reference'; reference_analysis: ReferenceImageAnalysis[]; combination_prompts: CombinationPrompt[] };
+  | { mode: 'reference'; reference_analysis: ReferenceImageAnalysis[]; combination_prompts: CombinationPrompt[] }
+  | { mode: 'mood-board-reference'; reference_analysis: ReferenceImageAnalysis[]; combination_prompts: CombinationPrompt[]; categories: TagCategory[]; full_prompts: FullPromptSuggestion[] };

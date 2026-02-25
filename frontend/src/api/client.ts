@@ -80,6 +80,9 @@ class APIClient {
     remove_background?: boolean;
     parent_ids?: number[];
     precomputed_coordinates?: [number, number];
+    realm?: 'shoe' | 'mood-board';
+    shoe_view?: 'side' | '3/4-front' | '3/4-back';
+    parent_side_id?: number;
   }): Promise<{ status: string; images: ImageData[]; history_group?: HistoryGroup }> {
     const response = await axios.post(`${API_BASE}/add-external-images`, request);
     return response.data;
@@ -239,13 +242,15 @@ class APIClient {
     prompt: string,
     tags: { text: string; source: string; color: string }[],
     referenceImageIds: number[],
-    brief: string
+    brief: string,
+    realm: string = 'shoe'
   ): Promise<{ prompt: string }> {
     const response = await axios.post(`${API_BASE}/agent/refine-prompt`, {
       prompt,
       tags,
       reference_image_ids: referenceImageIds,
       brief,
+      realm,
     });
     return response.data;
   }

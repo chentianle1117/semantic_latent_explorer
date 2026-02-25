@@ -28,11 +28,19 @@ import "./SuggestionsPanel.css";
 // ─── Color System ────────────────────────────────────────────────────────────
 
 export const CATEGORY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  // Shoe categories
   material:   { bg: "rgba(88, 130, 255, 0.13)",  border: "rgba(88, 130, 255, 0.5)",  text: "#8CB4FF" },
   color:      { bg: "rgba(255, 160, 64, 0.13)",   border: "rgba(255, 160, 64, 0.5)",  text: "#FFA040" },
   silhouette: { bg: "rgba(64, 210, 180, 0.13)",   border: "rgba(64, 210, 180, 0.5)",  text: "#40D2B4" },
   style:      { bg: "rgba(200, 100, 255, 0.13)",  border: "rgba(200, 100, 255, 0.5)", text: "#C864FF" },
   details:    { bg: "rgba(255, 100, 120, 0.13)",  border: "rgba(255, 100, 120, 0.5)", text: "#FF6478" },
+  // Mood board concept categories
+  mood:           { bg: "rgba(255, 107, 43, 0.13)",  border: "rgba(255, 107, 43, 0.5)",  text: "#FF6B2B" },
+  "form language": { bg: "rgba(64, 210, 180, 0.13)",  border: "rgba(64, 210, 180, 0.5)",  text: "#40D2B4" },
+  era:            { bg: "rgba(200, 100, 255, 0.13)",  border: "rgba(200, 100, 255, 0.5)", text: "#C864FF" },
+  technique:      { bg: "rgba(88, 130, 255, 0.13)",   border: "rgba(88, 130, 255, 0.5)",  text: "#8CB4FF" },
+  palette:        { bg: "rgba(255, 160, 64, 0.13)",   border: "rgba(255, 160, 64, 0.5)",  text: "#FFA040" },
+  components:     { bg: "rgba(255, 100, 120, 0.13)",  border: "rgba(255, 100, 120, 0.5)", text: "#FF6478" },
 };
 
 export const REF_IMAGE_COLORS = ["#00d2ff", "#ffa040", "#ff60c0", "#80ff60"];
@@ -57,6 +65,8 @@ export interface SuggestionsPanelProps {
   onTagsLoaded?: (pills: PillDef[]) => void;
   /** Called when reference analysis loads — parent can use descriptors for @A/@B resolution */
   onRefAnalysisLoaded?: (analysis: ReferenceImageAnalysis[]) => void;
+  /** 'shoe' (default) or 'mood-board' — controls category theme */
+  mode?: 'shoe' | 'mood-board';
 }
 
 // ─── Inline @A/@B chip + descriptor tag renderer for combination prompts ─────
@@ -267,6 +277,7 @@ export const SuggestionsPanel: React.FC<SuggestionsPanelProps> = ({
   referenceImages,
   onTagsLoaded,
   onRefAnalysisLoaded,
+  mode = 'shoe',
 }) => {
   const designBrief = useAppStore((s) => s.designBrief);
 
@@ -290,37 +301,52 @@ export const SuggestionsPanel: React.FC<SuggestionsPanelProps> = ({
     setError(false);
     try {
       const brief = designBrief || "Explore shoe design variations";
+      // Mood board mode with references → hybrid analysis (per-image descriptors + concept categories)
+      // Mood board mode without references → concept categories only
+      const modeStr = mode === 'mood-board'
+        ? (isRefMode ? "mood-board-reference" : "mood-board")
+        : isRefMode ? "reference" : "text";
+      console.log(`[SuggestionsPanel] fetch: mode=${mode}, isRefMode=${isRefMode}, modeStr=${modeStr}, refIds=[${refIds.join(',')}]`);
       const result = await apiClient.getSuggestTags(
         brief,
         isRefMode ? refIds : [],
-        isRefMode ? "reference" : "text"
+        modeStr
       );
-      if (result.mode === "reference") {
+      console.log(`[SuggestionsPanel] response: mode=${result.mode}`, result);
+      if (result.mode === "reference" || result.mode === "mood-board-reference") {
         setRefAnalysis(result.reference_analysis);
         setCombinationPrompts(result.combination_prompts);
         // Expose analysis to parent (for @A/@B resolution during generation)
         onRefAnalysisLoaded?.(result.reference_analysis);
         // Notify parent of available pills for overlay rendering
-        if (onTagsLoaded) {
-          const pills: PillDef[] = [];
-          for (let i = 0; i < result.reference_analysis.length; i++) {
-            const color = REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length];
-            const raw = result.reference_analysis[i] as Record<string, unknown>;
-            const descs = result.reference_analysis[i].descriptors
-              ?? (raw.tags as string[])
-              ?? (raw.key_descriptors as string[])
-              ?? [];
-            for (const t of descs) pills.push({ text: t, color });
-          }
-          // Also include @A, @B mentions
-          for (let i = 0; i < result.reference_analysis.length; i++) {
-            const label = String.fromCharCode(65 + i);
-            const color = REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length];
-            pills.push({ text: `@${label}`, color });
-            pills.push({ text: `@${label}'s`, color });
-          }
-          onTagsLoaded(pills);
+        const pills: PillDef[] = [];
+        for (let i = 0; i < result.reference_analysis.length; i++) {
+          const color = REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length];
+          const raw = result.reference_analysis[i] as Record<string, unknown>;
+          const descs = result.reference_analysis[i].descriptors
+            ?? (raw.tags as string[])
+            ?? (raw.key_descriptors as string[])
+            ?? [];
+          for (const t of descs) pills.push({ text: t, color });
         }
+        // Also include @A, @B mentions
+        for (let i = 0; i < result.reference_analysis.length; i++) {
+          const label = String.fromCharCode(65 + i);
+          const color = REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length];
+          pills.push({ text: `@${label}`, color });
+          pills.push({ text: `@${label}'s`, color });
+        }
+
+        // Hybrid mood-board-reference also has categories + full_prompts
+        if (result.mode === "mood-board-reference") {
+          const hybridResult = result as { categories: TagCategory[]; full_prompts: FullPromptSuggestion[] };
+          setCategories(hybridResult.categories ?? []);
+          setFullPrompts(hybridResult.full_prompts ?? []);
+          // Add category pills too
+          pills.push(...buildCategoryPills(hybridResult.categories ?? []));
+        }
+
+        if (onTagsLoaded) onTagsLoaded(pills);
       } else {
         setCategories(result.categories);
         setFullPrompts(result.full_prompts);
@@ -336,7 +362,7 @@ export const SuggestionsPanel: React.FC<SuggestionsPanelProps> = ({
       setIsLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [designBrief, refKey, isRefMode]);
+  }, [designBrief, refKey, isRefMode, mode]);
 
   // Fetch only once on mount
   useEffect(() => {
@@ -374,7 +400,32 @@ export const SuggestionsPanel: React.FC<SuggestionsPanelProps> = ({
           </>
         ) : error ? (
           <div className="sp-empty">Could not load suggestions</div>
+        ) : isRefMode && mode === 'mood-board' ? (
+          // Mood board + references: show BOTH ref analysis AND concept categories
+          <>
+            {refAnalysis.length > 0 && (
+              <RefMode
+                analysis={refAnalysis}
+                combinationPrompts={combinationPrompts}
+                onSelectPrompt={onSelectPrompt}
+                onReferenceTagClick={onReferenceTagClick}
+              />
+            )}
+            {categories.length > 0 && (
+              <TextMode
+                categories={categories}
+                fullPrompts={fullPrompts}
+                selectedTagSet={selectedTagSet}
+                onToggleTag={onToggleTag ?? (() => {})}
+                onAppendPrompt={handleAppendPrompt}
+              />
+            )}
+            {refAnalysis.length === 0 && categories.length === 0 && (
+              <div className="sp-empty">No analysis available</div>
+            )}
+          </>
         ) : isRefMode ? (
+          // Shoe reference mode: per-image descriptors + combination prompts
           refAnalysis.length === 0 ? (
             <div className="sp-empty">No analysis available</div>
           ) : (

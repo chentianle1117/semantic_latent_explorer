@@ -34,17 +34,28 @@ function taperedBezierD(
   return `M${left.join('L')}L${right.reverse().join('L')}Z`;
 }
 
+// ─── Realm-aware edge colors ──────────────────────────────────────────────────
+function getRealmEdgeColor(parentRealm: string, childRealm: string): string {
+  const pMood = parentRealm === 'mood-board';
+  const cMood = childRealm === 'mood-board';
+  if (pMood && cMood) return 'rgba(255, 107, 43, 0.8)';  // orange: board→board
+  if (!pMood && !cMood) return 'rgba(50, 70, 88, 1.0)';  // dark blue-gray: shoe→shoe
+  if (pMood && !cMood) return 'rgba(63, 185, 80, 0.8)';  // green: board→shoe (consolidation)
+  return 'rgba(168, 85, 247, 0.7)';                       // purple: shoe→board (abstraction)
+}
+
 // ─── Tree layout computation ──────────────────────────────────────────────────
 function computeTreeLayout(
   allImages: ImageData[],
   availH: number,
 ): {
   nodes: { id: number; x: number; y: number; img: ImageData }[];
-  edges: { key: string; px: number; py: number; cx: number; cy: number }[];
+  edges: { key: string; px: number; py: number; cx: number; cy: number; parentRealm: string; childRealm: string }[];
   totalW: number;
   dotR: number;
 } {
-  const images = allImages.filter(img => !img.is_ghost);
+  // Exclude ghost nodes and 3/4 satellite views — only side views represent designs in the tree
+  const images = allImages.filter(img => !img.is_ghost && img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back');
   if (images.length === 0) return { nodes: [], edges: [], totalW: 120, dotR: 6 };
 
   const idSet = new Set(images.map(img => img.id));
@@ -120,7 +131,8 @@ function computeTreeLayout(
   }));
 
   // Edges: draw from parent → child using the parents[] array (works even with stale children[])
-  const edges: { key: string; px: number; py: number; cx: number; cy: number }[] = [];
+  const imgMap = new Map(images.map(img => [img.id, img]));
+  const edges: { key: string; px: number; py: number; cx: number; cy: number; parentRealm: string; childRealm: string }[] = [];
   images.forEach(img => {
     const cp = posMap.get(img.id);
     if (!cp) return;
@@ -128,7 +140,13 @@ function computeTreeLayout(
       if (!idSet.has(pid)) return;
       const pp = posMap.get(pid);
       if (!pp) return;
-      edges.push({ key: `${pid}→${img.id}`, px: pp.x, py: pp.y, cx: cp.x, cy: cp.y });
+      const parent = imgMap.get(pid);
+      edges.push({
+        key: `${pid}→${img.id}`,
+        px: pp.x, py: pp.y, cx: cp.x, cy: cp.y,
+        parentRealm: parent?.realm ?? 'shoe',
+        childRealm: img.realm ?? 'shoe',
+      });
     });
   });
 
@@ -139,6 +157,7 @@ function computeTreeLayout(
 // ─── Genealogy SVG Tree ───────────────────────────────────────────────────────
 const GenealogyTree: React.FC = () => {
   const allImages = useAppStore(s => s.images);
+  const isolatedImageIds = useAppStore(s => s.isolatedImageIds);
   const selectedImageIds = useAppStore(s => s.selectedImageIds);
   const setSelectedImageIds = useAppStore(s => s.setSelectedImageIds);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -154,10 +173,17 @@ const GenealogyTree: React.FC = () => {
     return () => obs.disconnect();
   }, []);
 
+  // When isolation is active, only show isolated items in the tree
+  const treeImages = useMemo(() => {
+    if (isolatedImageIds === null) return allImages;
+    const isoSet = new Set(isolatedImageIds);
+    return allImages.filter(img => isoSet.has(img.id));
+  }, [allImages, isolatedImageIds]);
+
   const selectedSet = useMemo(() => new Set(selectedImageIds), [selectedImageIds]);
   const { nodes, edges, totalW, dotR } = useMemo(
-    () => computeTreeLayout(allImages, availH),
-    [allImages, availH],
+    () => computeTreeLayout(treeImages, availH),
+    [treeImages, availH],
   );
 
   // Collect unique display categories actually used for legend
@@ -180,21 +206,23 @@ const GenealogyTree: React.FC = () => {
               </filter>
             </defs>
 
-            {/* Edges — tapered ribbons, thick at parent, thin at child */}
+            {/* Edges — tapered ribbons, thick at parent, thin at child, realm-colored */}
             {edges.map(e => (
               <path
                 key={e.key}
                 d={taperedBezierD(e.px, e.py, e.cx, e.cy, dotR * 0.72, dotR * 0.26)}
-                fill="rgba(50,70,88,1.0)"
+                fill={getRealmEdgeColor(e.parentRealm, e.childRealm)}
                 stroke="none"
               />
             ))}
 
-            {/* Nodes — solid filled circles */}
+            {/* Nodes — solid filled circles, with realm indicator */}
             {nodes.map(n => {
               const sel = selectedSet.has(n.id);
               const del = !n.img.visible;
-              const col = getCategoryColor(n.img.generation_method);
+              const isMoodBoard = n.img.realm === 'mood-board';
+              const col = isMoodBoard ? '#FF6B2B' : getCategoryColor(n.img.generation_method);
+              const selColor = isMoodBoard ? '#FF6B2B' : '#00d2ff';
               const label = n.img.prompt
                 ? (n.img.prompt.length > 80 ? n.img.prompt.slice(0, 80) + '…' : n.img.prompt)
                 : `Image ${n.id}`;
@@ -205,15 +233,25 @@ const GenealogyTree: React.FC = () => {
                   onClick={() => setSelectedImageIds([n.id])}
                   style={{ cursor: 'pointer' }}
                 >
-                  <title>{label}{del ? ' (deleted)' : ''}</title>
+                  <title>{label}{isMoodBoard ? ' [mood board]' : ''}{del ? ' (deleted)' : ''}</title>
                   {/* Hit area */}
                   <circle r={dotR + 6} fill="transparent" />
+                  {/* Mood board outer ring indicator */}
+                  {isMoodBoard && !del && (
+                    <circle
+                      r={dotR + 3}
+                      fill="none"
+                      stroke="rgba(255, 107, 43, 0.4)"
+                      strokeWidth={1.5}
+                      strokeDasharray="3 2"
+                    />
+                  )}
                   {/* Solid filled circle */}
                   <circle
                     r={sel ? dotR + 2 : dotR}
                     fill={del ? 'rgba(55,65,78,0.6)' : col}
                     fillOpacity={del ? 0.5 : 0.88}
-                    stroke={sel ? '#00d2ff' : 'rgba(0,0,0,0.25)'}
+                    stroke={sel ? selColor : 'rgba(0,0,0,0.25)'}
                     strokeWidth={sel ? 2.5 : 1}
                     filter={sel ? 'url(#dt-sel-glow)' : undefined}
                   />
@@ -251,13 +289,28 @@ const GenealogyTree: React.FC = () => {
 export const BottomDrawer: React.FC = () => {
   const setIsExpanded = useAppStore(s => s.setIsHistoryExpanded);
   const allImages = useAppStore(s => s.images);
+  const isolatedImageIds = useAppStore(s => s.isolatedImageIds);
   const images = allImages.filter(img => img.visible);
   const deletedIds = useMemo(
     () => new Set(allImages.filter(img => !img.visible).map(img => img.id)),
     [allImages],
   );
-  const historyGroups = useAppStore(s => s.historyGroups);
+  const allHistoryGroups = useAppStore(s => s.historyGroups);
   const setSelectedImageIds = useAppStore(s => s.setSelectedImageIds);
+
+  // When isolation is active, filter history groups to only those with isolated items
+  const historyGroups = useMemo(() => {
+    if (isolatedImageIds === null) return allHistoryGroups;
+    const isoSet = new Set(isolatedImageIds);
+    const filtered = allHistoryGroups.filter(g => g.image_ids.some(id => isoSet.has(id)));
+    console.log(`[BottomDrawer] isolation active: ${isolatedImageIds.length} ids, ${filtered.length}/${allHistoryGroups.length} groups pass filter`);
+    return filtered;
+  }, [allHistoryGroups, isolatedImageIds]);
+
+  // Filtered image count for stats
+  const displayedImageCount = isolatedImageIds !== null
+    ? images.filter(img => isolatedImageIds.includes(img.id)).length
+    : images.length;
 
   // Exclusive tab: only one panel open at a time. null = drawer collapsed.
   const [activeTab, setActiveTab] = useState<'history' | 'lineage' | null>(null);
@@ -318,14 +371,14 @@ export const BottomDrawer: React.FC = () => {
               </button>
             </div>
             <span className="drawer-stats drawer-stats--compact" onClick={e => e.stopPropagation()}>
-              {historyGroups.length} batches · {images.length} images
+              {historyGroups.length} batches · {displayedImageCount} images{isolatedImageIds !== null ? ' (isolated)' : ''}
             </span>
           </>
         ) : (
           /* Collapsed: stats + batch chip thumbnails — clicking anywhere on bar expands */
           <>
             <span className="drawer-stats">
-              {historyGroups.length} batches · {images.length} images
+              {historyGroups.length} batches · {displayedImageCount} images{isolatedImageIds !== null ? ' (isolated)' : ''}
             </span>
             <div className="drawer-thumbs">
               {historyGroups.slice(-8).map(group => {
@@ -335,13 +388,18 @@ export const BottomDrawer: React.FC = () => {
                     : null;
                 const thumbDeleted = thumbnailImage ? deletedIds.has(thumbnailImage.id) : false;
                 const deletedCount = group.image_ids.filter(id => deletedIds.has(id)).length;
+                // When isolated, only select images that are in the isolation set
+                const isoSet = isolatedImageIds !== null ? new Set(isolatedImageIds) : null;
+                const selectableIds = group.image_ids.filter(id =>
+                  !deletedIds.has(id) && (isoSet === null || isoSet.has(id))
+                );
                 return (
                   <div
                     key={group.id}
                     className="drawer-batch-chip"
                     onClick={e => {
                       e.stopPropagation();
-                      setSelectedImageIds(group.image_ids.filter(id => !deletedIds.has(id)));
+                      setSelectedImageIds(selectableIds);
                     }}
                   >
                     {thumbnailImage && (
@@ -384,13 +442,16 @@ export const BottomDrawer: React.FC = () => {
                         : null;
                     const allDeleted = group.image_ids.every(id => deletedIds.has(id));
                     const someDeleted = !allDeleted && group.image_ids.some(id => deletedIds.has(id));
+                    // When isolated, only select images that are in the isolation set
+                    const isoSet = isolatedImageIds !== null ? new Set(isolatedImageIds) : null;
+                    const selectableIds = group.image_ids.filter(id =>
+                      !deletedIds.has(id) && (isoSet === null || isoSet.has(id))
+                    );
                     return (
                       <div
                         key={group.id}
                         className={`drawer-group${allDeleted ? ' highlighting' : ''}`}
-                        onClick={() =>
-                          setSelectedImageIds(group.image_ids.filter(id => !deletedIds.has(id)))
-                        }
+                        onClick={() => setSelectedImageIds(selectableIds)}
                         title={group.prompt || ''}
                       >
                         {thumbnailImage ? (

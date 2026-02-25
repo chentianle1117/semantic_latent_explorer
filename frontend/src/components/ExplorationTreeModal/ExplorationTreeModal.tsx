@@ -32,11 +32,23 @@ const CAT_COLORS: Record<string, string> = {
 
 function getCatColor(img: ImageData | null): string {
   if (!img) return '#8b949e';
+  // Mood board realm gets its own color regardless of generation method
+  if (img.realm === 'mood-board') return '#FF6B2B';
   const m = img.generation_method ?? '';
   if (m === 'dataset') return CAT_COLORS.dataset;
   if (m === 'generated' || m === 'text2image' || m === 'variation') return CAT_COLORS.generated;
   if (m === 'agent' || m === 'exploration') return CAT_COLORS.agent;
   return CAT_COLORS.user;
+}
+
+// Realm-aware edge colors for cross-realm lineage
+function getRealmEdgeColor(sourceImg: ImageData | null, targetImg: ImageData | null): string {
+  const sRealm = sourceImg?.realm ?? 'shoe';
+  const tRealm = targetImg?.realm ?? 'shoe';
+  if (sRealm === 'mood-board' && tRealm === 'mood-board') return 'rgba(255, 107, 43, 0.5)';  // orange
+  if (sRealm !== 'mood-board' && tRealm !== 'mood-board') return 'rgba(139, 148, 158, 0.25)'; // default gray
+  if (sRealm === 'mood-board' && tRealm !== 'mood-board') return 'rgba(63, 185, 80, 0.5)';    // green (consolidation)
+  return 'rgba(168, 85, 247, 0.45)';                                                           // purple (abstraction)
 }
 
 interface HierarchyNode {
@@ -58,14 +70,16 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
   const setFlyToImageId = useAppStore((s) => s.setFlyToImageId);
 
   const { hierarchy, links, posMap, maxDepth, treeWidth, treeHeight } = useMemo(() => {
+    // Exclude 3/4 satellite views — only side views represent designs in the tree
+    const treeImages = images.filter(img => img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back');
     const imageMap = new Map<number, ImageData>();
-    images.forEach((img) => imageMap.set(img.id, img));
+    treeImages.forEach((img) => imageMap.set(img.id, img));
 
     // Build parent→children map (use first parent only per child for tree structure)
     const childrenByParent = new Map<number, number[]>();
     const hasParent = new Set<number>();
 
-    images.forEach((img) => {
+    treeImages.forEach((img) => {
       (img.parents || []).forEach((parentId) => {
         if (!imageMap.has(parentId)) return;
         if (hasParent.has(img.id)) return; // only one parent per child for tree
@@ -77,7 +91,7 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
     });
 
     // Find root nodes (no parents)
-    const roots = images.filter((img) => !hasParent.has(img.id)).map((img) => img.id);
+    const roots = treeImages.filter((img) => !hasParent.has(img.id)).map((img) => img.id);
 
     const visited = new Set<number>();
     const buildHierarchy = (id: number): HierarchyNode => {
@@ -243,7 +257,11 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
         .text(d === 0 ? "ROOTS" : `GEN ${d}`);
     }
 
-    // Links — subtle horizontal bezier
+    // Build image map early (needed for realm-aware link colors)
+    const imageMap = new Map<number, ImageData>();
+    images.forEach((img) => imageMap.set(img.id, img));
+
+    // Links — subtle horizontal bezier, realm-colored
     links.forEach((link) => {
       const s = posMap.get(link.source);
       const t = posMap.get(link.target);
@@ -253,19 +271,18 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
       const tx = t.x - NODE_W / 2 - 4;
       const midX = (sx + tx) / 2;
       const pathD = `M ${sx} ${s.y} C ${midX} ${s.y}, ${midX} ${t.y}, ${tx} ${t.y}`;
+      const edgeColor = getRealmEdgeColor(imageMap.get(link.source) ?? null, imageMap.get(link.target) ?? null);
 
       zoomGroup.append("path")
         .attr("d", pathD)
         .attr("fill", "none")
-        .attr("stroke", "rgba(139,148,158,0.25)")
+        .attr("stroke", edgeColor)
         .attr("stroke-width", 1.5)
         .attr("marker-end", "url(#tree-arrow)");
     });
 
     // Nodes
     const allNodes = Array.from(posMap.entries());
-    const imageMap = new Map<number, ImageData>();
-    images.forEach((img) => imageMap.set(img.id, img));
 
     allNodes.forEach(([id, pos]) => {
       const img = imageMap.get(id) ?? null;

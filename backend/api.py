@@ -118,6 +118,9 @@ class AddExternalImagesRequest(BaseModel):
     remove_background: Optional[bool] = False
     parent_ids: Optional[List[int]] = []  # Parent image IDs for genealogy tracking
     precomputed_coordinates: Optional[List[float]] = None  # Skip projection if already known (ghost accept)
+    realm: str = 'shoe'        # 'shoe' or 'mood-board'
+    shoe_view: str = 'side'    # 'side', '3/4-front', '3/4-back'
+    parent_side_id: int = -1   # For 3/4 satellites: ID of parent side-view shoe (-1 = none)
 
 
 class InterpretBriefRequest(BaseModel):
@@ -131,7 +134,7 @@ class UpdateBriefFieldsRequest(BaseModel):
 class SuggestTagsRequest(BaseModel):
     brief: str
     reference_image_ids: List[int] = []
-    mode: str = "text"  # "text" or "reference"
+    mode: str = "text"  # "text", "reference", "mood-board", or "mood-board-reference"
 
 
 class ComposePromptRequest(BaseModel):
@@ -144,6 +147,7 @@ class RefinePromptRequest(BaseModel):
     tags: List[Dict] = []  # [{"text": "white leather", "source": "A", "color": "#00d2ff"}, ...]
     reference_image_ids: List[int] = []
     brief: str = ""
+    realm: str = "shoe"  # "shoe" or "mood-board"
 
 
 class ImageResponse(BaseModel):
@@ -161,6 +165,9 @@ class ImageResponse(BaseModel):
     suggested_prompt: str = ''  # Suggested prompt for ghost nodes
     reasoning: str = ''  # Why this ghost was suggested
     neighbors: List[int] = []  # K-nearest semantic neighbors for physics simulation
+    realm: str = 'shoe'        # 'shoe' or 'mood-board'
+    shoe_view: str = 'side'    # 'side', '3/4-front', '3/4-back'
+    parent_side_id: int = -1   # For 3/4 satellites: ID of parent side-view shoe (-1 = none)
 
 
 class StateResponse(BaseModel):
@@ -437,6 +444,9 @@ def _deserialize_canvas(data: dict) -> None:
             is_ghost=img_data.get("is_ghost", False),
             suggested_prompt=img_data.get("suggested_prompt", ""),
             reasoning=img_data.get("reasoning", ""),
+            realm=img_data.get("realm", "shoe"),
+            shoe_view=img_data.get("shoe_view", "side"),
+            parent_side_id=img_data.get("parent_side_id", -1),
         )
         state.images_metadata.append(meta)
 
@@ -859,7 +869,10 @@ def image_metadata_to_response(img: ImageMetadata, neighbor_map: Optional[Dict[i
         is_ghost=img.is_ghost,
         suggested_prompt=img.suggested_prompt,
         reasoning=img.reasoning,
-        neighbors=neighbors
+        neighbors=neighbors,
+        realm=getattr(img, 'realm', 'shoe'),
+        shoe_view=getattr(img, 'shoe_view', 'side'),
+        parent_side_id=getattr(img, 'parent_side_id', -1),
     )
 
 
@@ -1351,10 +1364,16 @@ async def suggest_tags(request: SuggestTagsRequest):
             if f.get("value"):
                 fields_section += f"- {f['label']}: {f['value']}\n"
 
+    # Normalize: mood-board-reference without refs → mood-board
+    effective_mode = request.mode
+    if effective_mode == "mood-board-reference" and not request.reference_image_ids:
+        effective_mode = "mood-board"
+    print(f"[suggest_tags] mode={request.mode}, effective_mode={effective_mode}, ref_ids={request.reference_image_ids}")
+
     try:
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
 
-        if request.mode == "reference" and request.reference_image_ids:
+        if effective_mode == "reference" and request.reference_image_ids:
             # ── Reference mode: multimodal analysis ──────────────────────────
             ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
             labels = [chr(65 + i) for i in range(len(ref_imgs))]  # A, B, C...
@@ -1450,6 +1469,168 @@ Return JSON ONLY (no markdown):
                 "combination_prompts": data.get("combination_prompts", []),
             }
 
+        elif effective_mode == "mood-board-reference" and request.reference_image_ids:
+            # ── Mood board reference mode: multimodal analysis + concept categories ──
+            # Combines per-image visual analysis (A/B/C/D descriptors) with mood-board
+            # concept categories, so users iterating on boards get both.
+            ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
+            labels = [chr(65 + i) for i in range(len(ref_imgs))]
+            label_map = {img.id: labels[i] for i, img in enumerate(ref_imgs)}
+
+            n = len(ref_imgs)
+            prompt_text = f"""You are a creative visual analysis AI for mood boards and design concept exploration.
+
+DESIGN BRIEF: {brief}{fields_section}
+
+The user selected {n} reference image{"s" if n > 1 else ""} (labeled {", ".join(labels)}). These are mood boards, concept sheets, style boards, or design sketches — analyze the visual and conceptual character of each.
+
+For each image, extract exactly 6-8 SHORT KEY DESCRIPTORS (1-3 words each) that capture the visual/conceptual character of that board. Include:
+- Mood/feeling (e.g., "aggressive energy", "calm elegance")
+- Color story (e.g., "warm earth tones", "neon accents")
+- Artistic technique (e.g., "gestural ink strokes", "collage layers")
+- Form language (e.g., "angular tension", "organic flow")
+- Design COMPONENTS visible (e.g., "exaggerated toe cap", "chunky midsole", "wraparound strap", "sculpted heel counter", "geometric outsole", "oversized tongue")
+
+IMPORTANT: Include at least 2 design component descriptors per image that describe specific physical parts/features shown in the design. These help users think about structural elements.
+
+Return descriptors as a FLAT JSON ARRAY of strings.
+
+Then suggest 2-3 combination/iteration prompts that reference specific boards using @A, @B notation.
+Each combination should describe how to BUILD ON or ITERATE these boards — what to explore further, what to combine, what new direction to take.
+Use the EXACT descriptor phrases from your analysis. Focus on artistic/conceptual direction.
+
+GOOD: "@A's warm earth tones with @B's angular tension, pushing toward bolder gestural marks and an exaggerated toe cap"
+BAD: "a shoe inspired by both boards" — too generic, NEVER write this
+
+Also generate 6 concept categories with 4-6 tags each, informed by the reference boards but going BEYOND them to suggest new directions:
+1. Mood — emotional/tonal direction
+2. Form Language — shape and structural vocabulary
+3. Era — time period / cultural reference
+4. Technique — artistic rendering style
+5. Palette — color direction
+6. Components — specific design elements/parts (e.g., "sculpted heel", "exaggerated toe", "floating midsole", "wraparound lacing", "deconstructed upper")
+
+Return JSON ONLY (no markdown):
+{{
+  "reference_analysis": [
+    {{"image_id": 0, "label": "A", "descriptors": ["warm earth tones", "gestural strokes", "layered textures", "organic flow", "exaggerated toe cap", "chunky outsole", "muted contrast"]}}
+  ],
+  "combination_prompts": [
+    {{"prompt": "@A's warm palette and exaggerated toe cap with @B's angular composition, more expressive marks", "reasoning": "combines warmth from A with structural energy from B"}}
+  ],
+  "categories": [
+    {{"name": "Mood", "tags": ["energetic", "serene", "aggressive", "playful"]}},
+    {{"name": "Form Language", "tags": ["organic curves", "angular", "fluid", "geometric"]}},
+    {{"name": "Era", "tags": ["retro 70s", "Y2K", "futurist", "contemporary"]}},
+    {{"name": "Technique", "tags": ["bold marker", "watercolor wash", "charcoal", "ink"]}},
+    {{"name": "Palette", "tags": ["earth tones", "neon pop", "monochrome", "pastel"]}},
+    {{"name": "Components", "tags": ["sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap"]}}
+  ],
+  "full_prompts": [
+    {{"prompt": "bold angular tension with futuristic silhouette, exaggerated toe cap and warm earth tones", "reasoning": "..."}}
+  ]
+}}"""
+
+            # Build content list: [text, pil_img_A, pil_img_B, ...]
+            content = [prompt_text]
+            for img in ref_imgs:
+                try:
+                    resized = img.pil_image.resize((256, 256))
+                    content.append(resized)
+                except Exception as img_err:
+                    print(f"[suggest_tags] mood-board-reference: failed to load image {img.id}: {img_err}")
+
+            print(f"[suggest_tags] mood-board-reference: sending {len(content)-1} images to Gemini")
+            response = model.generate_content(content)
+            text = (getattr(response, "text", None) or "").strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
+
+            import json as _json
+            data = _json.loads(text)
+            print(f"[suggest_tags] mood-board-reference: parsed JSON keys: {list(data.keys())}")
+
+            # Normalize reference_analysis
+            analysis = data.get("reference_analysis", [])
+            for i, entry in enumerate(analysis):
+                if i < len(ref_imgs):
+                    entry["image_id"] = ref_imgs[i].id
+                    entry["label"] = labels[i]
+                if "descriptors" not in entry or not entry.get("descriptors"):
+                    entry["descriptors"] = (
+                        entry.get("tags")
+                        or entry.get("key_descriptors")
+                        or entry.get("key_features")
+                        or entry.get("features")
+                        or []
+                    )
+                    if isinstance(entry["descriptors"], dict):
+                        flat = []
+                        for v in entry["descriptors"].values():
+                            if isinstance(v, list):
+                                flat.extend(v)
+                            elif isinstance(v, str):
+                                flat.extend([t.strip() for t in v.split(",") if t.strip()])
+                        entry["descriptors"] = flat
+            print(f"[suggest_tags] mood-board-reference: returning {len(analysis)} analyses, {len(data.get('categories', []))} categories")
+
+            return {
+                "mode": "mood-board-reference",
+                "reference_analysis": analysis,
+                "combination_prompts": data.get("combination_prompts", []),
+                "categories": data.get("categories", []),
+                "full_prompts": data.get("full_prompts", []),
+            }
+
+        elif effective_mode == "mood-board":
+            # ── Mood board mode: concept-oriented tag generation ───────────────
+            prompt_text = f"""You are a creative concept and style exploration assistant for mood boards and design sketches.
+
+DESIGN BRIEF: {brief}
+CANVAS: {count} designs, axes: {axis_info}{fields_section}
+
+Generate attribute tags organized into exactly 6 categories for MOOD BOARD, STYLE BOARD, and CONCEPT SKETCH generation.
+4-6 short tags (1-3 words each) per category. Tags should inspire visual direction, feeling, atmosphere, artistic style, and specific design elements.
+
+Categories: Mood, Form Language, Era, Technique, Palette, Components
+(Components = specific design elements like "sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap")
+
+Also suggest 2-3 complete concept prompts (under 20 words each) that read like artist briefs — evocative, atmospheric, and conceptual.
+
+Return JSON ONLY (no markdown):
+{{
+  "categories": [
+    {{"name": "Mood", "tags": ["energetic", "serene", "aggressive", "playful", "bold", "understated"]}},
+    {{"name": "Form Language", "tags": ["organic curves", "angular", "fluid lines", "geometric", "asymmetric"]}},
+    {{"name": "Era", "tags": ["retro 70s", "Y2K nostalgia", "futurist", "vintage 90s", "contemporary"]}},
+    {{"name": "Technique", "tags": ["bold marker", "cross-hatch", "watercolor wash", "gestural ink", "charcoal"]}},
+    {{"name": "Palette", "tags": ["earth tones", "neon pop", "monochrome", "pastel", "jewel tones"]}},
+    {{"name": "Components", "tags": ["sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap"]}}
+  ],
+  "full_prompts": [
+    {{"prompt": "bold angular tension with futuristic silhouette, exaggerated toe cap and warm earth tones", "reasoning": "..."}}
+  ]
+}}"""
+
+            response = model.generate_content(prompt_text)
+            text = (getattr(response, "text", None) or "").strip()
+            if text.startswith("```"):
+                text = text.split("```")[1]
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
+
+            import json as _json
+            data = _json.loads(text)
+            return {
+                "mode": "text",
+                "categories": data.get("categories", []),
+                "full_prompts": data.get("full_prompts", []),
+            }
+
         else:
             # ── Text mode: categorized tag generation ─────────────────────────
             prompt_text = f"""You are a shoe design exploration assistant.
@@ -1495,11 +1676,33 @@ Return JSON ONLY (no markdown):
             }
 
     except Exception as e:
-        print(f"ERROR in suggest_tags: {e}")
+        print(f"ERROR in suggest_tags (mode={effective_mode}): {e}")
         import traceback
         traceback.print_exc()
-        # Fallback: return default categories for text mode
-        if request.mode == "text":
+        # Fallback: return default categories per mode
+        mood_board_cats = [
+            {"name": "Mood", "tags": ["energetic", "serene", "aggressive", "playful", "bold"]},
+            {"name": "Form Language", "tags": ["organic curves", "angular", "fluid", "geometric"]},
+            {"name": "Era", "tags": ["retro 70s", "Y2K", "futurist", "vintage 90s"]},
+            {"name": "Technique", "tags": ["bold marker", "cross-hatch", "watercolor", "charcoal"]},
+            {"name": "Palette", "tags": ["earth tones", "neon pop", "monochrome", "pastel"]},
+            {"name": "Components", "tags": ["sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap"]},
+        ]
+        if effective_mode == "mood-board-reference":
+            return {
+                "mode": "mood-board-reference",
+                "reference_analysis": [],
+                "combination_prompts": [],
+                "categories": mood_board_cats,
+                "full_prompts": [],
+            }
+        if effective_mode == "mood-board":
+            return {
+                "mode": "text",
+                "categories": mood_board_cats,
+                "full_prompts": [],
+            }
+        if effective_mode == "text":
             return {
                 "mode": "text",
                 "categories": [
@@ -1555,7 +1758,8 @@ async def refine_prompt(request: RefinePromptRequest):
     if not request.prompt.strip():
         raise HTTPException(status_code=400, detail="No prompt provided")
 
-    brief = request.brief.strip() or "Explore shoe design variations"
+    is_mood_board = request.realm == "mood-board"
+    brief = request.brief.strip() or ("Explore design concepts and visual directions" if is_mood_board else "Explore shoe design variations")
 
     # Build tag list for the system prompt
     tag_list = ""
@@ -1570,7 +1774,29 @@ async def refine_prompt(request: RefinePromptRequest):
                 tag_entries.append(f'"{txt}"')
         tag_list = "\nDESIGN TAGS in the prompt: " + ", ".join(tag_entries)
 
-    prompt_text = f"""You are a design prompt refiner. The user has selected descriptor tags from specific reference images and may have typed additional notes.
+    if is_mood_board:
+        prompt_text = f"""You are a creative mood board and concept art prompt writer. The user wants to generate a STYLE BOARD, CONCEPT SKETCH, or MOOD BOARD — NOT a product render.
+
+DESIGN BRIEF: {brief}
+USER PROMPT: {request.prompt}{tag_list}
+
+Rewrite this into an evocative, artistic concept prompt (under 40 words) for a mood board or style exploration sheet.
+
+CRITICAL RULES:
+1. NEVER use the word "shoe" or any product-specific language. Think in terms of: mood, feeling, texture, atmosphere, color story, form language, gestural energy, material exploration, style direction.
+2. When a tag has a source attribution (e.g. "bold" (from A), "angular" (from B)), write "@A's bold energy" and "@B's angular tension" — use the @letter possessive form with evocative, conceptual language.
+3. If the user already typed @A, @B, @C, @D references, keep them EXACTLY as-is.
+4. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase them.
+5. The prompt should feel artistic, expressive, and conceptual — like briefing an artist on a mood board, not describing a product.
+
+EXAMPLES:
+- "A bold gestural exploration with @A's raw energy and @B's structured tension, earth-tone palette"
+- "Moody collage of @A's organic flow meeting angular precision, charcoal and warm amber tones"
+- "Abstract material study blending sleek surfaces with rugged textures, minimal and powerful"
+
+Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
+    else:
+        prompt_text = f"""You are a design prompt refiner. The user has selected descriptor tags from specific reference images and may have typed additional notes.
 
 DESIGN BRIEF: {brief}
 USER PROMPT: {request.prompt}{tag_list}
@@ -1801,7 +2027,10 @@ async def add_external_images(request: AddExternalImagesRequest):
                 prompt=request.prompt,
                 reference_ids=request.parent_ids.copy(),  # Reference IDs same as parents
                 timestamp=datetime.now(),
-                visible=True
+                visible=True,
+                realm=request.realm,
+                shoe_view=request.shoe_view,
+                parent_side_id=request.parent_side_id,
             )
             new_metadata.append(img_meta)
             state.next_id += 1
@@ -2749,6 +2978,9 @@ def _import_from_zip(zf: "zipfile.ZipFile") -> dict:
             is_ghost=meta.get("is_ghost", False),
             suggested_prompt=meta.get("suggested_prompt", ""),
             reasoning=meta.get("reasoning", ""),
+            realm=meta.get("realm", "shoe"),
+            shoe_view=meta.get("shoe_view", "side"),
+            parent_side_id=meta.get("parent_side_id", -1),
         ))
 
     if not new_images:
@@ -2946,6 +3178,9 @@ async def export_zip(ids: Optional[str] = None):
                     "is_ghost": img_meta.is_ghost,
                     "suggested_prompt": img_meta.suggested_prompt,
                     "reasoning": img_meta.reasoning,
+                    "realm": getattr(img_meta, 'realm', 'shoe'),
+                    "shoe_view": getattr(img_meta, 'shoe_view', 'side'),
+                    "parent_side_id": getattr(img_meta, 'parent_side_id', -1),
                 })
             canvas_history_data = []
             for hg in state.history_groups:

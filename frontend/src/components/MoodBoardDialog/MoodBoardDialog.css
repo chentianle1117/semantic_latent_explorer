@@ -1,0 +1,195 @@
+/* ── MoodBoardDialog ────────────────────────────────────────────────────── */
+
+/* Wider outer layout (matches prompt-dialog-outer but orange accent) */
+.mbd-outer {
+  /* Inherits prompt-dialog-outer layout; override accent color */
+}
+
+.mbd-main {
+  /* Inherits .dialog .prompt-dialog-main */
+}
+
+/* Title with orange mood-board accent */
+.mbd-title {
+  margin: 0 0 16px;
+  color: #e6edf3;
+  font-size: 16px;
+  font-weight: 600;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 107, 43, 0.25);
+}
+
+/* Section block */
+.mbd-section {
+  margin-bottom: 16px;
+}
+
+.mbd-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(180, 195, 210, 0.7);
+  margin-bottom: 8px;
+}
+
+.mbd-label-hint {
+  text-transform: none;
+  font-weight: 400;
+  color: rgba(140, 155, 170, 0.55);
+  letter-spacing: 0;
+  font-size: 10px;
+}
+
+/* ── Style preset pills ─────────────────────────────────────────────────── */
+
+.mbd-style-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mbd-style-pill {
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(255, 107, 43, 0.07);
+  border: 1px solid rgba(255, 107, 43, 0.25);
+  color: rgba(200, 180, 170, 0.8);
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.mbd-style-pill:hover {
+  background: rgba(255, 107, 43, 0.14);
+  border-color: rgba(255, 107, 43, 0.5);
+  color: rgba(255, 180, 140, 0.95);
+}
+
+.mbd-style-pill.selected {
+  background: rgba(255, 107, 43, 0.22);
+  border-color: rgba(255, 107, 43, 0.7);
+  color: #FF8C5A;
+  font-weight: 600;
+}
+
+/* ── Style reference upload ─────────────────────────────────────────────── */
+
+.mbd-ref-dropzone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  border: 1px dashed rgba(255, 107, 43, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 107, 43, 0.04);
+  cursor: pointer;
+  padding: 0 14px;
+  font-size: 12px;
+  color: rgba(180, 155, 140, 0.7);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mbd-ref-dropzone:hover {
+  border-color: rgba(255, 107, 43, 0.6);
+  background: rgba(255, 107, 43, 0.09);
+  color: rgba(220, 190, 170, 0.9);
+}
+
+.mbd-ref-dropzone.uploading {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.mbd-ref-icon {
+  font-size: 22px;
+  font-weight: 300;
+  color: rgba(255, 107, 43, 0.55);
+  line-height: 1;
+}
+
+.mbd-ref-preview {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mbd-ref-img {
+  width: 80px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 107, 43, 0.4);
+}
+
+.mbd-ref-clear {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(40, 45, 55, 0.92);
+  border: 1px solid rgba(255, 107, 43, 0.5);
+  color: rgba(255, 107, 43, 0.85);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+}
+
+.mbd-ref-clear:hover {
+  background: rgba(255, 107, 43, 0.2);
+}
+
+.mbd-ref-uploading {
+  font-size: 11px;
+  color: rgba(255, 107, 43, 0.7);
+  align-self: center;
+}
+
+/* ── Generate button (orange accent) ───────────────────────────────────── */
+
+.mbd-generate-btn {
+  background: linear-gradient(135deg, #FF6B2B 0%, #ff9f5a 100%) !important;
+}
+
+.mbd-generate-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(255, 107, 43, 0.4) !important;
+}
+
+/* ── Reference image thumbnails ───────────────────────────────────────── */
+
+.mbd-ref-thumbs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mbd-ref-thumb-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mbd-ref-thumb-img {
+  width: 180px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.mbd-ref-thumb-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}

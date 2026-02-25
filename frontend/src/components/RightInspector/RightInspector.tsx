@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useAppStore } from "../../store/appStore";
+import { getRealmAwareLabel } from "../../utils/generationCategories";
 import type { ImageData } from "../../types";
 import "./RightInspector.css";
 
@@ -90,15 +91,27 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     if (!inspectedImage) return [];
     return (inspectedImage.parents || [])
       .map((id) => imageMap.get(id))
-      .filter(Boolean) as ImageData[];
+      .filter((img): img is ImageData =>
+        !!img && img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back'
+      );
   }, [inspectedImage, imageMap]);
 
   const children = useMemo(() => {
     if (!inspectedImage) return [];
     return (inspectedImage.children || [])
       .map((id) => imageMap.get(id))
-      .filter(Boolean) as ImageData[];
+      .filter((img): img is ImageData =>
+        !!img && img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back'
+      );
   }, [inspectedImage, imageMap]);
+
+  // Find 3/4 satellite views for the inspected shoe (regardless of canvas filter toggle)
+  const satellites34 = useMemo(() => {
+    if (!inspectedImage || inspectedImage.realm === 'mood-board') return { front: null as ImageData | null, back: null as ImageData | null };
+    const front = images.find(img => img.parent_side_id === inspectedImage.id && img.shoe_view === '3/4-front') ?? null;
+    const back = images.find(img => img.parent_side_id === inspectedImage.id && img.shoe_view === '3/4-back') ?? null;
+    return { front, back };
+  }, [inspectedImage, images]);
 
   const riverRef = useRef<HTMLDivElement>(null);
   const [lineSegments, setLineSegments] = useState<LineSegment[]>([]);
@@ -241,6 +254,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 <div
                   key={img.id}
                   className={`deck-avatar ${inspectedImageId === img.id ? "active" : ""}`}
+                  style={img.realm === 'mood-board' ? { width: 72, aspectRatio: '3/2' } : undefined}
                   onClick={() => handleNodeClick(img.id)}
                   title={`#${img.id}`}
                 >
@@ -257,6 +271,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               <div className="river-lines-overlay" aria-hidden>
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="river-lines-svg">
                   <defs>
+                    {/* Shoe realm gradients (cyan/amber) */}
                     <linearGradient id="river-line-ancestor" x1="0%" y1="0%" x2="0%" y2="100%">
                       <stop offset="0%" stopColor="rgba(0, 229, 255, 0.35)" />
                       <stop offset="100%" stopColor="rgba(0, 229, 255, 0)" />
@@ -265,19 +280,29 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                       <stop offset="0%" stopColor="rgba(255, 170, 0, 0.35)" />
                       <stop offset="100%" stopColor="rgba(255, 170, 0, 0)" />
                     </linearGradient>
+                    {/* Mood board realm gradients (orange) */}
+                    <linearGradient id="river-line-ancestor-mb" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="rgba(255, 107, 43, 0.4)" />
+                      <stop offset="100%" stopColor="rgba(255, 107, 43, 0)" />
+                    </linearGradient>
+                    <linearGradient id="river-line-child-mb" x1="0%" y1="100%" x2="0%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(255, 107, 43, 0.4)" />
+                      <stop offset="100%" stopColor="rgba(255, 107, 43, 0)" />
+                    </linearGradient>
                   </defs>
                   {lineSegments.map((seg, i) => {
-                    // Cubic bezier with vertical tangents at both ends — proper genealogy S-curve.
-                    // Leaves the ancestor/child going straight toward hero, arrives straight at hero.
-                    // Sign of halfDy handles both upward (ancestor→hero) and downward (child→hero) directions.
                     const halfDy = (seg.to.y - seg.from.y) * 0.5;
                     const pathD = `M ${seg.from.x} ${seg.from.y} C ${seg.from.x} ${seg.from.y + halfDy} ${seg.to.x} ${seg.to.y - halfDy} ${seg.to.x} ${seg.to.y}`;
+                    const isMb = inspectedImage?.realm === 'mood-board';
+                    const gradId = seg.type === "ancestor"
+                      ? (isMb ? "river-line-ancestor-mb" : "river-line-ancestor")
+                      : (isMb ? "river-line-child-mb" : "river-line-child");
 
                     return (
                       <path
                         key={`${seg.type}-${i}`}
                         d={pathD}
-                        stroke={seg.type === "ancestor" ? "url(#river-line-ancestor)" : "url(#river-line-child)"}
+                        stroke={`url(#${gradId})`}
                         strokeWidth={0.6}
                         strokeDasharray="2 1.5"
                         strokeLinecap="butt"
@@ -293,15 +318,16 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               <div className={`river-ancestors ${ancestors.length > 3 ? 'many-items' : ''} ${ancestors.length > 5 ? 'very-many-items' : ''}`}>
                 {ancestors.map((a) => {
                   const isInSelection = selectedImageIds.includes(a.id);
+                  const isMb = a.realm === 'mood-board';
                   return (
                     <div
                       key={a.id}
                       className="river-node-wrapper"
                     >
                       <div
-                        className={`river-thumb ${isInSelection ? 'in-selection' : ''}`}
+                        className={`river-thumb ${isInSelection ? 'in-selection' : ''} ${isMb ? 'realm-mood-board' : ''}`}
                         onClick={() => handleNodeClick(a.id)}
-                        title={`#${a.id}`}
+                        title={`#${a.id}${isMb ? ' [mood board]' : ''}`}
                       >
                         <img src={`data:image/png;base64,${a.base64_image}`} alt={`#${a.id}`} />
                       </div>
@@ -323,23 +349,56 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </div>
             )}
 
-            {/* Hero Card - Fixed center */}
+            {/* Hero Card - Fixed center, with optional 3/4 flanking thumbnails */}
             <div className="hero-card">
-              {/* Pure hero image — meta moved below children, above action bar */}
-              <div
-                className={`hero-image-wrapper ${isHeroSelected ? "selected" : ""}`}
-                onMouseEnter={() => setHeroHoverAdd(!isHeroSelected)}
-                onMouseLeave={() => setHeroHoverAdd(false)}
-              >
-                <img
-                  src={`data:image/png;base64,${inspectedImage.base64_image}`}
-                  alt="Hero"
-                  className="hero-image"
-                />
-                {heroHoverAdd && !isHeroSelected && (
-                  <button className="hero-add-btn" onClick={handleHeroAddClick}>
-                    + Add to Selection
-                  </button>
+              <div className="hero-flanking-row">
+                {/* 3/4 Front satellite (left) */}
+                {satellites34.front && (
+                  <div
+                    className="hero-satellite"
+                    onClick={() => handleNodeClick(satellites34.front!.id)}
+                    title={`3/4 Front #${satellites34.front.id}`}
+                  >
+                    <img
+                      src={`data:image/png;base64,${satellites34.front.base64_image}`}
+                      alt="3/4 Front"
+                    />
+                    <span className="hero-satellite-label">3/4 F</span>
+                  </div>
+                )}
+
+                {/* Main hero image */}
+                <div
+                  className={`hero-image-wrapper ${isHeroSelected ? "selected" : ""}`}
+                  style={inspectedImage.realm === 'mood-board' ? { aspectRatio: '3 / 2', height: 'min(calc(100% - 44px), 22vh, 180px)' } : undefined}
+                  onMouseEnter={() => setHeroHoverAdd(!isHeroSelected)}
+                  onMouseLeave={() => setHeroHoverAdd(false)}
+                >
+                  <img
+                    src={`data:image/png;base64,${inspectedImage.base64_image}`}
+                    alt="Hero"
+                    className="hero-image"
+                  />
+                  {heroHoverAdd && !isHeroSelected && (
+                    <button className="hero-add-btn" onClick={handleHeroAddClick}>
+                      + Add to Selection
+                    </button>
+                  )}
+                </div>
+
+                {/* 3/4 Back satellite (right) */}
+                {satellites34.back && (
+                  <div
+                    className="hero-satellite"
+                    onClick={() => handleNodeClick(satellites34.back!.id)}
+                    title={`3/4 Back #${satellites34.back.id}`}
+                  >
+                    <img
+                      src={`data:image/png;base64,${satellites34.back.base64_image}`}
+                      alt="3/4 Back"
+                    />
+                    <span className="hero-satellite-label">3/4 B</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -349,15 +408,16 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               <div className={`river-children ${children.length > 3 ? 'many-items' : ''} ${children.length > 5 ? 'very-many-items' : ''}`}>
                 {children.map((c) => {
                   const isInSelection = selectedImageIds.includes(c.id);
+                  const isMb = c.realm === 'mood-board';
                   return (
                     <div
                       key={c.id}
                       className="river-node-wrapper"
                     >
                       <div
-                        className={`river-thumb ${isInSelection ? 'in-selection' : ''}`}
+                        className={`river-thumb ${isInSelection ? 'in-selection' : ''} ${isMb ? 'realm-mood-board' : ''}`}
                         onClick={() => handleNodeClick(c.id)}
-                        title={`#${c.id}`}
+                        title={`#${c.id}${isMb ? ' [mood board]' : ''}`}
                       >
                         <img src={`data:image/png;base64,${c.base64_image}`} alt={`#${c.id}`} />
                       </div>
@@ -385,7 +445,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
           <div className="hero-meta">
             <span className="hero-id">#{inspectedImage.id}</span>
             <span className="hero-meta-sep">·</span>
-            <span className="hero-method">{inspectedImage.generation_method}</span>
+            <span className="hero-method">{getRealmAwareLabel(inspectedImage.generation_method, inspectedImage.realm)}</span>
             {inspectedImage.prompt && (
               <span className="hero-prompt" title={inspectedImage.prompt}>{inspectedImage.prompt}</span>
             )}

@@ -391,6 +391,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const isolatedImageIds = useAppStore((state) => state.isolatedImageIds);
   const starFilter = useAppStore((state) => state.starFilter);
   const imageRatings = useAppStore((state) => state.imageRatings);
+  const showSideView = useAppStore((state) => state.showSideView);
+  const show34Front = useAppStore((state) => state.show34Front);
+  const show34Back = useAppStore((state) => state.show34Back);
   const imageSizeOverrides = useAppStore((state) => state.imageSizeOverrides);
   const imageOpacityOverrides = useAppStore((state) => state.imageOpacityOverrides);
   // Always-current refs so render closures never see stale overrides
@@ -412,7 +415,13 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const filtered = allImages.filter((img) => {
       if (!img.visible) return false;
       const lid = imageLayerMap[img.id] ?? "default";
-      return layerVisMap[lid] ?? true;
+      if (!(layerVisMap[lid] ?? true)) return false;
+      // Filter shoe views based on toggle state
+      const view = img.shoe_view ?? 'side';
+      if (view === 'side' && !showSideView) return false;
+      if (view === '3/4-front' && !show34Front) return false;
+      if (view === '3/4-back' && !show34Back) return false;
+      return true;
     });
     // Sort: higher layer index (deeper in stack) → render first; within same layer, lower ID first (older behind newer)
     return filtered.sort((a, b) => {
@@ -421,7 +430,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       if (bIdx !== aIdx) return bIdx - aIdx; // descending layer index: references first, shoes last
       return a.id - b.id; // ascending ID within layer: older images render first (behind newer)
     });
-  }, [allImages, layers, imageLayerMap]);
+  }, [allImages, layers, imageLayerMap, showSideView, show34Front, show34Back]);
 
   // Rubber-band selection state
   // mode: 'window'   (drag →, solid blue)   = must fully contain the shoe
@@ -662,6 +671,110 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         }
         return;
       }
+
+      // Image-addition fast path: new images added, none removed → append only the new nodes.
+      // This prevents camera jumps and visual blinks after generation completes.
+      const isAddOnly = [...prevIds].every(id => currIds.has(id)) && currIds.size > prevIds.size;
+      if (isAddOnly && canvasBounds !== null && svgRef.current &&
+          xScaleRef.current && yScaleRef.current) {
+        const newImages = images.filter(img => !prevIds.has(img.id));
+        console.log(`⚡ Image-addition fast path: appending ${newImages.length} new nodes`);
+        prevImagesRef.current = images;
+
+        const svg = d3.select(svgRef.current);
+        const imagesGroup = svg.select(".images");
+        if (!imagesGroup.empty()) {
+          const xs = xScaleRef.current!;
+          const ys = yScaleRef.current!;
+          const co = coordOffsetRef.current;
+          const cs = coordScaleRef.current;
+          const spx = stretchPivotXRef.current;
+          const spy = stretchPivotYRef.current;
+          const axScX = visualSettingsRef.current.axisScaleX ?? 1;
+          const axScY = visualSettingsRef.current.axisScaleY ?? 1;
+          const toS = (bx: number, by: number): [number, number] => [
+            spx + (bx - spx) * axScX,
+            spy + (by - spy) * axScY,
+          ];
+          const imgSize = visualSettingsRef.current.imageSize;
+
+          for (const d of newImages) {
+            const bx = (d.coordinates[0] + co[0]) * cs;
+            const by = (d.coordinates[1] + co[1]) * cs;
+            const [sx, sy] = toS(bx, by);
+            const sz = imageSizeOverridesRef.current[d.id] ?? imgSize;
+            const isMB = d.realm === 'mood-board';
+            const isRef = d.generation_method === 'dataset';
+            const w = isMB ? sz * 1.5 : sz;
+
+            const gNode = imagesGroup.append("g")
+              .datum(d)
+              .attr("class", "image-node")
+              .attr("id", `image-${d.id}`)
+              .attr("data-image-id", d.id)
+              .attr("transform", `translate(${xs(sx)}, ${ys(sy)})`);
+
+            // Click area
+            const rectY = (isMB || isRef) ? -sz / 2 : -sz * 0.3;
+            const rectH = (isMB || isRef) ? sz : sz * 0.6;
+            gNode.append("rect")
+              .attr("x", -w / 2)
+              .attr("y", rectY)
+              .attr("width", w)
+              .attr("height", rectH)
+              .attr("rx", 8)
+              .attr("fill", "transparent")
+              .attr("pointer-events", "all")
+              .style("cursor", "pointer")
+              .on("click", function (event) {
+                event.stopPropagation();
+                const curIsolated = useAppStore.getState().isolatedImageIds;
+                if (curIsolated !== null && !curIsolated.includes(d.id)) return;
+                toggleImageSelection(d.id, event.ctrlKey);
+                // Trigger selection change callback
+                setTimeout(() => {
+                  const newSel = useAppStore.getState().selectedImageIds;
+                  onSelectionChange(newSel.length > 0 ? -1 : 0, newSel.length > 0 ? -1 : 0, newSel.length);
+                }, 0);
+              })
+              .on("mouseenter", function () {
+                const g = d3.select(this.parentNode as SVGGElement);
+                if (!useAppStore.getState().selectedImageIds.includes(d.id)) {
+                  g.attr("filter", "url(#hover-glow)");
+                }
+              })
+              .on("mouseleave", function () {
+                const g = d3.select(this.parentNode as SVGGElement);
+                if (!useAppStore.getState().selectedImageIds.includes(d.id)) {
+                  g.attr("filter", null);
+                }
+              });
+
+            // Image element
+            gNode.append("image")
+              .attr("href", `data:image/png;base64,${d.base64_image}`)
+              .attr("x", -w / 2)
+              .attr("y", -sz / 2)
+              .attr("width", w)
+              .attr("height", sz)
+              .attr("opacity", imageOpacityOverridesRef.current[d.id] ?? visualSettingsRef.current.imageOpacity)
+              .style("pointer-events", "none");
+          }
+
+          // Update minimap dots
+          const allMinimapDots = images.map((img) => {
+            const bx2 = (img.coordinates[0] + co[0]) * cs;
+            const by2 = (img.coordinates[1] + co[1]) * cs;
+            const [sx2, sy2] = toS(bx2, by2);
+            return {
+              id: img.id, x: xs(sx2), y: ys(sy2),
+              category: getDisplayCategory(img.generation_method) as 'ref_image' | 'ref_shoe' | 'user' | 'agent',
+            };
+          });
+          useAppStore.getState().setMinimapDots(allMinimapDots);
+          return;
+        }
+      }
     }
 
     // Ghost-only fast path: only ghostNodes changed → update ghost section in-place, no full rebuild
@@ -845,19 +958,28 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
       if (sizeChanged) {
         const newSize = visualSettings.imageSize;
-        // Update each image node's inner rect (click area) and image (shoe)
-        svg.selectAll(".image-node").each(function() {
+        // Update each image node's inner rect (click area) and image
+        // Respects per-image overrides and mood board aspect ratio
+        svg.selectAll(".image-node").each(function(d: any) {
           const node = d3.select(this);
+          const sz = imageSizeOverridesRef.current[d.id] ?? newSize;
+          const isMoodBoard = d.realm === 'mood-board';
+          const isRef = (d.generation_method === 'dataset');
+          const w = isMoodBoard ? sz * 1.5 : sz;
+          const h = sz;
+          // Click area: mood boards + refs use full rect, shoes use narrower hit area
+          const rectY = (isMoodBoard || isRef) ? -sz / 2 : -sz * 0.3;
+          const rectH = (isMoodBoard || isRef) ? sz : sz * 0.6;
           node.select("rect")
-            .attr("x", -newSize / 2)
-            .attr("y", -newSize * 0.3)
-            .attr("width", newSize)
-            .attr("height", newSize * 0.6);
+            .attr("x", -w / 2)
+            .attr("y", rectY)
+            .attr("width", w)
+            .attr("height", rectH);
           node.select("image")
-            .attr("x", -newSize / 2)
-            .attr("y", -newSize / 2)
-            .attr("width", newSize)
-            .attr("height", newSize);
+            .attr("x", -w / 2)
+            .attr("y", -h / 2)
+            .attr("width", w)
+            .attr("height", h);
         });
 
         // Resize ghost node images and hit areas
@@ -1242,21 +1364,31 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     console.log("🎯 Attaching click handlers to", images.length, "image nodes");
 
     // Add invisible click area:
-    //   - References layer: full square (edge-to-edge image bounds, for any non-shoe content)
-    //   - Shoes layer: 60% vertical center crop (shoes are side-view, centred around middle)
+    //   - Mood boards: full 3:2 landscape rect
+    //   - References layer: full square
+    //   - Shoes layer: 60% vertical center crop
     imageNodes
       .append("rect")
-      .attr("x", (d: any) => -(imageSizeOverridesRef.current[d.id] ?? imageSize) / 2)
+      .attr("x", (d: any) => {
+        const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
+        const w = (d as any).realm === 'mood-board' ? sz * 1.5 : sz;
+        return -w / 2;
+      })
       .attr("y", (d: any) => {
         const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
         const isRef = (imageLayerMapRef.current[d.id] ?? "default") === "references";
-        return isRef ? -sz / 2 : -sz * 0.3;
+        const isMoodBoard = (d as any).realm === 'mood-board';
+        return isMoodBoard || isRef ? -sz / 2 : -sz * 0.3;
       })
-      .attr("width", (d: any) => imageSizeOverridesRef.current[d.id] ?? imageSize)
+      .attr("width", (d: any) => {
+        const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
+        return (d as any).realm === 'mood-board' ? sz * 1.5 : sz;
+      })
       .attr("height", (d: any) => {
         const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
         const isRef = (imageLayerMapRef.current[d.id] ?? "default") === "references";
-        return isRef ? sz : sz * 0.6;
+        const isMoodBoard = (d as any).realm === 'mood-board';
+        return isMoodBoard || isRef ? sz : sz * 0.6;
       })
       .attr("rx", 8)
       .attr("fill", "transparent")
@@ -1358,13 +1490,20 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         }
       });
 
-    // Add image
+    // Add image (mood boards render at 3:2 landscape aspect; shoes square)
     imageNodes
       .append("image")
       .attr("href", (d) => `data:image/png;base64,${d.base64_image}`)
-      .attr("x", (d: any) => -(imageSizeOverridesRef.current[d.id] ?? imageSize) / 2)
+      .attr("x", (d: any) => {
+        const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
+        const w = (d as any).realm === 'mood-board' ? sz * 1.5 : sz;
+        return -w / 2;
+      })
       .attr("y", (d: any) => -(imageSizeOverridesRef.current[d.id] ?? imageSize) / 2)
-      .attr("width", (d: any) => imageSizeOverridesRef.current[d.id] ?? imageSize)
+      .attr("width", (d: any) => {
+        const sz = imageSizeOverridesRef.current[d.id] ?? imageSize;
+        return (d as any).realm === 'mood-board' ? sz * 1.5 : sz;
+      })
       .attr("height", (d: any) => imageSizeOverridesRef.current[d.id] ?? imageSize)
       .attr("opacity", (d: any) => imageOpacityOverridesRef.current[d.id] ?? visualSettings.imageOpacity)
       .style("pointer-events", "none");
@@ -1439,22 +1578,32 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     imagesGroup.selectAll(".image-node").each(function(d: any) {
       const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) === starFilterVal;
       const isolatePasses = isolateSet === null || isolateSet.has(d.id);
+      const el = d3.select(this);
 
       // Compound: if fails any active filter, dim to near-invisible
+      // AND disable pointer-events so they don't block clicks on visible items
       if (!starPasses || !isolatePasses) {
-        d3.select(this).transition().duration(250).attr("opacity", 0.05);
+        el.transition().duration(250).attr("opacity", 0.05);
+        el.style("pointer-events", "none");
         return;
       }
+
+      // Re-enable pointer-events for visible items
+      el.style("pointer-events", null);
 
       // Both filters pass — apply selection cascade
       // Only selected shoes get full opacity; everything else dims equally.
       // Parent/child relationships are shown via genealogy lines, not opacity.
       if (selectedImageIds.length > 0) {
         const isSelected = selectedImageIds.includes(d.id);
+        // Selection dimming: selected=1.0, unselected=0.3 on <g>
+        // The <image> element inside already carries the per-image or global imageOpacity
         const opacity = isSelected ? 1.0 : 0.3;
-        d3.select(this).transition().duration(200).attr("opacity", opacity);
+        el.transition().duration(200).attr("opacity", opacity);
       } else {
-        d3.select(this).transition().duration(200).attr("opacity", visualSettings.imageOpacity);
+        // No selection: reset <g> to 1.0 (fully visible as a group)
+        // Actual imageOpacity is on the <image> element set by the render/fast-path
+        el.transition().duration(200).attr("opacity", 1.0);
       }
     });
 
@@ -1477,6 +1626,28 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const genealogyLinesGroup = svg.select(".genealogy-lines");
     genealogyLinesGroup.selectAll("*").remove();
 
+    // Build imageMap for realm lookups
+    const imageMap = new Map(images.map(img => [img.id, img]));
+
+    // ── Helper: pick genealogy line color by parent→child realm transition ──
+    const getGenealogyCssColor = (fromRealm: string | undefined, toRealm: string | undefined): string => {
+      const from = fromRealm ?? 'shoe';
+      const to = toRealm ?? 'shoe';
+      if (from === 'mood-board' && to === 'mood-board') return '#FF6B2B'; // orange: board→board
+      if (from === 'shoe' && to === 'shoe') return '#8BBFD9';             // steel-blue: shoe→shoe
+      if (from === 'mood-board' && to === 'shoe') return '#3fb950';        // green: consolidation
+      return '#a855f7';                                                    // purple: abstraction shoe→board
+    };
+
+    const getGenealogyCssDash = (fromRealm: string | undefined, toRealm: string | undefined): string => {
+      const from = fromRealm ?? 'shoe';
+      const to = toRealm ?? 'shoe';
+      // Dashed for same-realm boards and abstractions; solid for shoes and consolidation
+      if (from === 'mood-board' && to === 'mood-board') return '5 7';
+      if (from === 'shoe' && to === 'mood-board') return '3 5';
+      return '6 8'; // default dashed
+    };
+
     if (selectedImageIds.length > 0) {
       const drawnLinks = new Set<string>();
 
@@ -1493,9 +1664,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const sx = parseFloat(selectedMatch[1]);
         const sy = parseFloat(selectedMatch[2]);
 
-        // Parent → Selection: muted steel-blue, flows INTO selection
+        // Parent → Selection
         selectedImg.parents.forEach((parentId) => {
-          // Skip genealogy lines to/from non-isolated images
           if (isolateSet !== null && !isolateSet.has(parentId)) return;
           const key = `${parentId}->${selectedId}`;
           if (drawnLinks.has(key)) return;
@@ -1509,28 +1679,28 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const px = parseFloat(parentMatch[1]);
           const py = parseFloat(parentMatch[2]);
 
-          const cp1x = px;
-          const cp1y = py + (sy - py) * 0.4;
-          const cp2x = sx;
-          const cp2y = sy - (sy - py) * 0.4;
+          const cp1x = px; const cp1y = py + (sy - py) * 0.4;
+          const cp2x = sx; const cp2y = sy - (sy - py) * 0.4;
 
-          // Animated uniform centerline: parent → selection
+          const parentImg = imageMap.get(parentId);
+          const lineColor = getGenealogyCssColor(parentImg?.realm, selectedImg.realm);
+          const dashArr = getGenealogyCssDash(parentImg?.realm, selectedImg.realm);
+
           const pLine = genealogyLinesGroup.append("path")
             .attr("d", `M ${px} ${py} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${sx} ${sy}`)
-            .attr("stroke", "#8BBFD9")
+            .attr("stroke", lineColor)
             .attr("stroke-width", 1.8)
             .attr("fill", "none")
-            .attr("opacity", 0.75)
-            .attr("stroke-dasharray", "6 8");
+            .attr("opacity", 0.78)
+            .attr("stroke-dasharray", dashArr);
           pLine.append("animate")
             .attr("attributeName", "stroke-dashoffset")
             .attr("from", "14").attr("to", "0")
             .attr("dur", "1.8s").attr("repeatCount", "indefinite");
         });
 
-        // Selection → Child: same family, dimmer — flows OUT to child
+        // Selection → Child
         selectedImg.children.forEach((childId) => {
-          // Skip genealogy lines to/from non-isolated images
           if (isolateSet !== null && !isolateSet.has(childId)) return;
           const key = `${selectedId}->${childId}`;
           if (drawnLinks.has(key)) return;
@@ -1544,27 +1714,55 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const cx = parseFloat(childMatch[1]);
           const cy = parseFloat(childMatch[2]);
 
-          const cp1x = sx;
-          const cp1y = sy + (cy - sy) * 0.4;
-          const cp2x = cx;
-          const cp2y = cy - (cy - sy) * 0.4;
+          const cp1x = sx; const cp1y = sy + (cy - sy) * 0.4;
+          const cp2x = cx; const cp2y = cy - (cy - sy) * 0.4;
 
-          // Animated uniform centerline: selection → child
+          const childImg = imageMap.get(childId);
+          const lineColor = getGenealogyCssColor(selectedImg.realm, childImg?.realm);
+          const dashArr = getGenealogyCssDash(selectedImg.realm, childImg?.realm);
+
           const cLine = genealogyLinesGroup.append("path")
             .attr("d", `M ${sx} ${sy} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${cx} ${cy}`)
-            .attr("stroke", "#8BBFD9")
+            .attr("stroke", lineColor)
             .attr("stroke-width", 1.8)
             .attr("fill", "none")
-            .attr("opacity", 0.75)
-            .attr("stroke-dasharray", "6 8");
+            .attr("opacity", 0.78)
+            .attr("stroke-dasharray", dashArr);
           cLine.append("animate")
             .attr("attributeName", "stroke-dashoffset")
             .attr("from", "14").attr("to", "0")
             .attr("dur", "1.8s").attr("repeatCount", "indefinite");
         });
+
+        // 3/4 satellite tether lines (non-genealogy — glowing white, no arrow)
+        // Drawn when this selected shoe has satellite views visible on canvas
+        if (selectedImg.shoe_view === 'side' || !selectedImg.shoe_view) {
+          images.forEach((satImg) => {
+            if (satImg.parent_side_id !== selectedId) return;
+            const satNode = svg.select(`#image-${satImg.id}`).node() as SVGGElement;
+            if (!satNode) return;
+            const satTransform = satNode.getAttribute("transform");
+            const satMatch = satTransform?.match(/translate\(([^,]+),\s*([^)]+)\)/);
+            if (!satMatch) return;
+            const tx = parseFloat(satMatch[1]);
+            const ty = parseFloat(satMatch[2]);
+            const key = `tether-${selectedId}-${satImg.id}`;
+            if (drawnLinks.has(key)) return;
+            drawnLinks.add(key);
+            genealogyLinesGroup.append("line")
+              .attr("x1", sx).attr("y1", sy)
+              .attr("x2", tx).attr("y2", ty)
+              .attr("stroke", "rgba(200,225,255,0.55)")
+              .attr("stroke-width", 1.2)
+              .attr("stroke-dasharray", "none")
+              .style("filter", "drop-shadow(0 0 3px rgba(150,200,255,0.5))");
+          });
+        }
       });
     }
-  }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, visualSettings, isolatedImageIds, starFilter, imageRatings]);
+  // Note: visualSettings intentionally excluded — opacity is handled by the render/fast-path on <image>,
+  // not by this selection effect on <g>. Including it caused opacity compounding and slider blink.
+  }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, isolatedImageIds, starFilter, imageRatings]);
 
   // FlyTo effect: smoothly pan/zoom to a specific image
   const flyToImageId = useAppStore((state) => state.flyToImageId);
@@ -1731,6 +1929,61 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             ✕
           </button>
         )}
+      </div>
+
+      {/* 3/4 View Filter — top-right, below star filter */}
+      <div style={{
+        position: "absolute",
+        top: 52,
+        right: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "5px 10px",
+        background: "rgba(13, 17, 23, 0.82)",
+        backdropFilter: "blur(8px)",
+        border: `1px solid ${(!showSideView || show34Front || show34Back) ? "rgba(88,166,255,0.4)" : "rgba(48,54,61,0.4)"}`,
+        borderRadius: 8,
+        pointerEvents: "auto",
+        transition: "border-color 0.2s",
+      }}>
+        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(150,165,180,0.5)", textTransform: "uppercase", flexShrink: 0 }}>
+          Views
+        </span>
+        {([
+          ['side', 'showSideView', showSideView, 'Side'] as const,
+          ['3/4-front', 'show34Front', show34Front, '3/4 F'] as const,
+          ['3/4-back', 'show34Back', show34Back, '3/4 B'] as const,
+        ]).map(([_view, key, active, label]) => (
+          <button
+            key={key}
+            onClick={() => {
+              const store = useAppStore.getState();
+              if (key === 'showSideView') store.setShowSideView(!active);
+              else if (key === 'show34Front') store.setShow34Front(!active);
+              else store.setShow34Back(!active);
+            }}
+            title={active ? `Hide ${label} views` : `Show ${label} views`}
+            style={{
+              background: active ? "rgba(88,166,255,0.15)" : "none",
+              border: `1px solid ${active ? "rgba(88,166,255,0.5)" : "rgba(80,90,100,0.35)"}`,
+              borderRadius: 5,
+              padding: "2px 7px",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: active ? 600 : 400,
+              color: active ? "#58a6ff" : "rgba(140,155,170,0.5)",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#58a6ff"; e.currentTarget.style.borderColor = "rgba(88,166,255,0.5)"; }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = active ? "#58a6ff" : "rgba(140,155,170,0.5)";
+              e.currentTarget.style.borderColor = active ? "rgba(88,166,255,0.5)" : "rgba(80,90,100,0.35)";
+            }}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* X-Axis: label centred at bottom edge, slider directly below */}

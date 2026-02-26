@@ -92,6 +92,9 @@ desktop.ini
 
 # ===== Project Specific =====
 
+# Session JSON files (contain base64 images, 17-55 MB each)
+backend/data/researcher/sessions/*.json
+
 # Data directories (large, should not be committed)
 raw_data/
 cache/

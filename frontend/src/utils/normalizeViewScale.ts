@@ -51,7 +51,7 @@ function stripDataPrefix(dataUrl: string): string {
   return dataUrl.replace(/^data:image\/\w+;base64,/, '');
 }
 
-/** Find the tight foreground bounding box (non-white pixels). */
+/** Find the tight foreground bounding box (non-white / non-transparent pixels). */
 async function getTightBbox(base64: string, whiteTh = 240): Promise<{
   x0: number; y0: number; x1: number; y1: number; w: number; h: number;
 }> {
@@ -67,6 +67,9 @@ async function getTightBbox(base64: string, whiteTh = 240): Promise<{
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
+      const alpha = d[i + 3];
+      // Skip transparent pixels (alpha < 10) — they are background
+      if (alpha < 10) continue;
       if (d[i] < whiteTh || d[i + 1] < whiteTh || d[i + 2] < whiteTh) {
         x0 = Math.min(x0, x);
         y0 = Math.min(y0, y);
@@ -78,7 +81,7 @@ async function getTightBbox(base64: string, whiteTh = 240): Promise<{
   return { x0, y0, x1, y1, w: Math.max(1, x1 - x0 + 1), h: Math.max(1, y1 - y0 + 1) };
 }
 
-/** Tight-crop an image and scale to target dimensions on a white background. */
+/** Tight-crop an image and scale to target dimensions (transparent background). */
 async function cropTightAndScale(base64: string, targetW: number, targetH: number, whiteTh = 240): Promise<string> {
   const bbox = await getTightBbox(base64, whiteTh);
   const img = await loadImage(toDataUrl(base64));
@@ -90,8 +93,8 @@ async function cropTightAndScale(base64: string, targetW: number, targetH: numbe
   const out = document.createElement('canvas');
   out.width = targetW; out.height = targetH;
   const outCtx = out.getContext('2d')!;
-  outCtx.fillStyle = 'white';
-  outCtx.fillRect(0, 0, targetW, targetH);
+  // Transparent background — rembg handles background removal separately
+  outCtx.clearRect(0, 0, targetW, targetH);
   outCtx.drawImage(crop, 0, 0, targetW, targetH);
 
   return stripDataPrefix(out.toDataURL('image/png'));

@@ -121,8 +121,9 @@ export function useMultiViewState(
   const [isBusy, setIsBusy] = useState(false);
   const [progressLabel, setProgressLabel] = useState('');
 
-  // Compute normalized dimensions ONCE from the original side view (not on every viewImages change).
-  // This ensures consistent scale across all versions.
+  // Normalize all views ONCE from the original side view.
+  // Tight-crops each image and computes consistent shoe-scale dimensions.
+  // Updates viewImages with cropped base64 so displayed images match dims exactly.
   useEffect(() => {
     let cancelled = false;
     const origSide = originalSideBase64Ref.current;
@@ -139,9 +140,33 @@ export function useMultiViewState(
     normalizeAllViewScales(origSide, viewBases).then(normalized => {
       if (cancelled) return;
       const dims: Partial<Record<ShoeViewType, ViewDimensions>> = {};
-      for (const [k, nv] of Object.entries(normalized) as [ShoeViewType, NormalizedView][]) {
+      const entries = Object.entries(normalized) as [ShoeViewType, NormalizedView][];
+
+      for (const [k, nv] of entries) {
         dims[k] = { w: nv.w, h: nv.h };
       }
+
+      // Replace viewImages base64 with tight-cropped normalized versions
+      // so displayed image content fills exactly the dims bounds
+      setViewImages(prev => {
+        const updated = { ...prev };
+        for (const [k, nv] of entries) {
+          if (updated[k]) {
+            updated[k] = { ...updated[k]!, base64_image: nv.base64 };
+          }
+        }
+        return updated;
+      });
+
+      // Also update initialRef so revert-to-original uses cropped images
+      const updatedInitial = { ...initialRef.current };
+      for (const [k, nv] of entries) {
+        if (updatedInitial[k]) {
+          updatedInitial[k] = { ...updatedInitial[k]!, base64_image: nv.base64 };
+        }
+      }
+      initialRef.current = updatedInitial;
+
       setViewDims(dims);
       setDisplayScale(computeDisplayScale(dims));
     }).catch(e => {

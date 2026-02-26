@@ -135,8 +135,10 @@ export async function normalizeAllViewScales(
   // 3. Normalize each view
   const result: NormalizedViewMap = {};
 
-  // Side
-  const sideScaled = await cropTightAndScale(sideBase64, ref_W, ref_H, whiteTh);
+  // Side — use viewBases['side'] if provided (e.g., newly generated side from update pipeline),
+  // otherwise use the reference sideBase64. ref_W/ref_H always come from the reference.
+  const sideSource = viewBases['side'] ?? sideBase64;
+  const sideScaled = await cropTightAndScale(sideSource, ref_W, ref_H, whiteTh);
   result['side'] = { base64: sideScaled, w: ref_W, h: ref_H, rule: 'reference' };
 
   // Landscape views: width = ref_W, height proportional

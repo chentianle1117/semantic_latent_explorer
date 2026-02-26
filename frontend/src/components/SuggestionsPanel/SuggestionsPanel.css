@@ -166,22 +166,24 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sp-matrix {
   display: flex;
   flex-direction: row;
-  overflow: visible;
+  flex-wrap: wrap;
   padding: 6px 4px 10px;
   flex: 1;
-  min-height: 120px;
+  min-height: 80px;
   gap: 0;
 }
 
 .sp-matrix-col {
-  flex: 1;
-  min-width: 78px;
+  flex: 1 1 auto;
+  min-width: 65px;
+  max-width: 50%;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -201,9 +203,9 @@
   padding: 3px 2px 5px;
   border-bottom: 1px solid;
   margin-bottom: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
 }
 
 .sp-matrix-tag {

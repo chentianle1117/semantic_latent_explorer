@@ -70,8 +70,8 @@ export const ExplorationTreeModal: React.FC<ExplorationTreeModalProps> = ({
   const setFlyToImageId = useAppStore((s) => s.setFlyToImageId);
 
   const { hierarchy, links, posMap, maxDepth, treeWidth, treeHeight } = useMemo(() => {
-    // Exclude 3/4 satellite views — only side views represent designs in the tree
-    const treeImages = images.filter(img => img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back');
+    // Exclude satellite views — only side views represent designs in the tree
+    const treeImages = images.filter(img => !img.shoe_view || img.shoe_view === 'side');
     const imageMap = new Map<number, ImageData>();
     treeImages.forEach((img) => imageMap.set(img.id, img));
 

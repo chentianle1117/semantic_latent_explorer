@@ -74,7 +74,7 @@ export const BatchPromptDialog: React.FC<BatchPromptDialogProps> = ({
 ]`;
 
   return (
-    <div className="batch-prompt-dialog-overlay" onClick={onClose}>
+    <div className="batch-prompt-dialog-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="batch-prompt-dialog batch-dialog-wide" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
           <h2>Batch Generate from JSON Prompts</h2>

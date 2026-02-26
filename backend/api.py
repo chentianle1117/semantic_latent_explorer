@@ -1380,7 +1380,9 @@ async def suggest_tags(request: SuggestTagsRequest):
             label_map = {img.id: labels[i] for i, img in enumerate(ref_imgs)}
 
             n = len(ref_imgs)
-            prompt_text = f"""You are a visual design AI. The user selected {n} reference image{"s" if n > 1 else ""}.
+
+            # Shared analysis instructions
+            analysis_instructions = f"""You are a visual design AI. The user selected {n} reference image{"s" if n > 1 else ""}.
 
 DESIGN BRIEF: {brief}{fields_section}
 
@@ -1390,7 +1392,41 @@ For each image, extract exactly 5-6 SHORT KEY DESCRIPTORS (1-3 words each) that 
 
 Good examples of descriptors: "white leather", "chunky sole", "minimalist upper", "perforated toe box", "high-top", "earth tones", "woven mesh", "contrast stitching"
 CORRECT format: "descriptors": ["white leather", "chunky sole", "minimalist upper", "high-top", "contrast stitching"]
-WRONG format: "features": {{"material": "leather", "color": "white"}} — NEVER use this format
+WRONG format: "features": {{"material": "leather", "color": "white"}} — NEVER use this format"""
+
+            if n == 1:
+                # Single image: suggest VARIATIONS of this one shoe, using @A's descriptors
+                prompt_text = f"""{analysis_instructions}
+
+Then suggest 2-3 VARIATION prompts for this single shoe. Each prompt should describe a specific design modification or iteration of @A — changing one or two aspects while keeping the rest.
+
+Use @A's notation to reference specific features from the analysis. Use the EXACT descriptor phrases from your analysis.
+
+GOOD examples:
+- "@A's oxford silhouette with a chunkier sole and contrast stitching"
+- "make @A's upper more minimalist, remove the brogue details, keep the cap toe"
+- "@A's leather construction but in a high-top version with a gum outsole"
+- "sleeker version of @A with a thinner sole and cleaner lines"
+
+BAD examples (too generic — NEVER write these):
+- "a stylish shoe inspired by the reference"
+- "improve the design"
+- "make it better"
+
+IMPORTANT: Only reference @A. Do NOT mention @B, @C, or @D — there is only ONE reference image.
+
+Return JSON ONLY (no markdown):
+{{
+  "reference_analysis": [
+    {{"image_id": 0, "label": "A", "descriptors": ["white leather", "chunky sole", "low-top", "minimalist", "perforated toe", "clean lines"]}}
+  ],
+  "combination_prompts": [
+    {{"prompt": "@A's chunky sole with a knit upper and earth tones", "reasoning": "keeps the bold sole from A, swaps leather for knit"}}
+  ]
+}}"""
+            else:
+                # Multiple images: suggest COMBINATION prompts that cross-reference @A, @B, etc.
+                prompt_text = f"""{analysis_instructions}
 
 Then suggest 2-3 combination prompts that EXPLICITLY REFERENCE specific images using @A, @B notation.
 Each combination MUST describe a RELATIONSHIP between the images — which specific feature from which image combines with which feature from another. Be specific about parts (upper, sole, silhouette, colorway, material, texture).
@@ -1478,37 +1514,57 @@ Return JSON ONLY (no markdown):
             label_map = {img.id: labels[i] for i, img in enumerate(ref_imgs)}
 
             n = len(ref_imgs)
-            prompt_text = f"""You are a creative visual analysis AI for mood boards and design concept exploration.
+
+            # Shared mood board analysis instructions
+            mb_analysis_instructions = f"""You are a creative visual analysis AI for SHOE DESIGN mood boards and concept exploration.
 
 DESIGN BRIEF: {brief}{fields_section}
 
-The user selected {n} reference image{"s" if n > 1 else ""} (labeled {", ".join(labels)}). These are mood boards, concept sheets, style boards, or design sketches — analyze the visual and conceptual character of each.
+The user selected {n} reference image{"s" if n > 1 else ""} (labeled {", ".join(labels)}). These are shoe design mood boards, concept sheets, or design sketches — analyze the visual and conceptual character of each board as it relates to shoe/footwear design.
 
 For each image, extract exactly 6-8 SHORT KEY DESCRIPTORS (1-3 words each) that capture the visual/conceptual character of that board. Include:
 - Mood/feeling (e.g., "aggressive energy", "calm elegance")
 - Color story (e.g., "warm earth tones", "neon accents")
 - Artistic technique (e.g., "gestural ink strokes", "collage layers")
 - Form language (e.g., "angular tension", "organic flow")
-- Design COMPONENTS visible (e.g., "exaggerated toe cap", "chunky midsole", "wraparound strap", "sculpted heel counter", "geometric outsole", "oversized tongue")
+- Shoe design COMPONENTS visible (e.g., "exaggerated toe cap", "chunky midsole", "wraparound strap", "sculpted heel counter", "geometric outsole", "oversized tongue")
 
-IMPORTANT: Include at least 2 design component descriptors per image that describe specific physical parts/features shown in the design. These help users think about structural elements.
+IMPORTANT: Include at least 2 shoe component descriptors per image. All descriptors should relate to footwear design concepts. This is a SHOE design tool.
 
-Return descriptors as a FLAT JSON ARRAY of strings.
+Return descriptors as a FLAT JSON ARRAY of strings."""
 
+            if n == 1:
+                # Single mood board: suggest ITERATIONS of this one board
+                combination_instructions = f"""
+Then suggest 2-3 iteration prompts for this single board using @A notation.
+Each prompt should describe how to BUILD ON or ITERATE this shoe design board — what concepts to push further, what new direction to explore.
+Use the EXACT descriptor phrases from your analysis. Keep it conceptual but always about shoe design.
+
+GOOD: "@A's warm earth tones pushed toward bolder gestural marks with an exaggerated toe cap"
+GOOD: "explore @A's angular tension in a more minimal palette with floating midsole"
+BAD: "a product inspired by this board" — too generic and not shoe-specific, NEVER write this
+
+IMPORTANT: Only reference @A. Do NOT mention @B, @C, or @D — there is only ONE reference image."""
+            else:
+                # Multiple mood boards: suggest COMBINATIONS across boards
+                combination_instructions = f"""
 Then suggest 2-3 combination/iteration prompts that reference specific boards using @A, @B notation.
-Each combination should describe how to BUILD ON or ITERATE these boards — what to explore further, what to combine, what new direction to take.
-Use the EXACT descriptor phrases from your analysis. Focus on artistic/conceptual direction.
+Each combination should describe how to BUILD ON or ITERATE these shoe design boards — what shoe concepts to explore further, what to combine, what new footwear direction to take.
+Use the EXACT descriptor phrases from your analysis. Keep it conceptual but always about shoe design.
 
 GOOD: "@A's warm earth tones with @B's angular tension, pushing toward bolder gestural marks and an exaggerated toe cap"
-BAD: "a shoe inspired by both boards" — too generic, NEVER write this
+BAD: "a product inspired by both boards" — too generic and not shoe-specific, NEVER write this"""
 
-Also generate 6 concept categories with 4-6 tags each, informed by the reference boards but going BEYOND them to suggest new directions:
-1. Mood — emotional/tonal direction
-2. Form Language — shape and structural vocabulary
-3. Era — time period / cultural reference
-4. Technique — artistic rendering style
-5. Palette — color direction
-6. Components — specific design elements/parts (e.g., "sculpted heel", "exaggerated toe", "floating midsole", "wraparound lacing", "deconstructed upper")
+            prompt_text = f"""{mb_analysis_instructions}
+{combination_instructions}
+
+Also generate 6 concept categories with 4-6 tags each, informed by the reference boards but going BEYOND them to suggest new shoe design directions:
+1. Mood — emotional/tonal direction for the shoe
+2. Form Language — shoe shape and structural vocabulary
+3. Era — time period / cultural footwear reference
+4. Technique — artistic rendering style for shoe sketches
+5. Palette — color direction for shoe design
+6. Components — specific shoe parts/elements (e.g., "sculpted heel", "exaggerated toe", "floating midsole", "wraparound lacing", "deconstructed upper")
 
 Return JSON ONLY (no markdown):
 {{
@@ -1527,7 +1583,7 @@ Return JSON ONLY (no markdown):
     {{"name": "Components", "tags": ["sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap"]}}
   ],
   "full_prompts": [
-    {{"prompt": "bold angular tension with futuristic silhouette, exaggerated toe cap and warm earth tones", "reasoning": "..."}}
+    {{"prompt": "bold angular tension with futuristic shoe silhouette, exaggerated toe cap and warm earth tones", "reasoning": "..."}}
   ]
 }}"""
 
@@ -1587,31 +1643,33 @@ Return JSON ONLY (no markdown):
 
         elif effective_mode == "mood-board":
             # ── Mood board mode: concept-oriented tag generation ───────────────
-            prompt_text = f"""You are a creative concept and style exploration assistant for mood boards and design sketches.
+            prompt_text = f"""You are a creative concept and style exploration assistant for SHOE DESIGN mood boards, concept sketches, and footwear design exploration sheets.
 
 DESIGN BRIEF: {brief}
 CANVAS: {count} designs, axes: {axis_info}{fields_section}
 
-Generate attribute tags organized into exactly 6 categories for MOOD BOARD, STYLE BOARD, and CONCEPT SKETCH generation.
-4-6 short tags (1-3 words each) per category. Tags should inspire visual direction, feeling, atmosphere, artistic style, and specific design elements.
+Generate attribute tags organized into exactly 6 categories for SHOE DESIGN mood boards, style boards, and concept sketches.
+4-6 short tags (1-3 words each) per category. Tags should inspire shoe design visual direction, feeling, atmosphere, artistic style, and specific footwear elements.
+
+IMPORTANT: This is a SHOE/FOOTWEAR design tool. All tags and prompts must relate to shoe design concepts, even when expressed in low-fi, conceptual terms.
 
 Categories: Mood, Form Language, Era, Technique, Palette, Components
-(Components = specific design elements like "sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap")
+(Components = specific shoe design elements like "sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap", "deconstructed upper")
 
-Also suggest 2-3 complete concept prompts (under 20 words each) that read like artist briefs — evocative, atmospheric, and conceptual.
+Also suggest 2-3 complete shoe concept prompts (under 20 words each) that read like footwear designer briefs — evocative, atmospheric, and conceptual but always about shoes.
 
 Return JSON ONLY (no markdown):
 {{
   "categories": [
     {{"name": "Mood", "tags": ["energetic", "serene", "aggressive", "playful", "bold", "understated"]}},
     {{"name": "Form Language", "tags": ["organic curves", "angular", "fluid lines", "geometric", "asymmetric"]}},
-    {{"name": "Era", "tags": ["retro 70s", "Y2K nostalgia", "futurist", "vintage 90s", "contemporary"]}},
+    {{"name": "Era", "tags": ["retro 70s runner", "Y2K sneaker", "futurist boot", "vintage 90s trainer", "contemporary"]}},
     {{"name": "Technique", "tags": ["bold marker", "cross-hatch", "watercolor wash", "gestural ink", "charcoal"]}},
     {{"name": "Palette", "tags": ["earth tones", "neon pop", "monochrome", "pastel", "jewel tones"]}},
     {{"name": "Components", "tags": ["sculpted heel", "exaggerated toe", "floating midsole", "wraparound strap"]}}
   ],
   "full_prompts": [
-    {{"prompt": "bold angular tension with futuristic silhouette, exaggerated toe cap and warm earth tones", "reasoning": "..."}}
+    {{"prompt": "bold angular shoe with futuristic silhouette, exaggerated toe cap and warm earth tones", "reasoning": "..."}}
   ]
 }}"""
 
@@ -1717,6 +1775,199 @@ Return JSON ONLY (no markdown):
         return {"mode": "reference", "reference_analysis": [], "combination_prompts": []}
 
 
+class RembgBatchRequest(BaseModel):
+    images: Dict[str, str]  # key → base64 (no data: prefix)
+
+
+@app.post("/api/rembg-batch")
+async def rembg_batch(request: RembgBatchRequest):
+    """Remove backgrounds from a batch of base64 images via rembg."""
+    results: Dict[str, str] = {}
+    for key, b64 in request.images.items():
+        try:
+            if b64.startswith("data:"):
+                b64 = b64.split(",", 1)[1]
+            img_bytes = base64.b64decode(b64)
+            pil_img = Image.open(BytesIO(img_bytes))
+            if pil_img.mode != 'RGB':
+                pil_img = pil_img.convert('RGB')
+
+            buf = BytesIO()
+            pil_img.save(buf, format='PNG')
+            buf.seek(0)
+            output_bytes = remove(buf.getvalue())
+
+            result_b64 = base64.b64encode(output_bytes).decode()
+            results[key] = result_b64
+        except Exception as e:
+            print(f"[rembg-batch] failed for {key}: {e}")
+            results[key] = b64  # fallback: return original
+    print(f"[rembg-batch] processed {len(results)} images")
+    return {"images": results}
+
+
+class AnalyzeViewsRequest(BaseModel):
+    view_images: Dict[str, str]  # view_type → base64 (no data: prefix)
+    brief: str = ""
+
+
+@app.post("/api/agent/analyze-views")
+async def analyze_views(request: AnalyzeViewsRequest):
+    """Multi-view design analysis via Gemini: extract components, colors, suggest edits."""
+    if not gemini_api_key:
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+    view_names = list(request.view_images.keys())
+    n = len(view_names)
+    if n == 0:
+        raise HTTPException(status_code=400, detail="No view images provided")
+
+    brief = request.brief.strip() or "Analyze this shoe design"
+    print(f"[analyze-views] {n} views: {view_names}")
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+
+        prompt_text = f"""You are a professional footwear design analyst. You are shown {n} views of the SAME shoe.
+Views provided: {", ".join(view_names)}
+DESIGN BRIEF: {brief}
+
+Analyze the shoe design and return JSON with these fields:
+
+1. "components" — array of shoe components you can identify:
+   Each: {{"name": "toe cap", "current": ["rounded", "smooth leather"], "visible_in": ["front", "side"]}}
+   "current" = 2-3 SHORT descriptors of what this component CURRENTLY looks like.
+   Identify: toe box/cap, upper/vamp, collar/tongue, sole unit (midsole + outsole), closure system, heel counter, any decorative details.
+
+2. "descriptor_matrix" — for each component, provide alternative descriptors the user might apply.
+   This is a matrix: rows = components, columns = descriptor categories.
+   Each: {{"component": "toe cap", "descriptors": {{
+     "shape": ["pointed", "squared", "almond", "rounded"],
+     "material": ["patent leather", "suede", "mesh", "knit"],
+     "detail": ["perforated", "brogue", "plain", "contrast stitched"]
+   }}}}
+   Descriptor categories: "shape", "material", "color", "texture", "proportion", "detail"
+   Each category should have 3-5 short options (1-3 words each). Include the CURRENT descriptor as one option.
+   Not every component needs every category — only include relevant ones.
+
+3. "color_palette" — array of dominant colors:
+   Each: {{"hex": "#F5F5F0", "name": "off-white", "location": "upper panels"}}
+   Extract 3-6 distinct colors.
+
+4. "style_summary" — 1-2 sentence description of the overall design aesthetic.
+
+5. "suggested_edits" — array of 4-6 specific, actionable edit suggestions:
+   Each: {{"category": "<cat>", "suggestion": "<specific edit>", "reasoning": "<why>"}}
+   Categories: "component", "material", "color", "proportion", "detail", "style"
+
+Return ONLY valid JSON, no markdown fences:
+{{
+  "components": [...],
+  "descriptor_matrix": [...],
+  "color_palette": [...],
+  "style_summary": "...",
+  "suggested_edits": [...]
+}}"""
+
+        # Build multimodal content: [prompt, pil_img_1, pil_img_2, ...]
+        content = [prompt_text]
+        for vt in view_names:
+            try:
+                b64 = request.view_images[vt]
+                # Strip data: prefix if present
+                if b64.startswith("data:"):
+                    b64 = b64.split(",", 1)[1]
+                img_bytes = base64.b64decode(b64)
+                pil_img = Image.open(BytesIO(img_bytes)).convert("RGB")
+                pil_img = pil_img.resize((256, 256))
+                content.append(pil_img)
+            except Exception as img_err:
+                print(f"[analyze-views] failed to load {vt}: {img_err}")
+
+        response = model.generate_content(content)
+        text = (getattr(response, "text", None) or "").strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+
+        import json as _json
+        data = _json.loads(text)
+
+        result = {
+            "components": data.get("components", []),
+            "descriptor_matrix": data.get("descriptor_matrix", []),
+            "color_palette": data.get("color_palette", []),
+            "style_summary": data.get("style_summary", ""),
+            "suggested_edits": data.get("suggested_edits", []),
+        }
+        print(f"[analyze-views] {len(result['components'])} components, {len(result['descriptor_matrix'])} matrix rows, {len(result['color_palette'])} colors, {len(result['suggested_edits'])} suggestions")
+        return result
+
+    except Exception as e:
+        print(f"ERROR in analyze_views: {e}")
+        import traceback
+        traceback.print_exc()
+        # Fallback
+        return {
+            "components": [],
+            "descriptor_matrix": [],
+            "color_palette": [],
+            "style_summary": "Analysis unavailable",
+            "suggested_edits": [],
+        }
+
+
+class ComposeEditPromptRequest(BaseModel):
+    selected_pairs: List[Dict[str, str]]  # [{"component": "toe cap", "descriptor": "pointed"}, ...]
+    style_summary: str = ""
+    brief: str = ""
+
+
+@app.post("/api/agent/compose-edit-prompt")
+async def compose_edit_prompt(request: ComposeEditPromptRequest):
+    """Compose a coherent edit prompt from selected component+descriptor pairs."""
+    if not gemini_api_key:
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+    if not request.selected_pairs:
+        raise HTTPException(status_code=400, detail="No pairs provided")
+
+    pairs_text = "\n".join(
+        f"- {p['component']}: {p['descriptor']}" for p in request.selected_pairs
+    )
+    print(f"[compose-edit-prompt] {len(request.selected_pairs)} pairs")
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        prompt = f"""You are a footwear design prompt engineer. A designer has selected these component+descriptor pairs to modify a shoe:
+
+{pairs_text}
+
+Current shoe style: {request.style_summary or 'not specified'}
+Design brief: {request.brief or 'general shoe design'}
+
+Compose ONE concise, natural-language edit prompt (1-2 sentences) that incorporates ALL the selected changes.
+The prompt should be specific and actionable — it will be used as input to an image generation model.
+
+GOOD: "make the toe cap more pointed with patent leather finish, switch the upper panels to woven mesh, and increase the midsole stack height"
+BAD: "improve the shoe design" (too vague)
+BAD: "Component: toe cap, Descriptor: pointed" (just listing — not natural language)
+
+Return ONLY the prompt text, no JSON, no quotes, no explanation."""
+
+        response = model.generate_content(prompt)
+        text = (getattr(response, "text", None) or "").strip().strip('"').strip("'")
+        print(f"[compose-edit-prompt] result: {text[:100]}...")
+        return {"prompt": text}
+
+    except Exception as e:
+        print(f"ERROR in compose_edit_prompt: {e}")
+        # Fallback: simple concatenation
+        parts = [f"{p['descriptor']} {p['component']}" for p in request.selected_pairs]
+        return {"prompt": ", ".join(parts)}
+
+
 @app.post("/api/agent/compose-prompt")
 async def compose_prompt_endpoint(request: ComposePromptRequest):
     """Compose a natural-language prompt from selected tags + brief."""
@@ -1759,7 +2010,7 @@ async def refine_prompt(request: RefinePromptRequest):
         raise HTTPException(status_code=400, detail="No prompt provided")
 
     is_mood_board = request.realm == "mood-board"
-    brief = request.brief.strip() or ("Explore design concepts and visual directions" if is_mood_board else "Explore shoe design variations")
+    brief = request.brief.strip() or ("Explore shoe design concepts and visual directions" if is_mood_board else "Explore shoe design variations")
 
     # Build tag list for the system prompt
     tag_list = ""
@@ -1775,24 +2026,24 @@ async def refine_prompt(request: RefinePromptRequest):
         tag_list = "\nDESIGN TAGS in the prompt: " + ", ".join(tag_entries)
 
     if is_mood_board:
-        prompt_text = f"""You are a creative mood board and concept art prompt writer. The user wants to generate a STYLE BOARD, CONCEPT SKETCH, or MOOD BOARD — NOT a product render.
+        prompt_text = f"""You are a creative shoe design mood board and concept art prompt writer. The user wants to generate a SHOE DESIGN STYLE BOARD, CONCEPT SKETCH, or MOOD BOARD — low-fi and conceptual, but always about footwear/shoe design.
 
 DESIGN BRIEF: {brief}
 USER PROMPT: {request.prompt}{tag_list}
 
-Rewrite this into an evocative, artistic concept prompt (under 40 words) for a mood board or style exploration sheet.
+Rewrite this into an evocative, artistic concept prompt (under 40 words) for a shoe design mood board or style exploration sheet.
 
 CRITICAL RULES:
-1. NEVER use the word "shoe" or any product-specific language. Think in terms of: mood, feeling, texture, atmosphere, color story, form language, gestural energy, material exploration, style direction.
+1. Keep it conceptual and low-fi but always grounded in SHOE/FOOTWEAR design. You can mention shoe parts (sole, upper, toe, heel), silhouettes, and footwear concepts. Think in terms of: mood, shoe silhouette, texture, sole form, upper treatment, color story, gestural energy, material exploration.
 2. When a tag has a source attribution (e.g. "bold" (from A), "angular" (from B)), write "@A's bold energy" and "@B's angular tension" — use the @letter possessive form with evocative, conceptual language.
 3. If the user already typed @A, @B, @C, @D references, keep them EXACTLY as-is.
 4. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase them.
-5. The prompt should feel artistic, expressive, and conceptual — like briefing an artist on a mood board, not describing a product.
+5. The prompt should feel artistic, expressive, and conceptual — like briefing a footwear designer on a shoe concept board.
 
 EXAMPLES:
-- "A bold gestural exploration with @A's raw energy and @B's structured tension, earth-tone palette"
-- "Moody collage of @A's organic flow meeting angular precision, charcoal and warm amber tones"
-- "Abstract material study blending sleek surfaces with rugged textures, minimal and powerful"
+- "A bold gestural shoe exploration with @A's raw energy and @B's structured sole tension, earth-tone palette"
+- "Moody shoe collage of @A's organic upper flow meeting angular heel precision, charcoal and warm amber tones"
+- "Abstract shoe material study blending sleek leather surfaces with rugged outsole textures, minimal and powerful"
 
 Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
     else:

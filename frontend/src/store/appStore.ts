@@ -124,9 +124,8 @@ interface AppStore extends AppState {
   setIsolatedImageIds: (ids: number[] | null) => void;
 
   // Shoe view filter toggles
-  setShowSideView: (v: boolean) => void;
-  setShow34Front: (v: boolean) => void;
-  setShow34Back: (v: boolean) => void;
+  toggleSatelliteView: (viewType: string) => void;
+  enableSatelliteViews: (views: string[]) => void;
 
   // Star ratings
   setImageRating: (imageId: number, rating: number) => void;
@@ -274,9 +273,7 @@ const initialState: AppState = {
   eventLog: [] as EventLogEntry[],
 
   // Shoe view filter toggles
-  showSideView: true,
-  show34Front: false,
-  show34Back: false,
+  visibleSatelliteViews: {} as Record<string, boolean>,  // all off by default
 
   // Onboarding tutorial
   onboardingActive: false,
@@ -579,15 +576,26 @@ export const useAppStore = create<AppStore>((set) => ({
       selectedImageIds: [],
       hoveredImageId: null,
       hoveredGroupId: null,
+      minimapDots: [],
+      minimapGhostDots: [],
+      isolatedImageIds: null,
     }),
 
   // Isolate mode
   setIsolatedImageIds: (ids) => set({ isolatedImageIds: ids }),
 
-  // 3/4 satellite view filter toggles
-  setShowSideView: (v) => set({ showSideView: v }),
-  setShow34Front: (v) => set({ show34Front: v }),
-  setShow34Back: (v) => set({ show34Back: v }),
+  // Satellite view filter toggles
+  toggleSatelliteView: (viewType) => set((s) => {
+    const current = s.visibleSatelliteViews[viewType];
+    // 'side' defaults to visible (undefined → treat as true); satellites default to hidden (undefined → false)
+    const wasVisible = viewType === 'side' ? current !== false : !!current;
+    return { visibleSatelliteViews: { ...s.visibleSatelliteViews, [viewType]: !wasVisible } };
+  }),
+  enableSatelliteViews: (views) => set((s) => {
+    const updated = { ...s.visibleSatelliteViews };
+    for (const v of views) updated[v] = true;
+    return { visibleSatelliteViews: updated };
+  }),
 
   // Star ratings
   setImageRating: (imageId, rating) =>

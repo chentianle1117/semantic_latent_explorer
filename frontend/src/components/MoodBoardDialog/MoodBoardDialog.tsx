@@ -177,7 +177,7 @@ export const MoodBoardDialog: React.FC<MoodBoardDialogProps> = ({
   const hasChips = selectedTags.size > 0;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
+    <div className="dialog-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div
         className="prompt-dialog-outer mbd-outer"
         onClick={(e) => e.stopPropagation()}

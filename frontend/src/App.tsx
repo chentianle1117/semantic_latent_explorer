@@ -21,13 +21,16 @@ import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefO
 import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { OnboardingTour } from "./components/OnboardingTour/OnboardingTour";
+import { MultiViewEditor } from "./components/MultiViewEditor/MultiViewEditor";
 import { useAppStore } from "./store/appStore";
+import type { ImageData, ShoeViewType } from "./types";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useEventLog } from "./hooks/useEventLog";
 import { apiClient } from "./api/client";
 import { falClient } from "./api/falClient";
-import type { ShoeViewType } from "./types";
+import { generateAllViews } from "./utils/generateAllViews";
+import { SATELLITE_VIEWS } from "./api/falClient";
 import "./styles/app.css";
 
 export const App: React.FC = () => {
@@ -53,6 +56,9 @@ export const App: React.FC = () => {
   const [showRadialDial, setShowRadialDial] = useState(false);
   const [radialDialPos, setRadialDialPos] = useState({ x: 0, y: 0 });
   const [showExplorationTreeModal, setShowExplorationTreeModal] = useState(false);
+  const [multiViewTarget, setMultiViewTarget] = useState<{
+    sideImage: ImageData; satellites: ImageData[];
+  } | null>(null);
 
   // Native confirm dialog (replaces window.confirm)
   const [confirmState, setConfirmState] = useState<{
@@ -244,6 +250,82 @@ export const App: React.FC = () => {
       },
       { confirmLabel: "Clear All", danger: true }
     );
+  };
+
+  const handleMultiViewSave = async (updatedViews: Record<ShoeViewType, ImageData | null>) => {
+    if (!multiViewTarget) return;
+    const sideId = multiViewTarget.sideImage.id;
+    const prompt = multiViewTarget.sideImage.prompt ?? '';
+
+    // Collect changed views (skip unchanged base64)
+    const changedEntries: [ShoeViewType, ImageData][] = [];
+    for (const [view, imgData] of Object.entries(updatedViews) as [ShoeViewType, ImageData | null][]) {
+      if (!imgData) continue;
+      if (view === 'side') {
+        if (imgData.base64_image === multiViewTarget.sideImage.base64_image) continue;
+      } else {
+        const origSat = multiViewTarget.satellites.find(s => s.shoe_view === view);
+        if (origSat && imgData.base64_image === origSat.base64_image) continue;
+      }
+      changedEntries.push([view, imgData]);
+    }
+
+    // Nothing changed — just close
+    if (changedEntries.length === 0) {
+      setMultiViewTarget(null);
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationProgress(10);
+
+    try {
+      // Remove old satellites that are being replaced (hide them)
+      for (const [view] of changedEntries) {
+        if (view === 'side') continue; // don't remove the side view
+        const origSat = multiViewTarget.satellites.find(s => s.shoe_view === view);
+        if (origSat) {
+          useAppStore.getState().removeImage(origSat.id);
+        }
+      }
+
+      let done = 0;
+      for (const [view, imgData] of changedEntries) {
+        // Upload to fal.ai storage, then save via backend
+        const blob = await (await fetch(`data:image/png;base64,${imgData.base64_image}`)).blob();
+        const file = new File([blob], `${view}-${sideId}.jpg`, { type: 'image/jpeg' });
+        const url = await falClient.uploadFile(file);
+
+        const result = await apiClient.addExternalImages({
+          images: [{ url }],
+          prompt,
+          generation_method: 'reference',
+          remove_background: true,
+          realm: 'shoe',
+          shoe_view: view === 'side' ? undefined : view,
+          parent_side_id: view === 'side' ? undefined : sideId,
+          parent_ids: view === 'side' ? [] : [sideId],
+        });
+        mergeImages(result.images);
+
+        done++;
+        setGenerationProgress(10 + Math.round((done / changedEntries.length) * 80));
+      }
+
+      // Enable visibility for any new satellite views
+      const viewsToEnable = changedEntries
+        .filter(([v]) => v !== 'side')
+        .map(([v]) => v);
+      if (viewsToEnable.length > 0) {
+        useAppStore.getState().enableSatelliteViews(viewsToEnable);
+      }
+    } catch (err) {
+      console.error('Multi-View Editor save failed:', err);
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+      setMultiViewTarget(null);
+    }
   };
 
   const handleExportZip = async (exportIds?: number[]) => {
@@ -530,7 +612,7 @@ export const App: React.FC = () => {
     for (const id of sourceIds) {
       const img = images.find(i => i.id === id);
       if (!img) continue;
-      if ((img.shoe_view === '3/4-front' || img.shoe_view === '3/4-back') && img.parent_side_id != null) {
+      if (img.shoe_view && img.shoe_view !== 'side' && img.parent_side_id != null && img.parent_side_id > 0) {
         resolvedIds.add(img.parent_side_id);
       } else {
         resolvedIds.add(id);
@@ -552,7 +634,7 @@ export const App: React.FC = () => {
   const handlePromptDialogGenerate = async (
     referenceIds: number[],
     prompt: string,
-    numImages: number = 1
+    numImages: number = 1,
   ) => {
     console.log(
       `Generating from ${referenceIds.length} reference(s) with prompt: "${prompt}", count: ${numImages}`
@@ -576,6 +658,7 @@ export const App: React.FC = () => {
       { id: 'upload',  label: `Upload ${referenceIds.length} reference image${referenceIds.length > 1 ? 's' : ''}`, status: 'active' },
       { id: 'gen',     label: `Generate ${numImages} variation${numImages > 1 ? 's' : ''} via fal.ai`, status: 'pending' },
       { id: 'embed',   label: 'Embed with Jina CLIP v2', status: 'pending' },
+      { id: 'genviews', label: 'Generate satellite views (template sheets)', status: 'pending' as const },
       { id: 'project', label: 'Project to semantic canvas', status: 'pending' },
     ]);
     ps.addLogLine(`Prompt: "${prompt.substring(0, 60)}${prompt.length > 60 ? '…' : ''}"`);
@@ -590,7 +673,7 @@ export const App: React.FC = () => {
       for (const id of referenceIds) {
         const img = imgMap.get(id);
         if (!img) continue;
-        if ((img.shoe_view === '3/4-front' || img.shoe_view === '3/4-back') && img.parent_side_id != null) {
+        if (img.shoe_view && img.shoe_view !== 'side' && img.parent_side_id != null && img.parent_side_id > 0) {
           // Resolve to parent side view
           resolvedIds.add(img.parent_side_id);
           ps.addLogLine(`Resolved 3/4 view #${id} → side view #${img.parent_side_id}`);
@@ -642,7 +725,9 @@ export const App: React.FC = () => {
         images: result.images.map((img) => ({ url: img.url })),
         prompt: prompt,
         generation_method: "reference",
-        remove_background: removeBackground,
+        remove_background: true,
+        realm: 'shoe',
+        shoe_view: 'side',
         parent_ids: parentIds,
       });
       ps.addLogLine(`✓ CLIP embeddings computed (1024-dim), genealogy tracked`);
@@ -658,16 +743,80 @@ export const App: React.FC = () => {
       mergeImages(addResult.images);
       if (addResult.history_group) addHistoryGroup(addResult.history_group);
 
-      if (addResult?.images?.length > 0) {
-        const newIds = addResult.images.map((img: any) => img.id);
-        useAppStore.getState().setSelectedImageIds(newIds);
-        useAppStore.getState().setImagesLayer(newIds, 'default');
+      const sideIds: number[] = addResult?.images?.length > 0
+        ? addResult.images.map((img: any) => img.id)
+        : [];
+
+      if (sideIds.length > 0) {
+        useAppStore.getState().setSelectedImageIds(sideIds);
+        useAppStore.getState().setImagesLayer(sideIds, 'default');
         const curIsolated = useAppStore.getState().isolatedImageIds;
         if (curIsolated !== null) {
-          useAppStore.getState().setIsolatedImageIds([...curIsolated, ...newIds]);
+          useAppStore.getState().setIsolatedImageIds([...curIsolated, ...sideIds]);
         }
-        ps.addLogLine(`✓ ${newIds.length} image${newIds.length > 1 ? 's' : ''} placed on canvas (parents: [${parentIds.join(', ')}])`);
+        ps.addLogLine(`✓ ${sideIds.length} image${sideIds.length > 1 ? 's' : ''} placed on canvas (parents: [${parentIds.join(', ')}])`);
       }
+
+      // ── Generate all satellite views via template sheets ──
+      if (sideIds.length > 0) {
+        ps.updateStepStatus('genviews', 'active');
+        ps.addLogLine(`Generating all satellite views for ${sideIds.length} shoe${sideIds.length > 1 ? 's' : ''}...`);
+
+        const allImgsForViews = images.concat(addResult.images.map((img: any) => img));
+        const imgMapForViews = new Map(allImgsForViews.map((img: any) => [img.id, img]));
+
+        for (let si = 0; si < sideIds.length; si++) {
+          const sideId = sideIds[si];
+          const sideImg = imgMapForViews.get(sideId);
+          if (!sideImg?.base64_image) continue;
+
+          ps.addLogLine(`  → Generating views for shoe ${si + 1}/${sideIds.length}...`);
+
+          try {
+            const satelliteViews = await generateAllViews({
+              sideImageBase64: sideImg.base64_image,
+              prompt,
+              onProgress: (label, pct) => {
+                ps.addLogLine(`    ${label}`);
+                ps.updateProgress(80 + (pct / 100) * 15 * ((si + 1) / sideIds.length));
+              },
+            });
+
+            for (const [viewType, genView] of Object.entries(satelliteViews)) {
+              if (viewType === 'side') continue; // side already saved
+              ps.addLogLine(`    → Saving ${viewType} view (${genView.w}×${genView.h})...`);
+              const viewBlob = await (await fetch(`data:image/png;base64,${genView.base64}`)).blob();
+              const viewFile = new File([viewBlob], `${viewType}-${sideId}.png`, { type: "image/png" });
+              const viewUrl = await falClient.uploadFile(viewFile);
+
+              const satResult = await apiClient.addExternalImages({
+                images: [{ url: viewUrl }],
+                prompt,
+                generation_method: "reference",
+                remove_background: true,
+                realm: 'shoe',
+                shoe_view: viewType as any,
+                parent_side_id: sideId,
+                parent_ids: [sideId],
+              });
+              mergeImages(satResult.images);
+              if (satResult.images.length > 0) {
+                useAppStore.getState().setImagesLayer(
+                  satResult.images.map((img: any) => img.id),
+                  'default'
+                );
+              }
+            }
+          } catch (viewErr) {
+            console.error(`Failed to generate views for shoe ${sideId}:`, viewErr);
+            ps.addLogLine(`  ⚠ View generation failed for shoe ${si + 1}, continuing...`);
+          }
+        }
+        ps.updateStepStatus('genviews', 'done');
+        ps.addLogLine(`✓ All satellite views generated`);
+        useAppStore.getState().enableSatelliteViews(SATELLITE_VIEWS);
+      }
+
       ps.updateStepStatus('project', 'done');
       ps.updateProgress(100);
     } catch (error) {
@@ -897,18 +1046,17 @@ export const App: React.FC = () => {
             {showTextToImageDialog && (
               <TextToImageDialog
                 onClose={() => setShowTextToImageDialog(false)}
-                onGenerate={async (prompt, count, also34Views) => {
+                onGenerate={async (prompt, count) => {
                   setShowTextToImageDialog(false);
                   setIsGenerating(true);
                   const ps = useProgressStore.getState();
-                  const totalExpected = count + (also34Views ? count * 2 : 0);
-                  ps.showProgress("generating", `Generating ${totalExpected} image${totalExpected > 1 ? "s" : ""}...`, true);
+                  ps.showProgress("generating", `Generating ${count} shoe${count > 1 ? 's' : ''} + all views...`, true);
                   ps.updateProgress(0);
                   ps.setSteps([
-                    { id: 'gen',     label: `Generate ${count} shoe${count > 1 ? 's' : ''} via fal.ai`, status: 'active' },
-                    { id: 'embed',   label: `Embed with Jina CLIP v2`, status: 'pending' },
-                    ...(also34Views ? [{ id: 'gen34', label: `Generate 3/4 satellites`, status: 'pending' as const }] : []),
-                    { id: 'project', label: 'Project to semantic canvas', status: 'pending' as const },
+                    { id: 'gen',      label: `Generate ${count} side view${count > 1 ? 's' : ''} via fal.ai`, status: 'active' },
+                    { id: 'embed',    label: `Embed with Jina CLIP v2`, status: 'pending' },
+                    { id: 'genviews', label: `Generate satellite views (template sheets)`, status: 'pending' as const },
+                    { id: 'project',  label: 'Project to semantic canvas', status: 'pending' as const },
                   ]);
                   ps.addLogLine(`Prompt: "${prompt.substring(0, 60)}${prompt.length > 60 ? '…' : ''}"`);
 
@@ -931,22 +1079,22 @@ export const App: React.FC = () => {
                       genConfig: { realm: 'shoe', shoeView: 'side' },
                     });
                     ps.addLogLine(`✓ fal.ai returned ${result.images.length} image${result.images.length > 1 ? 's' : ''}`);
-                    ps.updateProgress(35);
+                    ps.updateProgress(25);
                     ps.updateStepStatus('gen', 'done');
                     ps.updateStepStatus('embed', 'active');
 
                     ps.addLogLine(`Embedding with Jina CLIP v2...`);
-                    if (removeBackground) ps.addLogLine('Background removal enabled — processing...');
+                    ps.addLogLine('Background removal enabled for all views');
                     const addResult = await apiClient.addExternalImages({
                       images: result.images.map((img) => ({ url: img.url })),
                       prompt: prompt,
                       generation_method: "batch",
-                      remove_background: removeBackground,
+                      remove_background: true,
                       realm: 'shoe',
                       shoe_view: 'side',
                     });
                     ps.addLogLine(`✓ CLIP embeddings computed (1024-dim)`);
-                    ps.updateProgress(60);
+                    ps.updateProgress(40);
                     ps.updateStepStatus('embed', 'done');
 
                     mergeImages(addResult.images);
@@ -970,43 +1118,48 @@ export const App: React.FC = () => {
                     addToAxisSuggestionCounter(count);
                     triggerConcurrentGhosts(prompt, [], []).catch(console.error);
 
-                    // ── 2. Generate 3/4 satellites (if requested) ────────────
-                    if (also34Views && sideIds.length > 0) {
-                      ps.updateStepStatus('gen34', 'active');
-                      ps.addLogLine(`Generating 3/4 satellites for ${sideIds.length} shoe${sideIds.length > 1 ? 's' : ''}...`);
+                    // ── 2. Always generate all satellite views via template sheets ────────────
+                    if (sideIds.length > 0) {
+                      ps.updateStepStatus('genviews', 'active');
+                      ps.addLogLine(`Generating all satellite views for ${sideIds.length} shoe${sideIds.length > 1 ? 's' : ''}...`);
 
                       const allImages = images.concat(
                         addResult.images.map((img: any) => img)
                       );
                       const imageMap = new Map(allImages.map((img: any) => [img.id, img]));
 
-                      for (const sideId of sideIds) {
+                      for (let si = 0; si < sideIds.length; si++) {
+                        const sideId = sideIds[si];
                         const sideImg = imageMap.get(sideId);
                         if (!sideImg?.base64_image) continue;
 
-                        // Upload side view as reference for consistent 3/4 generation
-                        const blob = await (await fetch(`data:image/png;base64,${sideImg.base64_image}`)).blob();
-                        const file = new File([blob], `side-${sideId}.png`, { type: "image/png" });
-                        const sideUrl = await falClient.uploadFile(file);
+                        ps.addLogLine(`  → Generating views for shoe ${si + 1}/${sideIds.length}...`);
 
-                        for (const view of ['3/4-front', '3/4-back'] as ShoeViewType[]) {
-                          ps.addLogLine(`  → ${view} for shoe ${sideId}...`);
-                          const viewResult = await falClient.generateImageEdit({
+                        try {
+                          const satelliteViews = await generateAllViews({
+                            sideImageBase64: sideImg.base64_image,
                             prompt,
-                            image_urls: [sideUrl],
-                            num_images: 1,
-                            output_format: "jpeg",
-                            genConfig: { realm: 'shoe', shoeView: view },
+                            onProgress: (label, pct) => {
+                              ps.addLogLine(`    ${label}`);
+                              ps.updateProgress(40 + (pct / 100) * 50 * ((si + 1) / sideIds.length));
+                            },
                           });
 
-                          if (viewResult.images.length > 0) {
+                          // Save each satellite view (normalized)
+                          for (const [viewType, genView] of Object.entries(satelliteViews)) {
+                            if (viewType === 'side') continue; // side already saved
+                            ps.addLogLine(`    → Saving ${viewType} view (${genView.w}×${genView.h})...`);
+                            const viewBlob = await (await fetch(`data:image/png;base64,${genView.base64}`)).blob();
+                            const viewFile = new File([viewBlob], `${viewType}-${sideId}.png`, { type: "image/png" });
+                            const viewUrl = await falClient.uploadFile(viewFile);
+
                             const satResult = await apiClient.addExternalImages({
-                              images: viewResult.images.map((img) => ({ url: img.url })),
+                              images: [{ url: viewUrl }],
                               prompt,
                               generation_method: "reference",
-                              remove_background: removeBackground,
+                              remove_background: true,
                               realm: 'shoe',
-                              shoe_view: view,
+                              shoe_view: viewType as any,
                               parent_side_id: sideId,
                               parent_ids: [sideId],
                             });
@@ -1018,10 +1171,14 @@ export const App: React.FC = () => {
                               );
                             }
                           }
+                        } catch (viewErr) {
+                          console.error(`Failed to generate views for shoe ${sideId}:`, viewErr);
+                          ps.addLogLine(`  ⚠ View generation failed for shoe ${si + 1}, continuing...`);
                         }
                       }
-                      ps.updateStepStatus('gen34', 'done');
-                      ps.addLogLine(`✓ 3/4 satellites generated`);
+                      ps.updateStepStatus('genviews', 'done');
+                      ps.addLogLine(`✓ All satellite views generated`);
+                      useAppStore.getState().enableSatelliteViews(SATELLITE_VIEWS);
                     }
 
                     ps.updateStepStatus('project', 'done');
@@ -1053,7 +1210,7 @@ export const App: React.FC = () => {
                       for (const id of selectedImageIds) {
                         const img = images.find(i => i.id === id);
                         if (!img) continue;
-                        if ((img.shoe_view === '3/4-front' || img.shoe_view === '3/4-back') && img.parent_side_id != null) {
+                        if (img.shoe_view && img.shoe_view !== 'side' && img.parent_side_id != null && img.parent_side_id > 0) {
                           resolvedIds.add(img.parent_side_id);
                         } else {
                           resolvedIds.add(id);
@@ -1200,6 +1357,9 @@ export const App: React.FC = () => {
                 { confirmLabel: "Remove", danger: true }
               );
             }}
+            onOpenMultiViewEditor={(sideImage, satellites) => {
+              setMultiViewTarget({ sideImage, satellites });
+            }}
           />
           <LayersSidebar />
         </div>
@@ -1225,6 +1385,16 @@ export const App: React.FC = () => {
         isOpen={showExplorationTreeModal}
         onClose={() => setShowExplorationTreeModal(false)}
       />
+
+      {/* Multi-View Editor overlay */}
+      {multiViewTarget && (
+        <MultiViewEditor
+          sideViewImage={multiViewTarget.sideImage}
+          satelliteViews={multiViewTarget.satellites}
+          onClose={() => setMultiViewTarget(null)}
+          onSave={handleMultiViewSave}
+        />
+      )}
 
       {/* Radial Dial (global actions: Space or middle-click) */}
       <RadialDial

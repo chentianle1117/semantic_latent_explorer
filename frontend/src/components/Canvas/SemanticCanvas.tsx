@@ -391,9 +391,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const isolatedImageIds = useAppStore((state) => state.isolatedImageIds);
   const starFilter = useAppStore((state) => state.starFilter);
   const imageRatings = useAppStore((state) => state.imageRatings);
-  const showSideView = useAppStore((state) => state.showSideView);
-  const show34Front = useAppStore((state) => state.show34Front);
-  const show34Back = useAppStore((state) => state.show34Back);
   const imageSizeOverrides = useAppStore((state) => state.imageSizeOverrides);
   const imageOpacityOverrides = useAppStore((state) => state.imageOpacityOverrides);
   // Always-current refs so render closures never see stale overrides
@@ -416,11 +413,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       if (!img.visible) return false;
       const lid = imageLayerMap[img.id] ?? "default";
       if (!(layerVisMap[lid] ?? true)) return false;
-      // Filter shoe views based on toggle state
+      // Only show side views on the semantic canvas — satellites are shown in the inspector
       const view = img.shoe_view ?? 'side';
-      if (view === 'side' && !showSideView) return false;
-      if (view === '3/4-front' && !show34Front) return false;
-      if (view === '3/4-back' && !show34Back) return false;
+      if (view !== 'side') return false;
       return true;
     });
     // Sort: higher layer index (deeper in stack) → render first; within same layer, lower ID first (older behind newer)
@@ -430,7 +425,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       if (bIdx !== aIdx) return bIdx - aIdx; // descending layer index: references first, shoes last
       return a.id - b.id; // ascending ID within layer: older images render first (behind newer)
     });
-  }, [allImages, layers, imageLayerMap, showSideView, show34Front, show34Back]);
+  }, [allImages, layers, imageLayerMap]);
 
   // Rubber-band selection state
   // mode: 'window'   (drag →, solid blue)   = must fully contain the shoe
@@ -728,9 +723,12 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               .style("cursor", "pointer")
               .on("click", function (event) {
                 event.stopPropagation();
+                // Satellite views redirect to their parent side view
+                const targetId = (d.shoe_view && d.shoe_view !== 'side' && d.parent_side_id && d.parent_side_id > 0)
+                  ? d.parent_side_id : d.id;
                 const curIsolated = useAppStore.getState().isolatedImageIds;
-                if (curIsolated !== null && !curIsolated.includes(d.id)) return;
-                toggleImageSelection(d.id, event.ctrlKey);
+                if (curIsolated !== null && !curIsolated.includes(targetId)) return;
+                toggleImageSelection(targetId, event.ctrlKey);
                 // Trigger selection change callback
                 setTimeout(() => {
                   const newSel = useAppStore.getState().selectedImageIds;
@@ -768,7 +766,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             const [sx2, sy2] = toS(bx2, by2);
             return {
               id: img.id, x: xs(sx2), y: ys(sy2),
-              category: getDisplayCategory(img.generation_method) as 'ref_image' | 'ref_shoe' | 'user' | 'agent',
+              category: getDisplayCategory(img.generation_method, img.realm),
             };
           });
           useAppStore.getState().setMinimapDots(allMinimapDots);
@@ -941,7 +939,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const sx = pivotX + (bx - pivotX) * axScaleX;
           const sy = pivotY + (by - pivotY) * axScaleY;
           return { id: d.id, x: xs(sx), y: ys(sy),
-            category: getDisplayCategory(d.generation_method) as 'ref_image' | 'ref_shoe' | 'user' | 'agent' };
+            category: getDisplayCategory(d.generation_method, d.realm) };
         });
         useAppStore.getState().setMinimapDots(fastMinimapDots);
         useAppStore.getState().setMinimapGhostDots(fastGhostDots);
@@ -1344,7 +1342,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         id: d.id,
         x: xScale(sx),
         y: yScale(sy),
-        category: getDisplayCategory(d.generation_method) as 'ref_image' | 'ref_shoe' | 'user' | 'agent',
+        category: getDisplayCategory(d.generation_method, d.realm),
       };
     });
     useAppStore.getState().setMinimapDots(minimapDots);
@@ -1734,30 +1732,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             .attr("dur", "1.8s").attr("repeatCount", "indefinite");
         });
 
-        // 3/4 satellite tether lines (non-genealogy — glowing white, no arrow)
-        // Drawn when this selected shoe has satellite views visible on canvas
-        if (selectedImg.shoe_view === 'side' || !selectedImg.shoe_view) {
-          images.forEach((satImg) => {
-            if (satImg.parent_side_id !== selectedId) return;
-            const satNode = svg.select(`#image-${satImg.id}`).node() as SVGGElement;
-            if (!satNode) return;
-            const satTransform = satNode.getAttribute("transform");
-            const satMatch = satTransform?.match(/translate\(([^,]+),\s*([^)]+)\)/);
-            if (!satMatch) return;
-            const tx = parseFloat(satMatch[1]);
-            const ty = parseFloat(satMatch[2]);
-            const key = `tether-${selectedId}-${satImg.id}`;
-            if (drawnLinks.has(key)) return;
-            drawnLinks.add(key);
-            genealogyLinesGroup.append("line")
-              .attr("x1", sx).attr("y1", sy)
-              .attr("x2", tx).attr("y2", ty)
-              .attr("stroke", "rgba(200,225,255,0.55)")
-              .attr("stroke-width", 1.2)
-              .attr("stroke-dasharray", "none")
-              .style("filter", "drop-shadow(0 0 3px rgba(150,200,255,0.5))");
-          });
-        }
+        // Satellite tether lines removed — satellites only shown in inspector
       });
     }
   // Note: visualSettings intentionally excluded — opacity is handled by the render/fast-path on <image>,
@@ -1931,60 +1906,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         )}
       </div>
 
-      {/* 3/4 View Filter — top-right, below star filter */}
-      <div style={{
-        position: "absolute",
-        top: 52,
-        right: 16,
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "5px 10px",
-        background: "rgba(13, 17, 23, 0.82)",
-        backdropFilter: "blur(8px)",
-        border: `1px solid ${(!showSideView || show34Front || show34Back) ? "rgba(88,166,255,0.4)" : "rgba(48,54,61,0.4)"}`,
-        borderRadius: 8,
-        pointerEvents: "auto",
-        transition: "border-color 0.2s",
-      }}>
-        <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(150,165,180,0.5)", textTransform: "uppercase", flexShrink: 0 }}>
-          Views
-        </span>
-        {([
-          ['side', 'showSideView', showSideView, 'Side'] as const,
-          ['3/4-front', 'show34Front', show34Front, '3/4 F'] as const,
-          ['3/4-back', 'show34Back', show34Back, '3/4 B'] as const,
-        ]).map(([_view, key, active, label]) => (
-          <button
-            key={key}
-            onClick={() => {
-              const store = useAppStore.getState();
-              if (key === 'showSideView') store.setShowSideView(!active);
-              else if (key === 'show34Front') store.setShow34Front(!active);
-              else store.setShow34Back(!active);
-            }}
-            title={active ? `Hide ${label} views` : `Show ${label} views`}
-            style={{
-              background: active ? "rgba(88,166,255,0.15)" : "none",
-              border: `1px solid ${active ? "rgba(88,166,255,0.5)" : "rgba(80,90,100,0.35)"}`,
-              borderRadius: 5,
-              padding: "2px 7px",
-              cursor: "pointer",
-              fontSize: 11,
-              fontWeight: active ? 600 : 400,
-              color: active ? "#58a6ff" : "rgba(140,155,170,0.5)",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#58a6ff"; e.currentTarget.style.borderColor = "rgba(88,166,255,0.5)"; }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = active ? "#58a6ff" : "rgba(140,155,170,0.5)";
-              e.currentTarget.style.borderColor = active ? "rgba(88,166,255,0.5)" : "rgba(80,90,100,0.35)";
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* View filter panel removed — only side views shown on canvas */}
 
       {/* X-Axis: label centred at bottom edge, slider directly below */}
       <div data-tour="axis-x" style={{

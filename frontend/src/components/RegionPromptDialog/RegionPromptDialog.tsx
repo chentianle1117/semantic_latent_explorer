@@ -20,7 +20,7 @@ export const RegionPromptDialog: React.FC<RegionPromptDialogProps> = ({
   const [imageCount, setImageCount] = useState(2);
 
   return (
-    <div className="region-prompt-dialog-overlay" onClick={onCancel}>
+    <div className="region-prompt-dialog-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
       <div className="region-prompt-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
           <h3>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useAppStore } from "../../store/appStore";
 import { getRealmAwareLabel } from "../../utils/generationCategories";
+import { SHOE_VIEW_LABELS } from "../../api/falClient";
 import type { ImageData } from "../../types";
 import "./RightInspector.css";
 
@@ -27,11 +28,13 @@ interface RightInspectorProps {
   onBackgroundColorChange: (color: string) => void;
   onGenerateFromReference?: () => void;
   onRemoveSelected?: () => void;
+  onOpenMultiViewEditor?: (sideImage: ImageData, satellites: ImageData[]) => void;
 }
 
 export const RightInspector: React.FC<RightInspectorProps> = ({
   onGenerateFromReference,
   onRemoveSelected,
+  onOpenMultiViewEditor,
 }) => {
   const isCollapsed = useAppStore((s) => s.isInspectorCollapsed);
   const setIsCollapsed = useAppStore((s) => s.setIsInspectorCollapsed);
@@ -58,59 +61,59 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     if (isCollapsed) setIsCollapsed(false);
   }, [isCollapsed, setIsCollapsed]);
 
-  useEffect(() => {
-    if (selectedImageIds.length > 0) {
-      // Always navigate to the LAST shoe added to selection
-      const lastSelected = selectedImageIds[selectedImageIds.length - 1];
-      if (!inspectedImageId || !selectedImageIds.includes(inspectedImageId)) {
-        setInspectedImageId(lastSelected);
-      } else {
-        // If a new shoe was just added, switch to it
-        setInspectedImageId(lastSelected);
-      }
-    } else {
-      setInspectedImageId(null);
-    }
-  }, [selectedImageIds]);
-
   const imageMap = useMemo(() => {
     const m = new Map<number, ImageData>();
     images.forEach((img) => m.set(img.id, img));
     return m;
   }, [images]);
 
+  // Auto-redirect: if a satellite view is selected, redirect to its parent side view
+  useEffect(() => {
+    if (selectedImageIds.length > 0) {
+      const lastSelected = selectedImageIds[selectedImageIds.length - 1];
+      const lastImg = imageMap.get(lastSelected);
+      // If this is a satellite view, redirect to the parent side view
+      const resolvedId = (lastImg && lastImg.shoe_view && lastImg.shoe_view !== 'side' && lastImg.parent_side_id && lastImg.parent_side_id > 0)
+        ? lastImg.parent_side_id
+        : lastSelected;
+      if (!inspectedImageId || !selectedImageIds.includes(inspectedImageId)) {
+        setInspectedImageId(resolvedId);
+      } else {
+        setInspectedImageId(resolvedId);
+      }
+    } else {
+      setInspectedImageId(null);
+    }
+  }, [selectedImageIds, imageMap]);
+
   const inspectedImage = inspectedImageId != null ? imageMap.get(inspectedImageId) : null;
   // Order selected images by selection order, latest first (leftmost in deck)
   const selectedImages = useMemo(() => {
-    const idSet = new Set(selectedImageIds);
     const mapped = selectedImageIds.map((id) => imageMap.get(id)).filter(Boolean) as ImageData[];
     return mapped.reverse();
   }, [selectedImageIds, imageMap]);
+
+  // Helper: check if an image is a satellite (non-side) view
+  const isSatellite = (img: ImageData) => img.shoe_view && img.shoe_view !== 'side';
 
   const ancestors = useMemo(() => {
     if (!inspectedImage) return [];
     return (inspectedImage.parents || [])
       .map((id) => imageMap.get(id))
-      .filter((img): img is ImageData =>
-        !!img && img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back'
-      );
+      .filter((img): img is ImageData => !!img && !isSatellite(img));
   }, [inspectedImage, imageMap]);
 
   const children = useMemo(() => {
     if (!inspectedImage) return [];
     return (inspectedImage.children || [])
       .map((id) => imageMap.get(id))
-      .filter((img): img is ImageData =>
-        !!img && img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back'
-      );
+      .filter((img): img is ImageData => !!img && !isSatellite(img));
   }, [inspectedImage, imageMap]);
 
-  // Find 3/4 satellite views for the inspected shoe (regardless of canvas filter toggle)
-  const satellites34 = useMemo(() => {
-    if (!inspectedImage || inspectedImage.realm === 'mood-board') return { front: null as ImageData | null, back: null as ImageData | null };
-    const front = images.find(img => img.parent_side_id === inspectedImage.id && img.shoe_view === '3/4-front') ?? null;
-    const back = images.find(img => img.parent_side_id === inspectedImage.id && img.shoe_view === '3/4-back') ?? null;
-    return { front, back };
+  // Find ALL satellite views for the inspected shoe (regardless of canvas filter toggle)
+  const satelliteViews = useMemo(() => {
+    if (!inspectedImage || inspectedImage.realm === 'mood-board') return [] as ImageData[];
+    return images.filter(img => img.parent_side_id === inspectedImage.id && isSatellite(img));
   }, [inspectedImage, images]);
 
   const riverRef = useRef<HTMLDivElement>(null);
@@ -213,8 +216,12 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
   // #endregion
 
   const handleNodeClick = (id: number) => {
-    setInspectedImageId(id);
-    setFlyToImageId(id);
+    // Auto-redirect satellite views to their parent side view
+    const img = imageMap.get(id);
+    const resolvedId = (img && isSatellite(img) && img.parent_side_id && img.parent_side_id > 0)
+      ? img.parent_side_id : id;
+    setInspectedImageId(resolvedId);
+    setFlyToImageId(resolvedId);
   };
 
   const handleAddToSelection = (id: number) => {
@@ -349,25 +356,61 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </div>
             )}
 
-            {/* Hero Card - Fixed center, with optional 3/4 flanking thumbnails */}
+            {/* Hero Card — side view hero flanked by satellite views */}
             <div className="hero-card">
-              <div className="hero-flanking-row">
-                {/* 3/4 Front satellite (left) */}
-                {satellites34.front && (
-                  <div
-                    className="hero-satellite"
-                    onClick={() => handleNodeClick(satellites34.front!.id)}
-                    title={`3/4 Front #${satellites34.front.id}`}
-                  >
-                    <img
-                      src={`data:image/png;base64,${satellites34.front.base64_image}`}
-                      alt="3/4 Front"
-                    />
-                    <span className="hero-satellite-label">3/4 F</span>
-                  </div>
-                )}
+              {satelliteViews.length > 0 ? (() => {
+                // Split satellites: left = [3/4-front, front, medial, top], right = [3/4-back, back, outsole]
+                const leftOrder = ['3/4-front', 'front', 'medial', 'top'];
+                const rightOrder = ['3/4-back', 'back', 'outsole'];
+                const leftSats = leftOrder.map(vt => satelliteViews.find(s => s.shoe_view === vt)).filter(Boolean) as typeof satelliteViews;
+                const rightSats = rightOrder.map(vt => satelliteViews.find(s => s.shoe_view === vt)).filter(Boolean) as typeof satelliteViews;
 
-                {/* Main hero image */}
+                const renderFlank = (sats: typeof satelliteViews) => (
+                  <div className="hero-flank">
+                    {sats.map((sat) => (
+                      <div
+                        key={sat.id}
+                        className="hero-satellite"
+                        onClick={() => {
+                          if (onOpenMultiViewEditor) {
+                            onOpenMultiViewEditor(inspectedImage, satelliteViews);
+                          }
+                        }}
+                        title={`${SHOE_VIEW_LABELS[sat.shoe_view as keyof typeof SHOE_VIEW_LABELS] ?? sat.shoe_view} #${sat.id}`}
+                      >
+                        <img
+                          src={`data:image/png;base64,${sat.base64_image}`}
+                          alt={sat.shoe_view ?? 'satellite'}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+
+                return (
+                  <div className="hero-layout-flanked">
+                    {leftSats.length > 0 && renderFlank(leftSats)}
+                    <div
+                      className={`hero-image-wrapper ${isHeroSelected ? "selected" : ""}`}
+                      style={inspectedImage.realm === 'mood-board' ? { aspectRatio: '3 / 2', height: 'min(calc(100% - 44px), 22vh, 180px)' } : undefined}
+                      onMouseEnter={() => setHeroHoverAdd(!isHeroSelected)}
+                      onMouseLeave={() => setHeroHoverAdd(false)}
+                    >
+                      <img
+                        src={`data:image/png;base64,${inspectedImage.base64_image}`}
+                        alt="Hero"
+                        className="hero-image"
+                      />
+                      {heroHoverAdd && !isHeroSelected && (
+                        <button className="hero-add-btn" onClick={handleHeroAddClick}>
+                          + Add to Selection
+                        </button>
+                      )}
+                    </div>
+                    {rightSats.length > 0 && renderFlank(rightSats)}
+                  </div>
+                );
+              })() : (
                 <div
                   className={`hero-image-wrapper ${isHeroSelected ? "selected" : ""}`}
                   style={inspectedImage.realm === 'mood-board' ? { aspectRatio: '3 / 2', height: 'min(calc(100% - 44px), 22vh, 180px)' } : undefined}
@@ -385,22 +428,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                     </button>
                   )}
                 </div>
-
-                {/* 3/4 Back satellite (right) */}
-                {satellites34.back && (
-                  <div
-                    className="hero-satellite"
-                    onClick={() => handleNodeClick(satellites34.back!.id)}
-                    title={`3/4 Back #${satellites34.back.id}`}
-                  >
-                    <img
-                      src={`data:image/png;base64,${satellites34.back.base64_image}`}
-                      alt="3/4 Back"
-                    />
-                    <span className="hero-satellite-label">3/4 B</span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
 
             {/* Children - Single row at bottom */}
@@ -516,11 +544,19 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               })()}
             </div>
 
-            {/* Row 2: Generate Variations + Isolate side by side */}
+            {/* Row 2: Generate Variations + Edit Views + Isolate */}
             <div className="action-row">
               {onGenerateFromReference && (
                 <button className="action-primary" onClick={onGenerateFromReference} data-tour="action-generate">
                   Generate Variations
+                </button>
+              )}
+              {onOpenMultiViewEditor && inspectedImage.realm !== 'mood-board' && (
+                <button
+                  className="action-edit-views"
+                  onClick={() => onOpenMultiViewEditor(inspectedImage, satelliteViews)}
+                >
+                  Edit Views{satelliteViews.length > 0 ? ` (${satelliteViews.length})` : ''}
                 </button>
               )}
               <button

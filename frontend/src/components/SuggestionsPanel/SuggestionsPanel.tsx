@@ -201,6 +201,7 @@ const RefMode: React.FC<{
   onSelectPrompt: (prompt: string) => void;
   onReferenceTagClick?: (tag: string, imageLabel: string) => void;
 }> = ({ analysis, combinationPrompts, onSelectPrompt, onReferenceTagClick }) => {
+  const isSingleImage = analysis.length === 1;
   return (
     <div className="sp-ref-mode">
       {/* Horizontal cards — one per reference image, no thumbnails */}
@@ -220,7 +221,7 @@ const RefMode: React.FC<{
               style={{ borderColor: hexToRgba(baseColor, 0.35) }}
             >
               <div className="sp-ref-img-label" style={{ color: baseColor }}>
-                Image {item.label}
+                {isSingleImage ? 'Reference' : `Image ${item.label}`}
               </div>
               <div className="sp-ref-feat-tags">
                 {tags.map((tag) => (
@@ -233,7 +234,7 @@ const RefMode: React.FC<{
                       background: hexToRgba(baseColor, 0.09),
                     }}
                     onClick={() => onReferenceTagClick?.(tag, item.label)}
-                    title={`Add from Image ${item.label}`}
+                    title={isSingleImage ? `Add "${tag}" to prompt` : `Add from Image ${item.label}`}
                   >
                     {tag}
                   </button>
@@ -244,10 +245,10 @@ const RefMode: React.FC<{
         })}
       </div>
 
-      {/* Combination prompts with @A/@B colored chips + descriptor tag pills */}
+      {/* Combination/variation prompts */}
       {combinationPrompts.length > 0 && (
         <div className="sp-section">
-          <div className="sp-section-label">Suggested Combinations</div>
+          <div className="sp-section-label">{isSingleImage ? 'Suggested Variations' : 'Suggested Combinations'}</div>
           {combinationPrompts.map((s, i) => (
             <button
               key={i}

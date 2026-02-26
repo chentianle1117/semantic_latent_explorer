@@ -10,6 +10,7 @@ import type {
   AxisLabels,
   WebSocketMessage,
   SuggestTagsResponse,
+  ViewAnalysisResponse,
 } from '../types';
 
 const API_BASE = '/api';
@@ -81,7 +82,7 @@ class APIClient {
     parent_ids?: number[];
     precomputed_coordinates?: [number, number];
     realm?: 'shoe' | 'mood-board';
-    shoe_view?: 'side' | '3/4-front' | '3/4-back';
+    shoe_view?: string;
     parent_side_id?: number;
   }): Promise<{ status: string; images: ImageData[]; history_group?: HistoryGroup }> {
     const response = await axios.post(`${API_BASE}/add-external-images`, request);
@@ -334,6 +335,35 @@ class APIClient {
   // Sync frontend layer state to backend (called when layers change, so export is always fresh)
   async syncLayers(imageLayerMap: Record<number, string>, layerDefinitions: Array<{id: string; name: string; color: string; visible: boolean}>): Promise<void> {
     await axios.post(`${API_BASE}/sync-layers`, { imageLayerMap, layerDefinitions }).catch(() => {/* non-critical */});
+  }
+
+  // Batch background removal via rembg
+  async rembgBatch(images: Record<string, string>): Promise<Record<string, string>> {
+    const response = await axios.post(`${API_BASE}/rembg-batch`, { images });
+    return response.data.images;
+  }
+
+  // AI Design Assistant: multi-view analysis via Gemini
+  async analyzeViews(viewImages: Record<string, string>, brief?: string): Promise<ViewAnalysisResponse> {
+    const response = await axios.post(`${API_BASE}/agent/analyze-views`, {
+      view_images: viewImages,
+      brief: brief || '',
+    });
+    return response.data;
+  }
+
+  // Compose a coherent edit prompt from selected component+descriptor pairs
+  async composeEditPrompt(
+    selectedPairs: Array<{ component: string; descriptor: string }>,
+    styleSummary?: string,
+    brief?: string,
+  ): Promise<{ prompt: string }> {
+    const response = await axios.post(`${API_BASE}/agent/compose-edit-prompt`, {
+      selected_pairs: selectedPairs,
+      style_summary: styleSummary || '',
+      brief: brief || '',
+    });
+    return response.data;
   }
 
   // Import a canvas from a previously exported ZIP file

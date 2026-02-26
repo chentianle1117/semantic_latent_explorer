@@ -9,7 +9,7 @@ import './TextToImageDialog.css';
 
 interface TextToImageDialogProps {
   onClose: () => void;
-  onGenerate: (prompt: string, count: number, also34Views: boolean) => void;
+  onGenerate: (prompt: string, count: number) => void;
 }
 
 export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
@@ -21,8 +21,6 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   // Free-form additional text
   const [freeText, setFreeText] = useState('');
   const [imageCount, setImageCount] = useState(2);
-  const [also34Views, setAlso34Views] = useState(false);
-
   // All available pills from SuggestionsPanel (kept for future use)
   const [_availablePills, setAvailablePills] = useState<PillDef[]>([]);
 
@@ -47,7 +45,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
       alert('Please enter a prompt or select tags');
       return;
     }
-    onGenerate(composedPrompt, imageCount, also34Views);
+    onGenerate(composedPrompt, imageCount);
     onClose();
   };
 
@@ -122,7 +120,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   const hasChips = selectedTags.size > 0;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
+    <div className="dialog-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="prompt-dialog-outer" data-tour="gen-dialog-text" onClick={(e) => e.stopPropagation()}>
 
         {/* Left panel: chip prompt area + count */}
@@ -227,16 +225,6 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
               label="Number of Images"
             />
 
-            {/* 3/4 view satellites */}
-            <label className="ttd-also34-row">
-              <input
-                type="checkbox"
-                checked={also34Views}
-                onChange={(e) => setAlso34Views(e.target.checked)}
-              />
-              <span>Also generate 3/4 views</span>
-              <span className="ttd-also34-hint"> (+2 images per shoe: front &amp; back angle)</span>
-            </label>
           </div>
 
           <div className="dialog-actions">
@@ -246,7 +234,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
               onClick={handleSubmit}
               disabled={!composedPrompt}
             >
-              Generate {imageCount}{also34Views ? ` + ${imageCount * 2} 3/4` : ''} Image{imageCount > 1 || also34Views ? 's' : ''}
+              Generate {imageCount} Image{imageCount > 1 ? 's' : ''}
             </button>
           </div>
         </div>

@@ -28,6 +28,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const setHistoryGroups = useAppStore((s) => s.setHistoryGroups);
   const setAxisLabels = useAppStore((s) => s.setAxisLabels);
   const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
+  const setMinimapDots = useAppStore((s) => s.setMinimapDots);
+  const setMinimapGhostDots = useAppStore((s) => s.setMinimapGhostDots);
+  const setIsolatedImageIds = useAppStore((s) => s.setIsolatedImageIds);
 
   const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
   const completedSteps = useAppStore((s) => s.completedSteps);
@@ -71,6 +74,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     try {
       await apiClient.importZip(file);
       // Reload full state from backend after import (necessary — replacing entire canvas)
+      setMinimapDots([]);
+      setMinimapGhostDots([]);
+      setIsolatedImageIds(null);
       const state = await apiClient.getState();
       setImages(state.images ?? []);
       setHistoryGroups(state.history_groups ?? []);

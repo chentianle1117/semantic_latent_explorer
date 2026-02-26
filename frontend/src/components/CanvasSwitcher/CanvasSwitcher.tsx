@@ -28,6 +28,9 @@ export const CanvasSwitcher: React.FC = () => {
   const setCurrentCanvasId = useAppStore((s) => s.setCurrentCanvasId);
   const setCanvasName = useAppStore((s) => s.setCanvasName);
   const setCanvasList = useAppStore((s) => s.setCanvasList);
+  const setMinimapDots = useAppStore((s) => s.setMinimapDots);
+  const setMinimapGhostDots = useAppStore((s) => s.setMinimapGhostDots);
+  const setIsolatedImageIds = useAppStore((s) => s.setIsolatedImageIds);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -91,6 +94,9 @@ export const CanvasSwitcher: React.FC = () => {
       ps.updateStepStatus('render', 'active');
       ps.updateProgress(80);
       const s = result.state;
+      setMinimapDots([]);
+      setMinimapGhostDots([]);
+      setIsolatedImageIds(null);
       setImages(s.images ?? []);
       setHistoryGroups(s.history_groups ?? []);
       if (s.axis_labels) setAxisLabels(s.axis_labels);
@@ -116,6 +122,9 @@ export const CanvasSwitcher: React.FC = () => {
     if (!name) return;
     try {
       const result = await apiClient.newCanvas(name);
+      setMinimapDots([]);
+      setMinimapGhostDots([]);
+      setIsolatedImageIds(null);
       setImages([]);
       setHistoryGroups([]);
       resetCanvasBounds();
@@ -137,6 +146,9 @@ export const CanvasSwitcher: React.FC = () => {
       // Reload state from backend after branch
       const loadResult = await apiClient.loadSession(result.canvasId);
       const s = loadResult.state;
+      setMinimapDots([]);
+      setMinimapGhostDots([]);
+      setIsolatedImageIds(null);
       setImages(s.images ?? []);
       setHistoryGroups(s.history_groups ?? []);
       if (s.axis_labels) setAxisLabels(s.axis_labels);

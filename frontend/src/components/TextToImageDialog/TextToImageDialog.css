@@ -353,29 +353,54 @@
 .ttd-cat-style     { background: rgba(200, 100, 255, 0.13); border: 1px solid rgba(200, 100, 255, 0.45); color: #C864FF; }
 .ttd-cat-details   { background: rgba(255, 100, 120, 0.13); border: 1px solid rgba(255, 100, 120, 0.45); color: #FF6478; }
 
-/* ─── 3/4 views checkbox row ─────────────────────────────────────────────── */
+/* ─── Additional views section ───────────────────────────────────────────── */
 
-.ttd-also34-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
+.ttd-views-section {
+  margin-top: 6px;
+}
+
+.ttd-views-label {
+  display: block;
   font-size: 12px;
+  font-weight: 600;
   color: rgba(180, 195, 210, 0.85);
-  cursor: pointer;
-  user-select: none;
-  margin-top: 4px;
+  margin-bottom: 6px;
 }
 
-.ttd-also34-row input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  accent-color: #58a6ff;
-  cursor: pointer;
-}
-
-.ttd-also34-hint {
+.ttd-views-hint {
+  font-weight: 400;
   color: rgba(120, 140, 160, 0.55);
   font-size: 11px;
+}
+
+.ttd-views-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ttd-view-pill {
+  background: none;
+  border: 1px solid rgba(80, 90, 100, 0.4);
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(140, 155, 170, 0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ttd-view-pill:hover {
+  color: rgba(200, 180, 240, 0.9);
+  border-color: rgba(180, 160, 220, 0.5);
+}
+
+.ttd-view-pill.selected {
+  background: rgba(180, 160, 220, 0.15);
+  border-color: rgba(180, 160, 220, 0.6);
+  color: rgba(200, 180, 240, 0.95);
+  font-weight: 600;
 }
 
 /* Pulse animation for tutorial-highlighted buttons */

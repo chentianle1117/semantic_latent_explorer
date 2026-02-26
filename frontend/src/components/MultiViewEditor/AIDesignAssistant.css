@@ -1,0 +1,437 @@
+/* ─── AI Design Assistant Panel (right side of MVE) ────────────────── */
+
+.aida-panel {
+  flex: 0 0 35%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(8, 12, 18, 0.95);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ─── Section Layout ───────────────────────────────────────────────── */
+
+.aida-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.aida-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.aida-section-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: rgba(150, 165, 180, 0.5);
+  text-transform: uppercase;
+}
+
+.aida-refresh-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: rgba(150, 165, 180, 0.4);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+.aida-refresh-btn:hover {
+  color: rgba(0, 210, 255, 0.7);
+  background: rgba(0, 210, 255, 0.08);
+}
+
+/* ─── Style Summary ────────────────────────────────────────────────── */
+
+.aida-style-summary {
+  font-size: 11px;
+  font-style: italic;
+  color: rgba(180, 195, 210, 0.65);
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+/* ─── Component Chips (current analysis) ─────────────────────────── */
+
+.aida-components {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.aida-component-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  background: rgba(255, 100, 120, 0.1);
+  border: 1px solid rgba(255, 100, 120, 0.25);
+  color: rgba(255, 100, 120, 0.85);
+}
+
+.aida-component-chip .aida-chip-name {
+  font-weight: 600;
+}
+
+.aida-component-chip .aida-chip-desc {
+  font-weight: 400;
+  color: rgba(180, 195, 210, 0.5);
+  font-size: 9px;
+}
+
+/* ─── Color Palette ────────────────────────────────────────────────── */
+
+.aida-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.aida-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.aida-swatch-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+}
+
+.aida-swatch-label {
+  font-size: 7px;
+  color: rgba(150, 165, 180, 0.45);
+  text-align: center;
+  max-width: 48px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Component × Descriptor Matrix ──────────────────────────────── */
+
+.aida-matrix-section {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.aida-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.aida-matrix-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.aida-matrix-component {
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(200, 210, 220, 0.7);
+  text-transform: lowercase;
+}
+
+.aida-matrix-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.aida-matrix-tag {
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-size: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(180, 195, 210, 0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.aida-matrix-tag:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(200, 210, 220, 0.85);
+}
+
+.aida-matrix-tag--selected {
+  font-weight: 600;
+}
+
+.aida-pair-count {
+  font-size: 9px;
+  color: rgba(0, 210, 255, 0.6);
+  margin-left: auto;
+}
+
+/* ─── Compose Button ─────────────────────────────────────────────── */
+
+.aida-compose-btn {
+  margin-top: 8px;
+  width: 100%;
+  padding: 5px 12px;
+  background: rgba(200, 100, 255, 0.1);
+  border: 1px solid rgba(200, 100, 255, 0.35);
+  border-radius: 5px;
+  color: rgba(200, 100, 255, 0.85);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.aida-compose-btn:hover:not(:disabled) {
+  background: rgba(200, 100, 255, 0.2);
+}
+.aida-compose-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ─── Suggested Edits (Quick Suggestions) ────────────────────────── */
+
+.aida-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aida-suggestion-card {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border-left: 3px solid rgba(150, 165, 180, 0.3);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.aida-suggestion-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.aida-suggestion-card--component  { border-left-color: rgba(255, 100, 120, 0.6); }
+.aida-suggestion-card--material   { border-left-color: rgba(88, 130, 255, 0.6); }
+.aida-suggestion-card--color      { border-left-color: rgba(255, 160, 64, 0.6); }
+.aida-suggestion-card--proportion { border-left-color: rgba(64, 210, 180, 0.6); }
+.aida-suggestion-card--detail     { border-left-color: rgba(200, 100, 255, 0.6); }
+.aida-suggestion-card--style      { border-left-color: rgba(255, 200, 60, 0.6); }
+
+.aida-suggestion-text {
+  font-size: 11px;
+  color: rgba(200, 210, 220, 0.85);
+  line-height: 1.35;
+}
+
+.aida-suggestion-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.aida-suggestion-category {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(150, 165, 180, 0.4);
+}
+
+.aida-suggestion-reasoning {
+  font-size: 9px;
+  color: rgba(150, 165, 180, 0.35);
+  font-style: italic;
+}
+
+/* ─── Edit Prompt (fixed at bottom) ────────────────────────────────── */
+
+.aida-edit-section {
+  margin-top: auto;
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(6, 10, 16, 0.98);
+  flex-shrink: 0;
+}
+
+.aida-edit-section textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: rgba(200, 210, 220, 0.9);
+  font-size: 12px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  min-height: 44px;
+  max-height: 90px;
+  box-sizing: border-box;
+}
+.aida-edit-section textarea:focus {
+  border-color: rgba(0, 210, 255, 0.4);
+}
+.aida-edit-section textarea::placeholder {
+  color: rgba(120, 135, 150, 0.5);
+}
+
+.aida-update-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: rgba(0, 210, 255, 0.15);
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  border-radius: 6px;
+  color: rgba(0, 210, 255, 0.9);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.aida-update-btn:hover:not(:disabled) {
+  background: rgba(0, 210, 255, 0.25);
+}
+.aida-update-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Progress (replaces edit section when busy) ───────────────────── */
+
+.aida-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.aida-progress-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 210, 255, 0.2);
+  border-top-color: rgba(0, 210, 255, 0.8);
+  border-radius: 50%;
+  animation: mve-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.aida-progress-label {
+  font-size: 11px;
+  color: rgba(0, 210, 255, 0.7);
+}
+
+/* ─── Loading State ────────────────────────────────────────────────── */
+
+.aida-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.aida-loading-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 210, 255, 0.15);
+  border-top-color: rgba(0, 210, 255, 0.6);
+  border-radius: 50%;
+  animation: mve-spin 0.8s linear infinite;
+}
+
+.aida-loading-text {
+  font-size: 10px;
+  color: rgba(150, 165, 180, 0.4);
+}
+
+/* ─── Error State ──────────────────────────────────────────────────── */
+
+.aida-error {
+  font-size: 10px;
+  color: rgba(248, 81, 73, 0.7);
+  font-style: italic;
+  padding: 4px 0;
+}
+
+/* ─── Version History Strip ───────────────────────────────────────── */
+
+.aida-history-section {
+  flex-shrink: 0;
+}
+
+.aida-history-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.aida-history-strip::-webkit-scrollbar {
+  height: 3px;
+}
+.aida-history-strip::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.aida-history-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.aida-history-thumb-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 5px;
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.15s;
+}
+
+.aida-history-item:hover .aida-history-thumb-wrap {
+  border-color: rgba(0, 210, 255, 0.5);
+}
+
+.aida-history-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.aida-history-thumb-empty {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.aida-history-label {
+  font-size: 8px;
+  color: rgba(150, 165, 180, 0.5);
+  text-align: center;
+  max-width: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

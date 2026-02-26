@@ -85,12 +85,16 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         .replace(new RegExp(`@${label}'s\\b`, 'gi'), `${descriptors}'s`)
         .replace(new RegExp(`@${label}\\b`, 'gi'), descriptors);
     }
-    // Fallback for any @A/@B not covered by analysis
-    resolved = resolved
-      .replace(/@A\b/gi, 'the first reference image')
-      .replace(/@B\b/gi, 'the second reference image')
-      .replace(/@C\b/gi, 'the third reference image')
-      .replace(/@D\b/gi, 'the fourth reference image');
+    // Fallback for any @X not covered by analysis — only resolve labels that have actual images
+    const fallbackLabels = ['the first reference image', 'the second reference image', 'the third reference image', 'the fourth reference image'];
+    for (let i = 0; i < referenceImages.length; i++) {
+      const lbl = String.fromCharCode(65 + i);
+      resolved = resolved
+        .replace(new RegExp(`@${lbl}'s\\b`, 'gi'), `${fallbackLabels[i]}'s`)
+        .replace(new RegExp(`@${lbl}\\b`, 'gi'), fallbackLabels[i]);
+    }
+    // Strip any remaining @X references that don't correspond to actual images
+    resolved = resolved.replace(/@[A-D]'s\b/gi, 'the reference image\'s').replace(/@[A-D]\b/gi, 'the reference image');
 
     const referenceIds = referenceImages.map(img => img.id);
     onGenerate(referenceIds, resolved, numImages);
@@ -204,7 +208,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const hasChips = chipMap.size > 0;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
+    <div className="dialog-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="prompt-dialog-outer" data-tour="gen-dialog-ref" onClick={(e) => e.stopPropagation()}>
 
         {/* Left panel: generate form */}
@@ -221,7 +225,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
               </div>
               <ol className="ttd-guide-steps">
                 <li>
-                  <strong>Your reference shoes</strong> are shown above — each is labeled{' '}
+                  <strong>Your reference {referenceImages.length === 1 ? 'shoe is' : 'shoes are'}</strong> shown above{referenceImages.length > 1 ? <> — each is labeled{' '}
                   {labels.map((lbl, i) => (
                     <span
                       key={lbl}
@@ -237,23 +241,23 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                         color: REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length],
                       }}
                     >@{lbl}</span>
-                  ))}.
+                  ))}</> : null}.
                 </li>
                 <li>
-                  <strong>Right panel — Descriptor Tags</strong>: The AI has analyzed each shoe.
+                  <strong>Right panel — Descriptor Tags</strong>: The AI has analyzed {referenceImages.length === 1 ? 'the shoe' : 'each shoe'}.
                   Click colored descriptor tags to add them to your prompt as chips.
                 </li>
                 <li>
-                  <strong>Text box</strong>: Describe what you want. Type <code>@</code> to reference
-                  a specific shoe (e.g. <em>@A's sole with @B's colors</em>).
+                  <strong>Text box</strong>: Describe what you want.{referenceImages.length > 1 ? <> Type <code>@</code> to reference
+                  a specific shoe (e.g. <em>@A's sole with @B's colors</em>).</> : <> Describe variations you'd like
+                  (e.g. <em>chunkier sole, brighter colors</em>).</>}
                 </li>
                 <li>
                   Click <strong>Refine Prompt</strong> to let the AI weave your chips and text
                   into a polished prompt.
                 </li>
                 <li>
-                  Click <strong>Generate</strong> — results may blend references in unexpected and
-                  creative ways!
+                  Click <strong>Generate</strong> — results may {referenceImages.length > 1 ? 'blend references in unexpected and creative ways' : 'explore variations of your reference'}!
                 </li>
               </ol>
             </div>
@@ -338,17 +342,17 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                     onKeyDown={handleKeyDown}
                     placeholder={
                       hasChips
-                        ? 'Add more details or type @ to reference...'
+                        ? 'Add more details...'
                         : (referenceImages.length > 1
-                          ? 'e.g. more minimalist, @A sole with @B colors...'
-                          : 'e.g. more minimalist, brighter colors...')
+                          ? 'e.g. @A\'s sole with @B\'s colors, more minimalist...'
+                          : 'e.g. make it more minimalist, chunkier sole, brighter colors...')
                     }
                     rows={hasChips ? 2 : 4}
                     autoFocus
                     className="ttd-textarea no-overlay"
                   />
-                  {/* @mention dropdown */}
-                  {showMentionDrop && (
+                  {/* @mention dropdown — only when multiple references */}
+                  {showMentionDrop && referenceImages.length > 1 && (
                     <div className="ref-mention-drop">
                       {referenceImages.map((_, i) => (
                         <button
@@ -402,6 +406,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                 onChange={setNumImages}
                 label="Number of Variations"
               />
+
             </div>
           </div>
 

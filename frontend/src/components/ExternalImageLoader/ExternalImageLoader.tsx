@@ -84,7 +84,7 @@ export const ExternalImageLoader: React.FC<ExternalImageLoaderProps> = ({
   const totalCount = shoeFiles.length + refFiles.length;
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
+    <div className="dialog-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="dialog el-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="el-header">
           <h2>Load Images</h2>

@@ -3,7 +3,39 @@
  */
 
 export type ImageRealm = 'mood-board' | 'shoe';
-export type ShoeViewType = 'side' | '3/4-front' | '3/4-back';
+export type ShoeViewType = 'side' | '3/4-front' | '3/4-back' | 'top' | 'outsole' | 'medial' | 'front' | 'back';
+
+// AI Design Assistant types (Multi-View Editor)
+export interface ShoeComponent {
+  name: string;
+  current: string[];  // current descriptors of this component
+  visible_in: string[];
+}
+
+export interface DescriptorMatrixRow {
+  component: string;
+  descriptors: Record<string, string[]>;  // category → options, e.g. { shape: ["pointed", "rounded"], material: [...] }
+}
+
+export interface ColorSwatch {
+  hex: string;
+  name: string;
+  location: string;
+}
+
+export interface EditSuggestion {
+  category: 'component' | 'material' | 'color' | 'proportion' | 'detail' | 'style';
+  suggestion: string;
+  reasoning: string;
+}
+
+export interface ViewAnalysisResponse {
+  components: ShoeComponent[];
+  descriptor_matrix: DescriptorMatrixRow[];
+  color_palette: ColorSwatch[];
+  style_summary: string;
+  suggested_edits: EditSuggestion[];
+}
 
 export interface ImageData {
   id: number;
@@ -22,8 +54,8 @@ export interface ImageData {
   neighbors: number[];  // K-nearest semantic neighbors for physics simulation
   layerId?: string;  // undefined = 'default' layer
   realm?: ImageRealm;           // 'shoe' (default) or 'mood-board'
-  shoe_view?: ShoeViewType;     // 'side' (default), '3/4-front', '3/4-back'
-  parent_side_id?: number;      // For 3/4 satellites: ID of parent side-view shoe (-1 or absent = none)
+  shoe_view?: ShoeViewType;     // 'side' (default) or any satellite view type
+  parent_side_id?: number;      // For satellite views: ID of parent side-view shoe (-1 or absent = none)
 }
 
 export interface CanvasLayer {
@@ -158,10 +190,8 @@ export interface AppState {
   // Axis suggestion accumulator
   imagesSinceLastAxisSuggestion: number;
 
-  // Shoe view filter toggles
-  showSideView: boolean;   // default: true (can toggle off to show only 3/4)
-  show34Front: boolean;
-  show34Back: boolean;
+  // Shoe view filter toggles — per-view visibility (side defaults visible, satellites default hidden)
+  visibleSatelliteViews: Record<string, boolean>;  // keyed by ShoeViewType; side: false=hidden; satellites: true=visible
 
   // Onboarding tutorial
   onboardingActive: boolean;
@@ -305,7 +335,7 @@ export interface MinimapDot {
   id: number;
   x: number;   // base screen X (pre-zoom)
   y: number;   // base screen Y (pre-zoom)
-  category: 'ref_image' | 'ref_shoe' | 'user' | 'agent';
+  category: 'ref_image' | 'ref_shoe' | 'user' | 'agent' | 'mood_board';
   color?: string; // optional — used by ghost dots for DI blob coloring
 }
 

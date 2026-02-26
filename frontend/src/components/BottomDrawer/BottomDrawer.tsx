@@ -54,8 +54,8 @@ function computeTreeLayout(
   totalW: number;
   dotR: number;
 } {
-  // Exclude ghost nodes and 3/4 satellite views — only side views represent designs in the tree
-  const images = allImages.filter(img => !img.is_ghost && img.shoe_view !== '3/4-front' && img.shoe_view !== '3/4-back');
+  // Exclude ghost nodes and satellite views — only side views represent designs in the tree
+  const images = allImages.filter(img => !img.is_ghost && (!img.shoe_view || img.shoe_view === 'side'));
   if (images.length === 0) return { nodes: [], edges: [], totalW: 120, dotR: 6 };
 
   const idSet = new Set(images.map(img => img.id));
@@ -186,10 +186,10 @@ const GenealogyTree: React.FC = () => {
     [treeImages, availH],
   );
 
-  // Collect unique display categories actually used for legend
+  // Collect unique display categories actually used for legend (realm-aware)
   const usedCategories = useMemo(() => {
     const seen = new Set<DisplayCategory>();
-    nodes.forEach(n => seen.add(getDisplayCategory(n.img.generation_method)));
+    nodes.forEach(n => seen.add(getDisplayCategory(n.img.generation_method, n.img.realm)));
     return Array.from(seen) as DisplayCategory[];
   }, [nodes]);
 
@@ -221,7 +221,7 @@ const GenealogyTree: React.FC = () => {
               const sel = selectedSet.has(n.id);
               const del = !n.img.visible;
               const isMoodBoard = n.img.realm === 'mood-board';
-              const col = isMoodBoard ? '#FF6B2B' : getCategoryColor(n.img.generation_method);
+              const col = getCategoryColor(n.img.generation_method, n.img.realm);
               const selColor = isMoodBoard ? '#FF6B2B' : '#00d2ff';
               const label = n.img.prompt
                 ? (n.img.prompt.length > 80 ? n.img.prompt.slice(0, 80) + '…' : n.img.prompt)
@@ -273,8 +273,15 @@ const GenealogyTree: React.FC = () => {
         <div className="drawer-tree-legend">
           {usedCategories.map(cat => (
             <span key={cat} className="tree-legend-item">
-              <svg width={8} height={8} style={{ flexShrink: 0 }}>
-                <circle cx={4} cy={4} r={4} fill={CATEGORY_COLORS[cat]} />
+              <svg width={cat === 'mood_board' ? 14 : 8} height={cat === 'mood_board' ? 14 : 8} style={{ flexShrink: 0 }}>
+                {cat === 'mood_board' ? (
+                  <>
+                    <circle cx={7} cy={7} r={6} fill="none" stroke="rgba(255, 107, 43, 0.4)" strokeWidth={1} strokeDasharray="2 1.5" />
+                    <circle cx={7} cy={7} r={3.5} fill={CATEGORY_COLORS[cat]} />
+                  </>
+                ) : (
+                  <circle cx={4} cy={4} r={4} fill={CATEGORY_COLORS[cat]} />
+                )}
               </svg>
               {CATEGORY_LABELS[cat]}
             </span>

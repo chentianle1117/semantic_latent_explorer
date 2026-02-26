@@ -3,7 +3,7 @@
  * Slides in from the bottom-right, auto-dismisses after 6s or on click.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { useAppStore } from '../../store/appStore';
 import { TUTORIAL_SECTIONS, type SectionKey } from './steps';
 import { advanceToNextSection } from './useAutoAdvance';
@@ -11,25 +11,6 @@ import { advanceToNextSection } from './useAutoAdvance';
 export const SectionTransition: React.FC = () => {
   const sectionKey = useAppStore((s) => s.onboardingSectionTransition) as SectionKey | null;
   const showSectionTransition = useAppStore((s) => s.showSectionTransition);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auto-dismiss after 6 seconds
-  useEffect(() => {
-    if (!sectionKey) return;
-    timerRef.current = setTimeout(() => {
-      // Auto-advance to next section instead of just dismissing
-      const sectionIdx = TUTORIAL_SECTIONS.findIndex((s) => s.key === sectionKey);
-      const nextSection = TUTORIAL_SECTIONS[sectionIdx + 1];
-      if (nextSection) {
-        advanceToNextSection(sectionKey);
-      } else {
-        showSectionTransition(null);
-      }
-    }, 6000);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [sectionKey, showSectionTransition]);
 
   if (!sectionKey) return null;
 

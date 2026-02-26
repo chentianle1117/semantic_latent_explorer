@@ -328,8 +328,23 @@ class APIClient {
     return response.data;
   }
 
+  async setStudySessionName(name: string): Promise<{ studySessionName: string }> {
+    const response = await axios.post(`${API_BASE}/session/set-study-name`, { name });
+    return response.data;
+  }
+
+  async getStudySessionName(): Promise<{ studySessionName: string }> {
+    const response = await axios.get(`${API_BASE}/session/study-name`);
+    return response.data;
+  }
+
   async logEvent(type: string, data?: Record<string, any>): Promise<void> {
     await axios.post(`${API_BASE}/events/log`, { type, data }).catch(() => {/* fire-and-forget */});
+  }
+
+  async saveAsTemplate(): Promise<{ status: string; path: string; images: number }> {
+    const response = await axios.post(`${API_BASE}/sessions/save-as-template`);
+    return response.data;
   }
 
   // Sync frontend layer state to backend (called when layers change, so export is always fresh)

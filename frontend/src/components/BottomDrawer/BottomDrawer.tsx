@@ -319,8 +319,9 @@ export const BottomDrawer: React.FC = () => {
     ? images.filter(img => isolatedImageIds.includes(img.id)).length
     : images.length;
 
-  // Exclusive tab: only one panel open at a time. null = drawer collapsed.
-  const [activeTab, setActiveTab] = useState<'history' | 'lineage' | null>(null);
+  // Exclusive tab: in store so clear canvas can collapse it
+  const activeTab = useAppStore((s) => s.drawerActiveTab);
+  const setActiveTab = useAppStore((s) => s.setDrawerActiveTab);
   const isExpanded = activeTab !== null;
 
   // Sync global store so LayersSidebar + ProgressModal adjust their height
@@ -329,7 +330,7 @@ export const BottomDrawer: React.FC = () => {
   }, [isExpanded, setIsExpanded]);
 
   const switchTab = (tab: 'history' | 'lineage') => {
-    setActiveTab(prev => prev === tab ? null : tab);
+    setActiveTab(activeTab === tab ? null : tab);
   };
 
   return (

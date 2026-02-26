@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import "./HeaderBar.css";
 import { CanvasSwitcher } from "../CanvasSwitcher/CanvasSwitcher";
 import { ProgressBar } from "../OnboardingTour/ProgressBar";
@@ -20,17 +20,34 @@ interface HeaderBarProps {
 export const HeaderBar: React.FC<HeaderBarProps> = ({
   onOpenSettings,
 }) => {
-  const [importStatus, setImportStatus] = useState<'idle' | 'importing' | 'done'>('idle');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const studySessionName = useAppStore((s) => s.studySessionName);
+  const setStudySessionName = useAppStore((s) => s.setStudySessionName);
+  const [sessionDraft, setSessionDraft] = useState(studySessionName);
+  const sessionInputRef = useRef<HTMLInputElement>(null);
+  const hasFetchedSession = useRef(false);
 
-  const setImages = useAppStore((s) => s.setImages);
-  const setHistoryGroups = useAppStore((s) => s.setHistoryGroups);
-  const setAxisLabels = useAppStore((s) => s.setAxisLabels);
-  const resetCanvasBounds = useAppStore((s) => s.resetCanvasBounds);
-  const setMinimapDots = useAppStore((s) => s.setMinimapDots);
-  const setMinimapGhostDots = useAppStore((s) => s.setMinimapGhostDots);
-  const setIsolatedImageIds = useAppStore((s) => s.setIsolatedImageIds);
+  // Fetch study session name from backend on mount
+  useEffect(() => {
+    if (hasFetchedSession.current) return;
+    hasFetchedSession.current = true;
+    apiClient.getStudySessionName().then((res) => {
+      setStudySessionName(res.studySessionName);
+      setSessionDraft(res.studySessionName);
+    }).catch(() => {});
+  }, [setStudySessionName]);
+
+  // Sync draft when store changes externally
+  useEffect(() => { setSessionDraft(studySessionName); }, [studySessionName]);
+
+  const commitSessionName = useCallback(async () => {
+    const trimmed = sessionDraft.trim();
+    if (trimmed === studySessionName) return;
+    setStudySessionName(trimmed);
+    try {
+      await apiClient.setStudySessionName(trimmed);
+    } catch { /* silent */ }
+  }, [sessionDraft, studySessionName, setStudySessionName]);
 
   const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
   const completedSteps = useAppStore((s) => s.completedSteps);
@@ -60,36 +77,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     setOnboardingSpotlight(firstIncomplete?.id ?? TUTORIAL_STEPS[0].id);
   }, [onboardingSpotlight, completedSteps, onboardingDismissed, setOnboardingSpotlight, undismissOnboarding, setIsHistoryExpanded, setIsLayersExpanded]);
 
-  const handleImportClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileSelected = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Reset input so same file can be re-selected later
-    e.target.value = '';
-
-    setImportStatus('importing');
-    try {
-      await apiClient.importZip(file);
-      // Reload full state from backend after import (necessary — replacing entire canvas)
-      setMinimapDots([]);
-      setMinimapGhostDots([]);
-      setIsolatedImageIds(null);
-      const state = await apiClient.getState();
-      setImages(state.images ?? []);
-      setHistoryGroups(state.history_groups ?? []);
-      if (state.axis_labels) setAxisLabels(state.axis_labels);
-      resetCanvasBounds();
-      setImportStatus('done');
-      setTimeout(() => setImportStatus('idle'), 1800);
-    } catch (err) {
-      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      setImportStatus('idle');
-    }
-  }, [setImages, setHistoryGroups, setAxisLabels, resetCanvasBounds]);
-
   const handleSave = useCallback(async () => {
     setSaveStatus('saving');
     try {
@@ -102,34 +89,25 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
     }
   }, []);
 
-  const handleExport = useCallback(() => {
-    // Use relative URL so it works both locally and via ngrok
-    window.open('/api/export-zip', '_blank');
-  }, []);
-
   return (
     <>
       <div className="header-bar" data-tour="header">
-        {/* Hidden file input for ZIP import */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".zip"
-          style={{ display: 'none' }}
-          onChange={handleFileSelected}
-        />
-
         <div className="header-left">
           <CanvasSwitcher />
-          <button
-            className="header-canvas-action"
-            data-tour="import"
-            onClick={handleImportClick}
-            title="Import canvas from ZIP file"
-            disabled={importStatus === 'importing'}
-          >
-            {importStatus === 'importing' ? '…' : importStatus === 'done' ? '✓ Imported' : '↑ Import'}
-          </button>
+          <div className="session-name-group">
+            <span className="session-name-label">Session:</span>
+            <input
+              ref={sessionInputRef}
+              className="session-name-input"
+              type="text"
+              placeholder="e.g. P1-day1"
+              value={sessionDraft}
+              onChange={(e) => setSessionDraft(e.target.value)}
+              onBlur={commitSessionName}
+              onKeyDown={(e) => { if (e.key === 'Enter') sessionInputRef.current?.blur(); }}
+              title="Study session name — prefixed to all saved files for traceability"
+            />
+          </div>
           <button
             className="header-canvas-action"
             data-tour="save"
@@ -141,8 +119,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           </button>
           <button
             className="header-canvas-action"
-            onClick={handleExport}
-            title="Export canvas as ZIP download"
+            onClick={() => window.open('/api/export-zip', '_blank')}
+            title="Export all images as individual PNGs + metadata ZIP"
           >
             ↓ Export
           </button>

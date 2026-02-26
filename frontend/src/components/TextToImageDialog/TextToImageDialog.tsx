@@ -45,6 +45,11 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
       alert('Please enter a prompt or select tags');
       return;
     }
+    apiClient.logEvent('prompt_submit', {
+      prompt: composedPrompt,
+      imageCount,
+      selectedTagCount: selectedTags.size,
+    });
     onGenerate(composedPrompt, imageCount);
     onClose();
   };

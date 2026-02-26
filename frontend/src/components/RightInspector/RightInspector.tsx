@@ -38,15 +38,12 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
 }) => {
   const isCollapsed = useAppStore((s) => s.isInspectorCollapsed);
   const setIsCollapsed = useAppStore((s) => s.setIsInspectorCollapsed);
+  const studyMode = useAppStore((s) => s.studyMode);
   const selectedImageIds = useAppStore((s) => s.selectedImageIds);
   const clearSelection = useAppStore((s) => s.clearSelection);
   const toggleImageSelection = useAppStore((s) => s.toggleImageSelection);
   const setFlyToImageId = useAppStore((s) => s.setFlyToImageId);
   const images = useAppStore((s) => s.images);
-  const layers = useAppStore((s) => s.layers);
-  const imageLayerMap = useAppStore((s) => s.imageLayerMap);
-  const setImageLayer = useAppStore((s) => s.setImageLayer);
-  const setImagesLayer = useAppStore((s) => s.setImagesLayer);
   const isolatedImageIds = useAppStore((s) => s.isolatedImageIds);
   const setIsolatedImageIds = useAppStore((s) => s.setIsolatedImageIds);
   const imageRatings = useAppStore((s) => s.imageRatings);
@@ -280,21 +277,21 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                   <defs>
                     {/* Shoe realm gradients (cyan/amber) */}
                     <linearGradient id="river-line-ancestor" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="rgba(0, 229, 255, 0.35)" />
-                      <stop offset="100%" stopColor="rgba(0, 229, 255, 0)" />
+                      <stop offset="0%" stopColor="rgba(0, 229, 255, 0.55)" />
+                      <stop offset="100%" stopColor="rgba(0, 229, 255, 0.08)" />
                     </linearGradient>
                     <linearGradient id="river-line-child" x1="0%" y1="100%" x2="0%" y2="0%">
-                      <stop offset="0%" stopColor="rgba(255, 170, 0, 0.35)" />
-                      <stop offset="100%" stopColor="rgba(255, 170, 0, 0)" />
+                      <stop offset="0%" stopColor="rgba(255, 170, 0, 0.55)" />
+                      <stop offset="100%" stopColor="rgba(255, 170, 0, 0.08)" />
                     </linearGradient>
                     {/* Mood board realm gradients (orange) */}
                     <linearGradient id="river-line-ancestor-mb" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="rgba(255, 107, 43, 0.4)" />
-                      <stop offset="100%" stopColor="rgba(255, 107, 43, 0)" />
+                      <stop offset="0%" stopColor="rgba(255, 107, 43, 0.6)" />
+                      <stop offset="100%" stopColor="rgba(255, 107, 43, 0.08)" />
                     </linearGradient>
                     <linearGradient id="river-line-child-mb" x1="0%" y1="100%" x2="0%" y2="0%">
-                      <stop offset="0%" stopColor="rgba(255, 107, 43, 0.4)" />
-                      <stop offset="100%" stopColor="rgba(255, 107, 43, 0)" />
+                      <stop offset="0%" stopColor="rgba(255, 107, 43, 0.6)" />
+                      <stop offset="100%" stopColor="rgba(255, 107, 43, 0.08)" />
                     </linearGradient>
                   </defs>
                   {lineSegments.map((seg, i) => {
@@ -310,9 +307,8 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                         key={`${seg.type}-${i}`}
                         d={pathD}
                         stroke={`url(#${gradId})`}
-                        strokeWidth={0.6}
-                        strokeDasharray="2 1.5"
-                        strokeLinecap="butt"
+                        strokeWidth={0.8}
+                        strokeLinecap="round"
                         fill="none"
                       />
                     );
@@ -358,7 +354,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
 
             {/* Hero Card — side view hero flanked by satellite views */}
             <div className="hero-card">
-              {satelliteViews.length > 0 ? (() => {
+              {satelliteViews.length > 0 && !studyMode ? (() => {
                 // Split satellites: left = [3/4-front, front, medial, top], right = [3/4-back, back, outsole]
                 const leftOrder = ['3/4-front', 'front', 'medial', 'top'];
                 const rightOrder = ['3/4-back', 'back', 'outsole'];
@@ -512,36 +508,6 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                   )}
                 </div>
               </div>
-              {(() => {
-                // Determine current layer(s) of selected shoes
-                const uniqueLayerIds = [...new Set(selectedImageIds.map((id) => imageLayerMap[id] ?? "default"))];
-                const isMixed = uniqueLayerIds.length > 1;
-                const currentLayerId = isMixed ? "" : uniqueLayerIds[0];
-                const currentLayer = layers.find((l) => l.id === currentLayerId) ?? layers[0];
-                return (
-                  <div className="action-layer-wrap">
-                    <span className="action-layer-dot-inset" style={{ background: isMixed ? "#888" : currentLayer?.color }} />
-                    <select
-                      className="action-layer-select-inline"
-                      value={currentLayerId}
-                      onChange={(e) => {
-                        if (selectedImageIds.length > 1) {
-                          setImagesLayer(selectedImageIds, e.target.value);
-                        } else {
-                          setImageLayer(inspectedImage.id, e.target.value);
-                        }
-                      }}
-                      title={isMixed ? "Multiple layers — select to move all" : currentLayer?.name ?? "Layer"}
-                      data-tour="action-layer"
-                    >
-                      {isMixed && <option value="" disabled>Multiple Layers</option>}
-                      {layers.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })()}
             </div>
 
             {/* Row 2: Generate Variations + Edit Views + Isolate */}
@@ -551,7 +517,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                   Generate Variations
                 </button>
               )}
-              {onOpenMultiViewEditor && inspectedImage.realm !== 'mood-board' && (
+              {onOpenMultiViewEditor && !studyMode && inspectedImage.realm !== 'mood-board' && (
                 <button
                   className="action-edit-views"
                   onClick={() => onOpenMultiViewEditor(inspectedImage, satelliteViews)}

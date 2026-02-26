@@ -1,0 +1,49 @@
+{"type": "session_start", "timestamp": "2026-02-26T15:49:36.490578", "canvas_id": "eb6aed92-a448-488a-b72e-1e368464b1bb", "canvas_name": "Canvas 1", "participant_id": "Benson", "study_session": "S1"}
+{"type": "suggestion_click", "timestamp": "2026-02-26T15:49:52.610483", "data": {"tag": "technical knit", "category": "material", "action": "select"}}
+{"type": "design_brief_change", "timestamp": "2026-02-26T15:50:07.583955", "data": {"brief": "Basketball shoe low top"}}
+{"type": "suggestion_click", "timestamp": "2026-02-26T15:50:12.023928", "data": {"tag": "lightweight knit", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-26T15:50:12.582957", "data": {"tag": "sturdy sole", "category": "silhouette", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-26T15:50:18.887928", "data": {"prompt": "Update the reference shoe with a lightweight knit construction and a sturdy sole.", "imageCount": 2, "selectedTagCount": 0}}
+{"type": "generation", "timestamp": "2026-02-26T15:50:59.661910", "data": {"imageIds": [0, 1], "count": 2, "prompt": "Update the reference shoe with a lightweight knit construction and a sturdy sole."}}
+{"type": "selection", "timestamp": "2026-02-26T15:50:59.664354", "data": {"selectedIds": [0, 1], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T15:51:08.336351", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:51:12.664600", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:51:13.069292", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:51:13.790493", "data": {"selectedIds": [0], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:51:14.436670", "data": {"selectedIds": [0, 1], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-26T15:52:00.210108", "data": {"imageIds": [2, 3], "count": 2, "prompt": "A basketball shoe low top with knit upper, structured sole, tech details, light grey, dynamic shape, heel support's tech details and knit upper, chunky sole, white, textured midsole, clean aesthetic, low-top profile's textured midsole."}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:00.212016", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:01.782445", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:02.791890", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:03.598131", "data": {"selectedIds": [1, 0], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:04.136577", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-26T15:52:21.573823", "data": {"imageIds": [4], "count": 1, "prompt": "A basketball shoe low top with premium leather upper, minimalist stitching, subtle perforations, deep navy, classic cupsole, tonal branding, subtle texture, timeless appeal."}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:25.456078", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:26.051410", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:27.011862", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:27.333645", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:27.908247", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:28.250383", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:57.661546", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:58.159905", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:52:58.863439", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:53:02.642208", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:53:18.245588", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:53:18.715956", "data": {"selectedIds": [1, 2], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:07.999803", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:09.417636", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:09.849457", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:10.298066", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:10.578952", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:12.484379", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:12.854369", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:45.558283", "data": {"selectedIds": [0, 1, 2, 3], "count": 4}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:45.982329", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:46.313885", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:46.864448", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:55.152881", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:59.430704", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T15:54:59.806134", "data": {"selectedIds": [0], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T15:55:01.560267", "data": {"selectedIds": [0, 3], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-26T15:56:03.240339", "data": {"imageIds": [5, 6, 7], "count": 3, "prompt": "basketball shoe blending knit upper, textured grey, chunky sole, unique structure, heel support, low-top's unique sole structure with knit upper, white monochrome, speckled sole, geometric sole, lightweight feel, low-top's white monochrome knit upper and heel support"}}
+{"type": "selection", "timestamp": "2026-02-26T15:56:03.241869", "data": {"selectedIds": [5, 6, 7], "count": 3}}

@@ -646,9 +646,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const axisLabelsChanged = prevAxisLabelsRef.current !== axisLabels;
     const canvasBoundsChanged = prevCanvasBoundsRef.current !== canvasBounds;
 
-    // Layer-reorder fast path: if only the sort order changed (same set of image IDs),
-    // skip full rebuild — the SVG nodes are already present, just in a different stacking order.
-    // This prevents camera jumps when assigning shoes to different layers.
+    // Layer-reorder / visibility fast path: if only images changed (due to layer toggle
+    // or reorder), skip full rebuild — toggle SVG node display in-place to prevent camera jumps.
     if (imagesChanged && !visualSettingsChanged && !axisLabelsChanged && !canvasBoundsChanged && !ghostsChanged) {
       const prevIds = new Set(prevImagesRef.current.map(i => i.id));
       const currIds = new Set(images.map(i => i.id));
@@ -665,6 +664,56 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           });
         }
         return;
+      }
+
+      // Layer visibility fast path: images hidden/shown by toggling layer visibility.
+      // Hide removed nodes, show re-added nodes — NO full rebuild, NO camera jump.
+      if (canvasBounds !== null && svgRef.current) {
+        const removedIds = [...prevIds].filter(id => !currIds.has(id));
+        const addedIds = [...currIds].filter(id => !prevIds.has(id));
+        // Only use fast path if this is purely a visibility change (no brand-new images)
+        // Brand-new images (from generation) need the full add path below.
+        const allKnown = addedIds.every(id => {
+          const node = d3.select(svgRef.current!).select(`#image-${id}`);
+          return !node.empty();
+        });
+        if (removedIds.length > 0 || (addedIds.length > 0 && allKnown)) {
+          console.log(`⚡ Layer visibility fast path: hiding ${removedIds.length}, showing ${addedIds.length}`);
+          prevImagesRef.current = images;
+          const imagesGroup = d3.select(svgRef.current).select(".images");
+          removedIds.forEach(id => {
+            imagesGroup.select(`#image-${id}`).attr("display", "none");
+          });
+          addedIds.forEach(id => {
+            imagesGroup.select(`#image-${id}`).attr("display", null);
+          });
+          // Update minimap dots to reflect visible images only
+          if (xScaleRef.current && yScaleRef.current) {
+            const co = coordOffsetRef.current;
+            const cs = coordScaleRef.current;
+            const xs = xScaleRef.current;
+            const ys = yScaleRef.current;
+            const spx = stretchPivotXRef.current;
+            const spy = stretchPivotYRef.current;
+            const axScX = visualSettingsRef.current.axisScaleX ?? 1;
+            const axScY = visualSettingsRef.current.axisScaleY ?? 1;
+            const toS = (bx: number, by: number): [number, number] => [
+              spx + (bx - spx) * axScX,
+              spy + (by - spy) * axScY,
+            ];
+            const allMinimapDots = images.map((img) => {
+              const bx = (img.coordinates[0] + co[0]) * cs;
+              const by = (img.coordinates[1] + co[1]) * cs;
+              const [sx, sy] = toS(bx, by);
+              return {
+                id: img.id, x: xs(sx), y: ys(sy),
+                category: getDisplayCategory(img.generation_method, img.realm),
+              };
+            });
+            useAppStore.getState().setMinimapDots(allMinimapDots);
+          }
+          return;
+        }
       }
 
       // Image-addition fast path: new images added, none removed → append only the new nodes.
@@ -1574,7 +1623,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     }
 
     imagesGroup.selectAll(".image-node").each(function(d: any) {
-      const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) === starFilterVal;
+      const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) >= starFilterVal;
       const isolatePasses = isolateSet === null || isolateSet.has(d.id);
       const el = d3.select(this);
 
@@ -1626,6 +1675,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
     // Build imageMap for realm lookups
     const imageMap = new Map(images.map(img => [img.id, img]));
+
+    // Line thickness scales with image size (thinner at small sizes, max 1.2px)
+    const imgSize = useAppStore.getState().visualSettings.imageSize;
+    const lineWidth = Math.max(0.5, Math.min(1.2, imgSize / 120));
+    const dashScale = Math.max(0.6, Math.min(1.0, imgSize / 150));
 
     // ── Helper: pick genealogy line color by parent→child realm transition ──
     const getGenealogyCssColor = (fromRealm: string | undefined, toRealm: string | undefined): string => {
@@ -1684,16 +1738,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const lineColor = getGenealogyCssColor(parentImg?.realm, selectedImg.realm);
           const dashArr = getGenealogyCssDash(parentImg?.realm, selectedImg.realm);
 
+          const scaledDash = dashArr.split(' ').map(v => String(parseFloat(v) * dashScale)).join(' ');
           const pLine = genealogyLinesGroup.append("path")
             .attr("d", `M ${px} ${py} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${sx} ${sy}`)
             .attr("stroke", lineColor)
-            .attr("stroke-width", 1.8)
+            .attr("stroke-width", lineWidth)
             .attr("fill", "none")
-            .attr("opacity", 0.78)
-            .attr("stroke-dasharray", dashArr);
+            .attr("opacity", 0.7)
+            .attr("stroke-dasharray", scaledDash);
           pLine.append("animate")
             .attr("attributeName", "stroke-dashoffset")
-            .attr("from", "14").attr("to", "0")
+            .attr("from", String(Math.round(12 * dashScale))).attr("to", "0")
             .attr("dur", "1.8s").attr("repeatCount", "indefinite");
         });
 
@@ -1719,16 +1774,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           const lineColor = getGenealogyCssColor(selectedImg.realm, childImg?.realm);
           const dashArr = getGenealogyCssDash(selectedImg.realm, childImg?.realm);
 
+          const scaledDashC = dashArr.split(' ').map(v => String(parseFloat(v) * dashScale)).join(' ');
           const cLine = genealogyLinesGroup.append("path")
             .attr("d", `M ${sx} ${sy} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${cx} ${cy}`)
             .attr("stroke", lineColor)
-            .attr("stroke-width", 1.8)
+            .attr("stroke-width", lineWidth)
             .attr("fill", "none")
-            .attr("opacity", 0.78)
-            .attr("stroke-dasharray", dashArr);
+            .attr("opacity", 0.7)
+            .attr("stroke-dasharray", scaledDashC);
           cLine.append("animate")
             .attr("attributeName", "stroke-dashoffset")
-            .attr("from", "14").attr("to", "0")
+            .attr("from", String(Math.round(12 * dashScale))).attr("to", "0")
             .attr("dur", "1.8s").attr("repeatCount", "indefinite");
         });
 
@@ -2122,6 +2178,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         {/* Unhide — only shown in isolate mode */}
         {isolatedImageIds !== null && (
           <button
+            data-tour="unhide-all-btn"
             style={{
               background: "rgba(239,68,68,0.18)",
               backdropFilter: "blur(6px)",
@@ -2146,6 +2203,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         <DeletedImagesPanel />
         {/* Visual Reset: clear per-image size/opacity overrides */}
         <button
+          data-tour="visual-reset-btn"
           style={{
             background: "rgba(22, 27, 34, 0.85)",
             backdropFilter: "blur(6px)",
@@ -2170,6 +2228,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         </button>
         {/* Recenter / fit-all button */}
         <button
+          data-tour="recenter-btn"
           style={{
             background: "rgba(22, 27, 34, 0.85)",
             backdropFilter: "blur(6px)",

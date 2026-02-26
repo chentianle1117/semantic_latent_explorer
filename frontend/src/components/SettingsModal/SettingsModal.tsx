@@ -13,7 +13,6 @@ interface SettingsModalProps {
   backgroundColor?: string;
   onToggleLabels?: () => void;
   onBackgroundColorChange?: (color: string) => void;
-  onExportZip?: (ids?: number[]) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -25,35 +24,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   backgroundColor = "#0d1117",
   onToggleLabels = () => {},
   onBackgroundColorChange = () => {},
-  onExportZip,
 }) => {
   const removeBackground = useAppStore((s) => s.removeBackground);
   const setRemoveBackground = useAppStore((s) => s.setRemoveBackground);
-  const selectedImageIds = useAppStore((s) => s.selectedImageIds);
+  const studyMode = useAppStore((s) => s.studyMode);
+  const setStudyMode = useAppStore((s) => s.setStudyMode);
   const participantId = useAppStore((s) => s.participantId);
   const setParticipantId = useAppStore((s) => s.setParticipantId);
   const [participantInput, setParticipantInput] = useState(participantId);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
-  const importInputRef = React.useRef<HTMLInputElement>(null);
-
-  const handleImportZip = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportStatus('Importing…');
-    try {
-      const result = await apiClient.importZip(file);
-      const state = await apiClient.getState();
-      useAppStore.getState().setImages(state.images);
-      useAppStore.getState().setHistoryGroups(state.history_groups);
-      setImportStatus(`✓ Loaded ${result.images_loaded} images, ${result.groups_loaded} batches`);
-      setTimeout(() => setImportStatus(null), 4000);
-    } catch (err: any) {
-      setImportStatus(`✗ Import failed: ${err?.response?.data?.detail || err.message}`);
-      setTimeout(() => setImportStatus(null), 5000);
-    }
-    if (importInputRef.current) importInputRef.current.value = '';
-  };
-
   useEffect(() => {
     if (isOpen) setParticipantInput(participantId);
   }, [isOpen, participantId]);
@@ -96,7 +74,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   setParticipantInput(trimmed);
                   if (trimmed !== participantId) {
                     setParticipantId(trimmed);
-                    try { await apiClient.setParticipant(trimmed); } catch {/* silent */}
+                    try {
+                      await apiClient.setParticipant(trimmed);
+                      // Refresh canvas list for the new participant's directory
+                      const { sessions } = await apiClient.listSessions();
+                      useAppStore.getState().setCanvasList(sessions);
+                    } catch {/* silent */}
                   }
                 }}
                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
@@ -110,6 +93,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <p className="settings-hint" style={{ fontSize: '10px', marginTop: '4px', opacity: 0.6 }}>
               Session data saved to backend/data/{participantId}/sessions/
+            </p>
+          </div>
+
+          {/* Study Mode */}
+          <div className="settings-section">
+            <label className="settings-label">Study Mode</label>
+            <label className="settings-toggle">
+              <input
+                type="checkbox"
+                checked={studyMode}
+                onChange={(e) => setStudyMode(e.target.checked)}
+              />
+              Side-view only (no multi-view, no mood boards)
+            </label>
+            <p className="settings-hint" style={{ fontSize: '10px', marginTop: '4px', opacity: 0.6 }}>
+              Disables satellite view generation, mood boards, and the multi-view editor
             </p>
           </div>
 
@@ -145,7 +144,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="setting-row">
               <label>Image Size</label>
               <input
-                type="range" min="30" max="400"
+                type="range" min="30" max="250"
                 value={visualSettings.imageSize}
                 onChange={(e) => updateVisualSettings({ imageSize: parseInt(e.target.value) })}
               />
@@ -183,33 +182,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </label>
             </div>
             <div className="setting-actions">
-              {onExportZip && (
-                <button onClick={() => onExportZip(selectedImageIds.length > 0 ? selectedImageIds : undefined)}>
-                  {selectedImageIds.length > 0 ? `Export ${selectedImageIds.length} selected` : "Export all as ZIP"}
-                </button>
-              )}
-              <button
-                onClick={() => importInputRef.current?.click()}
-                title="Restore a previous session from an exported ZIP file"
-              >
-                Import from ZIP
-              </button>
-              <input
-                ref={importInputRef}
-                type="file"
-                accept=".zip"
-                style={{ display: 'none' }}
-                onChange={handleImportZip}
-              />
-              {importStatus && (
-                <span style={{ fontSize: 10, color: importStatus.startsWith('✓') ? '#34d399' : importStatus.startsWith('✗') ? '#f87171' : 'var(--text-secondary)', marginTop: 4 }}>
-                  {importStatus}
-                </span>
-              )}
               <button onClick={() => resetCanvasBounds()}>Recenter</button>
               <button
                 onClick={async () => {
-                  try { await apiClient.reapplyLayout(); } catch (e) { console.warn("Reapply failed:", e); }
+                  try {
+                    await apiClient.reapplyLayout();
+                    // Fetch updated coordinates from backend (broadcast_state_update doesn't reach us)
+                    const freshState = await apiClient.getState();
+                    useAppStore.getState().setImages(freshState.images);
+                    if (freshState.history_groups) useAppStore.getState().setHistoryGroups(freshState.history_groups);
+                  } catch (e) { console.warn("Reapply failed:", e); }
                   resetCanvasBounds();
                   updateVisualSettings({ coordinateScale: 1.0, coordinateOffset: [0, 0, 0] });
                 }}

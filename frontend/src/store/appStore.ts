@@ -42,6 +42,7 @@ interface AppStore extends AppState {
   setGenerationCount: (current: number, total: number) => void;
 
   setRemoveBackground: (remove: boolean) => void;
+  setStudyMode: (on: boolean) => void;
 
   setIs3DMode: (is3D: boolean) => void;
 
@@ -159,6 +160,13 @@ interface AppStore extends AppState {
   resetOnboarding: (canvasId?: string) => void;
   loadOnboardingState: (canvasId: string) => void;
   showSectionTransition: (key: string | null) => void;
+
+  // Bottom drawer tab — in store so handleClearCanvas can collapse it
+  drawerActiveTab: 'history' | 'lineage' | null;
+  setDrawerActiveTab: (tab: 'history' | 'lineage' | null) => void;
+
+  /** Reset all transient UI state (panels, ghosts, agent) — called on Clear Canvas */
+  resetTransientUIState: () => void;
 }
 
 const initialState: AppState = {
@@ -188,6 +196,7 @@ const initialState: AppState = {
   clusterCentroids: [], // Cluster centers for edge bundling
   clusterLabels: [], // Cluster assignment per image
   removeBackground: true,
+  studyMode: true, // Default ON: side-view only, no mood boards, no MVE
   isGenerating: false,
   isInitialized: false,
   generationProgress: 0,
@@ -269,6 +278,7 @@ const initialState: AppState = {
   currentCanvasId: null as string | null,
   canvasName: 'Canvas 1',
   participantId: 'researcher',
+  studySessionName: '' as string,
   canvasList: [] as CanvasMeta[],
   eventLog: [] as EventLogEntry[],
 
@@ -281,6 +291,9 @@ const initialState: AppState = {
   completedSteps: [] as string[],
   onboardingDismissed: false,
   onboardingSectionTransition: null as string | null,
+
+  // Bottom drawer tab
+  drawerActiveTab: null as 'history' | 'lineage' | null,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -415,6 +428,7 @@ export const useAppStore = create<AppStore>((set) => ({
     set({ generationCurrent: current, generationTotal: total }),
 
   setRemoveBackground: (remove) => set({ removeBackground: remove }),
+  setStudyMode: (on) => set({ studyMode: on }),
 
   // 3D mode
   setIs3DMode: (is3D) => set({ is3DMode: is3D }),
@@ -427,6 +441,16 @@ export const useAppStore = create<AppStore>((set) => ({
   setActiveToolbarFlyout: (flyout) => set((state) => ({
     activeToolbarFlyout: state.activeToolbarFlyout === flyout ? null : flyout,
   })),
+  setDrawerActiveTab: (tab) => set({ drawerActiveTab: tab }),
+  resetTransientUIState: () => set({
+    activeToolbarFlyout: null,
+    drawerActiveTab: null,
+    ghostNodes: [],
+    inlineAxisData: null,
+    agentStatus: 'idle',
+    agentInsights: [],
+    isAgentWorking: false,
+  }),
   setFlyToImageId: (id) => set({ flyToImageId: id }),
 
   // Minimap
@@ -625,6 +649,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setCurrentCanvasId: (id) => set({ currentCanvasId: id }),
   setCanvasName: (name) => set({ canvasName: name }),
   setParticipantId: (id) => set({ participantId: id }),
+  setStudySessionName: (name: string) => set({ studySessionName: name }),
   setCanvasList: (list) => set({ canvasList: list }),
   addEventLogEntry: (entry) => set((s) => ({ eventLog: [...s.eventLog, entry] })),
 

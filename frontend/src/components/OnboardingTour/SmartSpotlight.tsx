@@ -176,9 +176,10 @@ export const SmartSpotlight: React.FC<{ step: TutorialStep }> = ({ step }) => {
   }, [step.dialButtonId, step.dialogSelector]);
 
   // Phase 3 (dialog open) > Phase 2 (dial open) > Phase 1 (base)
-  const effectiveSelector = step.dialogSelector && dialogOpen
+  // Block dial/dialog phases when prereq not met (prevents highlighting e.g. delete button when nothing is selected)
+  const effectiveSelector = (step.dialogSelector && dialogOpen && prereqOk)
     ? step.dialogSelector
-    : step.dialButtonId && dialOpen
+    : (step.dialButtonId && dialOpen && prereqOk)
       ? `[data-tour="dial-${step.dialButtonId}"]`
       : step.targetSelector;
 

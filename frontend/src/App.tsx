@@ -100,6 +100,7 @@ export const App: React.FC = () => {
 
   const setImages = useAppStore((state) => state.setImages);
   const mergeImages = useAppStore((state) => state.mergeImages);
+  const updateImage = useAppStore((state) => state.updateImage);
   const setHistoryGroups = useAppStore((state) => state.setHistoryGroups);
   const addHistoryGroup = useAppStore((state) => state.addHistoryGroup);
   const setIsInitialized = useAppStore((state) => state.setIsInitialized);
@@ -193,31 +194,6 @@ export const App: React.FC = () => {
           // Load per-canvas onboarding progress from localStorage
           useAppStore.getState().loadOnboardingState(session.canvasId);
 
-          // Auto-import starter canvas if empty + not already done
-          const starterKey = `starterLoaded_${session.canvasId}`;
-          const currentImages = useAppStore.getState().images;
-          if (currentImages.length === 0 && !localStorage.getItem(starterKey)) {
-            try {
-              const res = await fetch('/api/import-starter', { method: 'POST' });
-              if (res.ok) {
-                const starterJson = await res.json().catch(() => null);
-                localStorage.setItem(starterKey, 'true');
-                const freshState = await apiClient.getState();
-                useAppStore.getState().setImages(freshState.images ?? []);
-                useAppStore.getState().setHistoryGroups(freshState.history_groups ?? []);
-                if (freshState.axis_labels) useAppStore.getState().setAxisLabels(freshState.axis_labels);
-                useAppStore.getState().resetCanvasBounds();
-                // Apply design_brief from starter if returned
-                if (starterJson?.design_brief) {
-                  useAppStore.getState().setDesignBrief(starterJson.design_brief);
-                }
-                console.log('[Onboarding] Starter canvas imported');
-              }
-            } catch {
-              // Starter not available — proceed with empty canvas
-            }
-          }
-
           // Tutorial starts on-demand via "?" button — no auto-start on page load
         }).catch(() => {/* session endpoints optional */});
       })
@@ -244,6 +220,7 @@ export const App: React.FC = () => {
           setHistoryGroups(state.history_groups);
           clearSelection();
           useAppStore.getState().clearDeletedStack();
+          useAppStore.getState().resetTransientUIState();
         } catch (error) {
           console.error("Clear failed:", error);
         }
@@ -325,80 +302,6 @@ export const App: React.FC = () => {
       setIsGenerating(false);
       setGenerationProgress(0);
       setMultiViewTarget(null);
-    }
-  };
-
-  const handleExportZip = async (exportIds?: number[]) => {
-    const toExport = exportIds ?? images.map((img) => img.id);
-    if (toExport.length === 0) {
-      alert("No images to export. Generate some images first!");
-      return;
-    }
-
-    // Show loading state
-    setIsGenerating(true);
-    setGenerationProgress(50);
-
-    try {
-      const idsParam = exportIds ? `?ids=${exportIds.join(",")}` : "";
-      console.log(
-        `📦 Exporting ${toExport.length} image(s) as ZIP${exportIds ? " (selected only)" : ""}`
-      );
-
-      const response = await fetch(
-        `http://localhost:8000/api/export-zip${idsParam}`,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/zip",
-          },
-        }
-      );
-
-      console.log("Response status:", response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Export error response:", errorText);
-        throw new Error(
-          `Export failed: ${response.status} ${response.statusText} - ${errorText}`
-        );
-      }
-
-      console.log("Creating blob from response...");
-      const blob = await response.blob();
-      console.log("Blob size:", blob.size, "bytes");
-
-      if (blob.size === 0) {
-        throw new Error("Received empty ZIP file from server");
-      }
-
-      // Download the ZIP file
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `zappos_export_${new Date()
-        .toISOString()
-        .replace(/[:.]/g, "-")}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      console.log(
-        `✅ Successfully exported ${toExport.length} image(s) with metadata!`
-      );
-      alert(`✅ Successfully exported ${toExport.length} image(s) with metadata!`);
-    } catch (error) {
-      console.error("❌ Export ZIP failed:", error);
-      alert(
-        `Failed to export ZIP: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsGenerating(false);
-      setGenerationProgress(0);
     }
   };
 
@@ -513,7 +416,8 @@ export const App: React.FC = () => {
   const handleLoadExternalImages = async (shoes: string[], references: string[]) => {
     const total = shoes.length + references.length;
     if (total === 0) return;
-    console.log(`📥 Loading ${shoes.length} shoes + ${references.length} references...`);
+    apiClient.logEvent('file_upload', { shoeCount: shoes.length, referenceCount: references.length, totalCount: total });
+    console.log(`Loading ${shoes.length} shoes + ${references.length} references...`);
     setShowExternalImageLoader(false);
     setIsGenerating(true);
     const ps = useProgressStore.getState();
@@ -743,6 +647,16 @@ export const App: React.FC = () => {
       mergeImages(addResult.images);
       if (addResult.history_group) addHistoryGroup(addResult.history_group);
 
+      // Update parent images' children arrays so genealogy lines show on canvas
+      const newChildIds = addResult.images.map((img: any) => img.id);
+      for (const pid of parentIds) {
+        const parent = useAppStore.getState().images.find((img) => img.id === pid);
+        if (parent) {
+          const updatedChildren = [...(parent.children || []), ...newChildIds.filter((c: number) => !parent.children.includes(c))];
+          updateImage(pid, { children: updatedChildren });
+        }
+      }
+
       const sideIds: number[] = addResult?.images?.length > 0
         ? addResult.images.map((img: any) => img.id)
         : [];
@@ -757,8 +671,8 @@ export const App: React.FC = () => {
         ps.addLogLine(`✓ ${sideIds.length} image${sideIds.length > 1 ? 's' : ''} placed on canvas (parents: [${parentIds.join(', ')}])`);
       }
 
-      // ── Generate all satellite views via template sheets ──
-      if (sideIds.length > 0) {
+      // ── Generate all satellite views via template sheets (skip in study mode) ──
+      if (sideIds.length > 0 && !useAppStore.getState().studyMode) {
         ps.updateStepStatus('genviews', 'active');
         ps.addLogLine(`Generating all satellite views for ${sideIds.length} shoe${sideIds.length > 1 ? 's' : ''}...`);
 
@@ -877,6 +791,8 @@ export const App: React.FC = () => {
       useAppStore.getState().setAxisLabels(state.axis_labels);
       setImages(state.images);
       setHistoryGroups(state.history_groups);
+      // Reset canvas bounds so SemanticCanvas recalculates from new coordinates
+      useAppStore.getState().resetCanvasBounds();
 
       useProgressStore.getState().updateProgress(100);
       useProgressStore.getState().hideProgress();
@@ -1118,8 +1034,8 @@ export const App: React.FC = () => {
                     addToAxisSuggestionCounter(count);
                     triggerConcurrentGhosts(prompt, [], []).catch(console.error);
 
-                    // ── 2. Always generate all satellite views via template sheets ────────────
-                    if (sideIds.length > 0) {
+                    // ── 2. Generate satellite views via template sheets (skip in study mode) ──
+                    if (sideIds.length > 0 && !useAppStore.getState().studyMode) {
                       ps.updateStepStatus('genviews', 'active');
                       ps.addLogLine(`Generating all satellite views for ${sideIds.length} shoe${sideIds.length > 1 ? 's' : ''}...`);
 
@@ -1348,6 +1264,7 @@ export const App: React.FC = () => {
               showConfirm(
                 `Remove ${ids.length} selected image${ids.length !== 1 ? "s" : ""} from canvas?`,
                 () => {
+                  apiClient.logEvent('delete', { deletedIds: ids, count: ids.length });
                   ids.forEach((id) => {
                     useAppStore.getState().removeImage(id);
                     apiClient.deleteImage(id).catch(() => {});
@@ -1376,7 +1293,6 @@ export const App: React.FC = () => {
         backgroundColor={backgroundColor}
         onToggleLabels={() => setShowLabels(!showLabels)}
         onBackgroundColorChange={setBackgroundColor}
-        onExportZip={handleExportZip}
         ghostCount={ghostCount}
         onGhostCountChange={setGhostCount}
       />
@@ -1533,7 +1449,7 @@ export const App: React.FC = () => {
             category: "global",
             onClick: () => setShowSettingsModal(true),
           },
-        ]}
+        ].filter(a => !useAppStore.getState().studyMode || a.id !== 'mood-board') as import('./components/RadialDial/RadialDial').RadialDialAction[]}
       />
 
       {/* Native confirm dialog — replaces window.confirm() */}

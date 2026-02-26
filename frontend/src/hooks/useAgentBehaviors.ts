@@ -90,10 +90,16 @@ export function useAgentBehaviors() {
       if (brief) setIsAgentUsingBrief(true);
       let altPrompt = '';
       let reasoning = '';
+      let yourDesignWas = '';
+      let thisExplores = '';
+      let keyShifts: string[] = [];
       try {
         const result = await apiClient.getConcurrentPrompt(userPrompt, brief, refUrls);
         altPrompt = result.prompt;
         reasoning = result.reasoning;
+        yourDesignWas = result.your_design_was || '';
+        thisExplores = result.this_explores || '';
+        keyShifts = result.key_shifts || [];
       } finally {
         setIsAgentUsingBrief(false);
       }
@@ -138,13 +144,13 @@ export function useAgentBehaviors() {
         parents: parentIds,
         source: 'concurrent',
         timestamp: Date.now(),
-        your_design_was: result.your_design_was,
-        this_explores: result.this_explores,
-        key_shifts: result.key_shifts,
+        your_design_was: yourDesignWas,
+        this_explores: thisExplores,
+        key_shifts: keyShifts,
       };
 
-      const insightMessage = result.your_design_was && result.this_explores
-        ? `Your design was ${result.your_design_was}. Exploring: ${result.this_explores}`
+      const insightMessage = yourDesignWas && thisExplores
+        ? `Your design was ${yourDesignWas}. Exploring: ${thisExplores}`
         : `Generated an alternative: "${altPrompt.substring(0, 60)}..."`;
 
       addGhostNode(ghost);

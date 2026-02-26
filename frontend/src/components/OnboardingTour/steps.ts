@@ -1,10 +1,10 @@
 /**
  * Onboarding tutorial step definitions — v5
  *
- * 4 color-coded sections, 31 steps:
- *   A  UI Layout   — 12 steps (includes Load Files)
+ * 4 color-coded sections, 32 steps:
+ *   A  UI Layout   — 11 steps (includes Load Files)
  *   B  Generation  — 5 steps
- *   C  Utilities   — 10 steps
+ *   C  Utilities   — 12 steps
  *   D  AI Agent    — 4 steps
  *
  * Steps with `dialButtonId` use two-phase spotlight:
@@ -187,21 +187,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   {
-    id: 'a-layers-assign',
-    section: 'a',
-    atomicUnit: 'ui-orientation',
-    title: 'Assign to Layer',
-    description: '',
-    instruction: 'This dropdown shows the **current layer** of the selected shoe(s). If they\'re on different layers, it shows **"Multiple Layers"**. Use the dropdown to **assign all selected shoes** to a layer.',
-    targetSelector: '[data-tour="action-layer"]',
-    cardPosition: 'left',
-    prerequisiteKey: 'a-layers-assign',
-    prerequisiteGuide: '**Select a shoe** on the canvas first.',
-    completionKey: 'a-layers-assign',
-    observationSelector: '[data-tour="canvas"]',
-  },
-
-  {
     id: 'a-inspector',
     section: 'a',
     atomicUnit: 'ui-orientation',
@@ -359,9 +344,33 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: 'Unhide All',
     description: '',
     instruction: 'Click the **⊙ Unhide All** button (bottom-right) to restore all hidden shoes back to the canvas.',
-    targetSelector: '[data-tour="canvas-reset-buttons"]',
+    targetSelector: '[data-tour="unhide-all-btn"]',
     cardPosition: 'left',
     completionKey: 'c-unhide',
+  },
+
+  {
+    id: 'c-visual-reset',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Visual Reset',
+    description: '',
+    instruction: '**Click the Visual Reset button** (bottom-right) to restore the default size and opacity of all shoes — useful after adjusting the size/opacity sliders.',
+    targetSelector: '[data-tour="visual-reset-btn"]',
+    cardPosition: 'left',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-recenter',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Recenter Canvas',
+    description: '',
+    instruction: '**Click the Recenter button** (bottom-right) to fit all shoes back into view — like "fit to screen" in any design tool. Handy after generating many shoes or after reprojecting axes.',
+    targetSelector: '[data-tour="recenter-btn"]',
+    cardPosition: 'left',
+    isInformational: true,
   },
 
   {
@@ -391,7 +400,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     cardPosition: 'left',
     prerequisiteKey: 'c-revert',
     prerequisiteGuide: '**Delete a shoe** first so the restore button appears.',
-    isInformational: true,
+    completionKey: 'c-revert',
   },
 
   {
@@ -450,7 +459,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     atomicUnit: 'isolate-manage',
     title: 'Star Filter',
     description: '',
-    instruction: 'The **star filter** (top-right) lets you show only shoes with a specific rating. Click a star to filter — e.g. clicking **4★** shows only 4-star shoes. Click again to clear.',
+    instruction: 'The **star filter** (top-right) lets you show only highly-rated shoes. Click a star to filter — e.g. clicking **4★** shows all shoes rated **4 stars or above**. Click again to clear.',
     targetSelector: '[data-tour="star-filter"]',
     cardPosition: 'left',
     completionKey: 'c-star-filter',
@@ -478,15 +487,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     atomicUnit: 'ai-actions',
     title: 'Explore Canvas',
     description: '',
-    instruction: '**Space** or **middle-click** → **Explore Canvas**. The AI finds unexplored regions in your design space.',
-    dialInstruction: '**Click Explore Canvas** — the AI will analyze gaps in the semantic space.',
+    instruction: '**Space** or **middle-click** → **Explore Canvas**. The AI scans your canvas for unexplored regions in the design space. This also triggers **automatically every 15 generations**. Processing takes 20–30 seconds — **you can move on** while it works in the background.',
+    dialInstruction: '**Click Explore Canvas** to start the analysis. It runs in the background — you\'ll see ghost suggestions appear once it finishes. Feel free to proceed!',
     targetSelector: '[data-tour="canvas"]',
     cardPosition: 'left',
     dialButtonId: 'explore-canvas',
     prerequisiteKey: 'd-explore',
     prerequisiteGuide: '**Generate some shoes** first so the AI has content to analyze.',
-    completionKey: 'd-explore',
-    waitingLabel: 'AI is analyzing...',
+    isInformational: true,
   },
 
   {

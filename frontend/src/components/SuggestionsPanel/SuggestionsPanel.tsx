@@ -158,7 +158,10 @@ const TextMode: React.FC<{
                         ? { background: col.bg, borderColor: col.border, color: col.text }
                         : undefined
                     }
-                    onClick={() => onToggleTag(tag, catKey, !selected)}
+                    onClick={() => {
+                      apiClient.logEvent('suggestion_click', { tag, category: catKey, action: selected ? 'deselect' : 'select' });
+                      onToggleTag(tag, catKey, !selected);
+                    }}
                     title={selected ? "Remove from prompt" : `Add "${tag}" (${cat.name})`}
                   >
                     {tag}

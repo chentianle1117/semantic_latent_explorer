@@ -1,0 +1,3 @@
+{"type": "session_start", "timestamp": "2026-02-26T15:42:31.390837", "canvas_id": "4fd270fb-7be0-4f9c-9040-48aa39238e2a", "canvas_name": "Canvas 1", "participant_id": "P1-Benson", "study_session": "session1"}
+{"type": "axis_change", "timestamp": "2026-02-26T15:42:31.407300", "data": {"axisLabels": {"x": ["formal", "sporty"], "y": ["dark", "colorful"], "z": ["casual", "elegant"]}}}
+{"type": "design_brief_change", "timestamp": "2026-02-26T15:42:31.410849", "data": {"brief": null}}

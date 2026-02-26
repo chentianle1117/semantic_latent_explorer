@@ -1,0 +1,55 @@
+{"type": "session_start", "timestamp": "2026-02-26T16:07:27.589970", "canvas_id": "eb6aed92-a448-488a-b72e-1e368464b1bb", "canvas_name": "Onboarding", "participant_id": "Benson", "study_session": null}
+{"type": "generation", "timestamp": "2026-02-26T16:07:28.946502", "data": {"imageIds": [0, 1, 2, 3], "count": 4, "prompt": "Update the reference shoe with a lightweight knit construction and a sturdy sole."}}
+{"type": "design_brief_change", "timestamp": "2026-02-26T16:07:28.948224", "data": {"brief": "Basketball shoe low top"}}
+{"type": "design_brief_change", "timestamp": "2026-02-26T16:08:36.942053", "data": {"brief": "Basketball shoe low top for fast moving players like point guards"}}
+{"type": "selection", "timestamp": "2026-02-26T16:09:02.813836", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:09:52.662454", "data": {"selectedIds": [0, 1], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:09:55.661904", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:09:57.777125", "data": {"selectedIds": [0, 1], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:09:58.769768", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:10:54.763693", "data": {"selectedIds": [2, 3, 0], "count": 3}}
+{"type": "file_upload", "timestamp": "2026-02-26T16:12:44.850637", "data": {"shoeCount": 0, "referenceCount": 1, "totalCount": 1}}
+{"type": "generation", "timestamp": "2026-02-26T16:12:50.320752", "data": {"imageIds": [5], "count": 1, "prompt": "Reference images"}}
+{"type": "selection", "timestamp": "2026-02-26T16:13:24.748984", "data": {"selectedIds": [2, 3, 0, 5], "count": 4}}
+{"type": "selection", "timestamp": "2026-02-26T16:13:27.101162", "data": {"selectedIds": [], "count": 0}}
+{"type": "suggestion_click", "timestamp": "2026-02-26T16:14:03.829270", "data": {"tag": "lightweight mesh", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-26T16:14:05.380232", "data": {"tag": "vibrant orange", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-26T16:14:08.624007", "data": {"tag": "low-cut", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-26T16:14:11.443353", "data": {"tag": "ultra-sporty", "category": "style", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-26T16:14:37.174374", "data": {"prompt": "Modify the reference shoe for point guards: update to lightweight mesh, vibrant orange color, low-cut silhouette, and an ultra-sporty aesthetic.", "imageCount": 2, "selectedTagCount": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:14:52.569965", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:14:53.153217", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-26T16:15:03.674523", "data": {"imageIds": [6, 7], "count": 2, "prompt": "Modify the reference shoe for point guards: update to lightweight mesh, vibrant orange color, low-cut silhouette, and an ultra-sporty aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-26T16:15:03.675901", "data": {"selectedIds": [6, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:15:05.254594", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:16:18.073801", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:16:59.792126", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:01.566657", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:02.941955", "data": {"selectedIds": [7, 6], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:04.986758", "data": {"selectedIds": [7, 6, 0], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:06.048349", "data": {"selectedIds": [7, 6], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:06.723193", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:07.229075", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:09.244323", "data": {"selectedIds": [0], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:10.507963", "data": {"selectedIds": [0, 6], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:18.219318", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:45.713944", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:17:54.936030", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:43.640844", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:52.916772", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:53.866167", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:54.716086", "data": {"selectedIds": [5, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:55.480527", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:56.095975", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:56.585214", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:18:56.940734", "data": {"selectedIds": [5, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:19:11.942948", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-26T16:19:31.345017", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-26T16:20:11.735979", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-26T16:20:41.580897", "data": {"imageIds": [8], "count": 1, "prompt": "A basketball shoe low-top with a matte, micro-perforated synthetic leather base in deep midnight blue, accented by geometric, reflective circuit board-inspired patterns in cyan and magenta across the quarter panels and ankle collar, with a translucent ice-blue rubber outsole and bold, angular branding."}}
+{"type": "selection", "timestamp": "2026-02-26T16:20:41.954209", "data": {"selectedIds": [8], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-26T16:20:42.041846", "data": {"imageIds": [9], "count": 1, "prompt": "A basketball shoe low-top with a translucent, ripstop nylon upper in a gradient of electric lime to neon orange, featuring iridescent holographic overlays on the heel counter and tongue, and a speckled neon pink and black midsole with a dynamic herringbone outsole pattern."}}
+{"type": "selection", "timestamp": "2026-02-26T16:20:43.140168", "data": {"selectedIds": [8, 9], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-26T16:20:47.013292", "data": {"selectedIds": [], "count": 0}}
+{"type": "axis_change", "timestamp": "2026-02-26T16:21:50.396083", "data": {"axisLabels": {"x": ["sleek", "aggressive"], "y": ["understated", "bold"], "z": ["casual", "elegant"]}}}
+{"type": "session_end", "timestamp": "2026-02-26T16:22:38.153303", "canvas_id": "eb6aed92-a448-488a-b72e-1e368464b1bb"}

@@ -127,6 +127,44 @@
   border-style: solid;
 }
 
+/* Study session name input */
+.session-name-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.session-name-label {
+  font-size: 10px;
+  color: rgba(140, 150, 160, 0.65);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+.session-name-input {
+  width: 100px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c9d1d9;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.session-name-input::placeholder {
+  color: rgba(130, 140, 150, 0.5);
+  font-style: italic;
+}
+
+.session-name-input:focus {
+  border-color: rgba(88, 166, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* Small inline action buttons next to canvas switcher */
 .header-canvas-action {
   display: inline-flex;

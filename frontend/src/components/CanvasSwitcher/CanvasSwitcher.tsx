@@ -88,6 +88,7 @@ export const CanvasSwitcher: React.FC = () => {
       ps.updateStepStatus('save', 'done');
       ps.updateStepStatus('load', 'active');
       ps.updateProgress(35);
+      apiClient.logEvent('canvas_switch', { fromCanvasId: currentCanvasId, toCanvasId: canvasId, action: 'load' });
       const result = await apiClient.loadSession(canvasId);
       ps.addLogLine(`Loaded "${result.canvasName}" — ${result.state.images?.length ?? 0} images`);
       ps.updateStepStatus('load', 'done');
@@ -121,6 +122,7 @@ export const CanvasSwitcher: React.FC = () => {
     const name = window.prompt('New canvas name:', 'Canvas ' + (canvasList.length + 2));
     if (!name) return;
     try {
+      apiClient.logEvent('canvas_switch', { fromCanvasId: currentCanvasId, action: 'new', newName: name });
       const result = await apiClient.newCanvas(name);
       setMinimapDots([]);
       setMinimapGhostDots([]);

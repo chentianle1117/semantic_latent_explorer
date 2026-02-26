@@ -1,0 +1,3 @@
+{"type": "session_start", "timestamp": "2026-02-26T15:57:26.905168", "canvas_id": "e32a7144-931a-4062-bab7-fc48eb2eda81", "canvas_name": "Canvas 1", "participant_id": "researcher", "study_session": null}
+{"type": "canvas_switch", "timestamp": "2026-02-26T16:07:15.742125", "data": {"fromCanvasId": "e32a7144-931a-4062-bab7-fc48eb2eda81", "toCanvasId": "eb6aed92-a448-488a-b72e-1e368464b1bb", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-02-26T16:07:15.744034", "canvas_id": "e32a7144-931a-4062-bab7-fc48eb2eda81"}

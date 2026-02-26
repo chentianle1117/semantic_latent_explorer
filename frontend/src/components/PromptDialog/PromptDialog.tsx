@@ -172,13 +172,11 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         return { text, source: imageLabel, color };
       });
 
-      // Pre-attribute chip tags with @A's/@B's notation BEFORE sending to Gemini.
-      // This guarantees @A/@B appear in the output — Gemini just polishes the sentence.
-      // e.g. chips "formal wear"→A, "platform sole"→B + freeText "minimalist" becomes:
-      //      "@A's formal wear, @B's platform sole, minimalist"
-      const preAttributedChips = Array.from(chipMap.entries()).map(
-        ([text, imageLabel]) => `@${imageLabel}'s ${text}`
-      );
+      // For multiple references: pre-attribute chip tags with @A's/@B's notation.
+      // For single reference: just use the tag text directly (no @A labels needed).
+      const preAttributedChips = referenceImages.length > 1
+        ? Array.from(chipMap.entries()).map(([text, imageLabel]) => `@${imageLabel}'s ${text}`)
+        : Array.from(chipMap.keys());
       const preAttributedPrompt = [...preAttributedChips, freeText.trim()]
         .filter(Boolean)
         .join(', ');

@@ -25,18 +25,17 @@ export function useAutoComplete(): void {
   const isGenerating        = useAppStore((s) => s.isGenerating);
   const axisLabels          = useAppStore((s) => s.axisLabels);
   const isolatedImageIds    = useAppStore((s) => s.isolatedImageIds);
-  const imageLayerMap       = useAppStore((s) => s.imageLayerMap);
   const agentInsights       = useAppStore((s) => s.agentInsights);
   const inlineAxisData      = useAppStore((s) => s.inlineAxisData);
   const ghostNodes          = useAppStore((s) => s.ghostNodes);
   const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
   const imageRatings        = useAppStore((s) => s.imageRatings);
+  const deletedStack        = useAppStore((s) => s.deletedImageStack);
   const starFilter          = useAppStore((s) => s.starFilter);
 
   // ── Change-detection refs ────────────────────────────────────────────────
   const prevAxes         = useRef(JSON.stringify(axisLabels));
   const prevIsolated     = useRef(isolatedImageIds);
-  const prevLayerMap     = useRef(JSON.stringify(imageLayerMap));
   const prevInsightCount = useRef(agentInsights.length);
   const prevInlineAxis   = useRef(inlineAxisData);
   const wasGenerating    = useRef(false);
@@ -99,7 +98,15 @@ export function useAutoComplete(): void {
     if (onboardingDismissed) return;
     const check = () => {
       const el = document.querySelector('[data-tour="tab-lineage"]');
-      if (el && el.classList.contains('active')) completeStep('a-lineage-tab');
+      if (el && el.classList.contains('active')) {
+        completeStep('a-lineage-tab');
+        // Collapse drawer after 2s so user sees the tree, then layers bar is revealed for next step
+        setTimeout(() => {
+          if (useAppStore.getState().completedSteps.includes('a-lineage-tab')) {
+            useAppStore.getState().setDrawerActiveTab(null);
+          }
+        }, 2000);
+      }
     };
     const obs = new MutationObserver(check);
     const container = document.querySelector('[data-tour="drawer-tabs"]');
@@ -119,17 +126,6 @@ export function useAutoComplete(): void {
       prevLayersExpanded.current = isLayersExpanded;
     }
   }, [isLayersExpanded, onboardingSpotlight, onboardingDismissed, completeStep]);
-
-  // ── a-layers-assign: non-default layer assignment ──────────────────────
-  useEffect(() => {
-    if (onboardingDismissed) return;
-    const nowMap = JSON.stringify(imageLayerMap);
-    if (nowMap !== prevLayerMap.current) {
-      const hasNonDefault = Object.values(imageLayerMap).some((v) => v !== 'default');
-      if (hasNonDefault) completeStep('a-layers-assign');
-      prevLayerMap.current = nowMap;
-    }
-  }, [imageLayerMap, onboardingDismissed, completeStep]);
 
   // ── b-deselect: selection is empty ──────────────────────────────────────
   // Complete on transition (>0 → 0) OR when spotlight lands on this step with 0 selected
@@ -211,20 +207,25 @@ export function useAutoComplete(): void {
     if (!isGenerating) prevImageCount.current = visCount;
   }, [images, isGenerating, onboardingDismissed, completeStep]);
 
-  // ── d-explore: AI insight or inline axis data ──────────────────────────
+  // ── c-revert: shoe restored (deleted stack shrank) ─────────────────────
+  const prevDeletedStackLen = useRef(deletedStack.length);
+  useEffect(() => {
+    if (!onboardingDismissed && prevDeletedStackLen.current > 0 && deletedStack.length < prevDeletedStackLen.current) {
+      completeStep('c-revert');
+    }
+    prevDeletedStackLen.current = deletedStack.length;
+  }, [deletedStack.length, onboardingDismissed, completeStep]);
+
+  // ── d-explore: track insight count for d-ghosts step awareness ────────
   useEffect(() => {
     if (!onboardingDismissed && agentInsights.length > prevInsightCount.current) {
-      completeStep('d-explore');
       prevInsightCount.current = agentInsights.length;
     }
-  }, [agentInsights.length, onboardingDismissed, completeStep]);
+  }, [agentInsights.length, onboardingDismissed]);
 
   useEffect(() => {
-    if (!onboardingDismissed && inlineAxisData !== null && prevInlineAxis.current === null) {
-      completeStep('d-explore');
-    }
     prevInlineAxis.current = inlineAxisData;
-  }, [inlineAxisData, onboardingDismissed, completeStep]);
+  }, [inlineAxisData]);
 
   // ── b-axes / d-axes: axis labels changed (manual edit or AI suggest) ───
   useEffect(() => {

@@ -100,6 +100,7 @@ export interface AppState {
   visualSettings: VisualSettings;
   canvasBounds: CanvasBounds | null; // null = auto-calculate from data
   removeBackground: boolean;
+  studyMode: boolean; // When on: side-view only, no mood boards, no multi-view editor
   isGenerating: boolean;
   isInitialized: boolean;
   generationProgress: number;

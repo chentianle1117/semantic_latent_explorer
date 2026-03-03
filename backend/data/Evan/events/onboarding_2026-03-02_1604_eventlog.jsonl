@@ -1,0 +1,12 @@
+{"type": "session_start", "timestamp": "2026-03-02T16:04:28.046085", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0", "canvas_name": "Onboarding", "participant_id": "Evan", "study_session": null}
+{"type": "generation", "timestamp": "2026-03-02T16:04:31.734170", "data": {"imageIds": [24, 30, 32, 33, 34, 36, 43, 44, 45, 47, 49, 50, 51, 52, 53, 56, 58, 61, 63, 64, 67, 72, 78, 79, 84, 85, 86, 87, 88, 89], "count": 30, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "axis_change", "timestamp": "2026-03-02T16:04:31.737691", "data": {"axisLabels": {"x": ["performance-driven", "style-led"], "y": ["heritage", "avant-garde"], "z": ["casual", "elegant"]}}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:04:31.744976", "data": {"brief": "This is a football boot designed for lightning-fast turf play, evoking the aggressive speed and dynamism of the Nike Mercurial line. The striking colorway of electric blue and vibrant pink will make a bold statement, pushing the boundaries of athletic aesthetics."}}
+{"type": "selection", "timestamp": "2026-03-02T16:04:33.975991", "data": {"selectedIds": [87], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:04:34.365310", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:04:35.054082", "data": {"selectedIds": [49], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:04:35.415163", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:04:36.377289", "data": {"selectedIds": [67], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:04:37.631250", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-03-02T16:04:43.896142", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "new", "newName": "tasks"}}
+{"type": "session_end", "timestamp": "2026-03-02T16:04:43.898487", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0"}

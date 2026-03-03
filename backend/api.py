@@ -148,6 +148,7 @@ class RefinePromptRequest(BaseModel):
     reference_image_ids: List[int] = []
     brief: str = ""
     realm: str = "shoe"  # "shoe" or "mood-board"
+    generation_mode: str = "single-ref"  # "scratch" | "single-ref" | "multi-ref"
 
 
 class ImageResponse(BaseModel):
@@ -1414,6 +1415,39 @@ async def update_brief_fields(request: UpdateBriefFieldsRequest):
     return {"status": "success"}
 
 
+class SynthesizeBriefRequest(BaseModel):
+    fields: List[Dict]  # [{key, label, value}, ...]
+
+@app.post("/api/agent/synthesize-brief")
+async def synthesize_brief(request: SynthesizeBriefRequest):
+    """Use Gemini to synthesize a natural language brief from structured fields."""
+    if not gemini_api_key:
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+    filled = [f for f in request.fields if f.get("value", "").strip()]
+    if not filled:
+        return {"brief": ""}
+
+    field_lines = "\n".join(f"- {f['label']}: {f['value']}" for f in filled)
+
+    prompt = f"""Convert these structured shoe design parameters into a concise, natural language design brief (2–4 sentences max):
+
+{field_lines}
+
+Write as if a designer is describing their shoe concept — specific, evocative, and faithful to the parameters. No bullet points, just flowing prose."""
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        response = model.generate_content(prompt)
+        brief = (getattr(response, "text", None) or "").strip()
+        # Persist in state so it's included in future prompts
+        state.design_brief = brief
+        return {"brief": brief}
+    except Exception as e:
+        print(f"ERROR in synthesize_brief: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/agent/suggest-tags")
 async def suggest_tags(request: SuggestTagsRequest):
     """Suggest categorized design attribute tags (text mode) or analyze reference images (reference mode)."""
@@ -2119,44 +2153,65 @@ EXAMPLES:
 - "Abstract shoe material study blending sleek leather surfaces with rugged outsole textures, minimal and powerful"
 
 Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
-    elif len(request.reference_image_ids) <= 1:
-        # Single reference — use "modify/update the shoe" language, no @A labels
-        prompt_text = f"""You are a design prompt refiner. The user wants to MODIFY or UPDATE an existing reference shoe.
+    elif request.generation_mode == "scratch":
+        # No reference images — creating from scratch. No "modify" language.
+        prompt_text = f"""You are a design prompt writer for shoe generation. The user is designing a NEW shoe from scratch — there is no reference image to modify.
 
 DESIGN BRIEF: {brief}
 USER PROMPT: {request.prompt}{tag_list}
 
-Rewrite this into a polished design prompt (under 40 words) that describes how to MODIFY the reference shoe.
+Rewrite this into a vivid, specific generation prompt (under 40 words) that describes the shoe to CREATE.
 
 CRITICAL RULES:
-1. Frame the prompt as a modification - use words like "modify", "update", "adjust", "transform", "restyle" the shoe.
-2. Do NOT use @A or @B labels — there is only one reference shoe.
+1. Use generative language — "a shoe with...", "design featuring...", "create a...". Never use words like "modify", "update", "adjust", "change", or "restyle".
+2. Do NOT use @A or @B labels — there are no reference images.
 3. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase them.
-4. Be specific about what changes to make to the existing shoe design.
+4. Be specific about the shoe's aesthetic, materials, silhouette, and mood.
 
 EXAMPLES:
-- Input: "chunkier sole, brighter colors" -> "Modify the shoe with a chunkier sole and brighter, more vibrant colorway"
-- Input: "more minimalist, sleeker silhouette" -> "Restyle the shoe into a sleeker, more minimalist silhouette with cleaner lines"
+- Input: "chunky sole, bright colors" → "A bold sneaker with an exaggerated chunky sole and vivid, high-contrast colorway"
+- Input: "minimalist, sleek" → "A clean minimalist sneaker with a sleek silhouette, tonal colorway, and refined proportions"
+
+Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
+    elif request.generation_mode == "single-ref":
+        # One reference — using it as inspiration to guide an update. Soft, exploratory language.
+        prompt_text = f"""You are a design prompt refiner. The user is using a reference shoe as inspiration — they want to explore updates or variations informed by it.
+
+DESIGN BRIEF: {brief}
+USER PROMPT: {request.prompt}{tag_list}
+
+Rewrite this into a natural, exploratory prompt (under 40 words) that uses the reference as a starting point.
+
+CRITICAL RULES:
+1. Use light, exploratory language — "using this as a reference", "building on", "drawing from", "taking cues from", "informed by". Avoid harsh words like "overhaul" or "drastically change".
+2. Do NOT use @A or @B labels — there is only one reference shoe.
+3. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase them.
+4. Make it feel like a natural next step, not a complete redesign.
+
+EXAMPLES:
+- Input: "chunkier sole, brighter colors" → "Using this as a reference, update the sole to be chunkier and push the colorway toward something brighter"
+- Input: "more minimalist, sleeker" → "Taking cues from the reference, refine the silhouette toward something sleeker and more minimal"
 
 Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
     else:
-        prompt_text = f"""You are a design prompt refiner. The user has selected descriptor tags from specific reference images and may have typed additional notes.
+        # Multiple references — combining elements from several shoes. Use "combine/blend/@A @B" language.
+        prompt_text = f"""You are a design prompt refiner. The user has selected descriptor tags from multiple reference images and wants to COMBINE elements from them.
 
 DESIGN BRIEF: {brief}
 USER PROMPT: {request.prompt}{tag_list}
 
-Rewrite this into a polished, specific design prompt (under 40 words).
+Rewrite this into a polished, specific combination prompt (under 40 words).
 
 CRITICAL RULES:
 1. When a tag has a source attribution in parentheses (e.g. "formal wear" (from A), "platform sole" (from B)), you MUST write "@A's formal wear" and "@B's platform sole" — use the @letter possessive form to attribute the tag to its source image. This is the most important rule.
 2. If the user already typed @A, @B, @C, @D references, keep them EXACTLY as-is — do NOT rephrase or remove them.
 3. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase or paraphrase them.
-4. Write a coherent, natural-sounding sentence that uses all the tags with their proper @A/@B attribution.
+4. Use combining language — "fusing", "blending", "merging", "@A's X with @B's Y" — to make clear this draws from multiple sources.
 
 EXAMPLE:
 Input prompt: "formal wear, platform sole"
 Tags: "formal wear" (from A), "platform sole" (from B)
-Output: "@A's formal wear aesthetic with @B's platform sole design"
+Output: "Fuse @A's formal wear aesthetic with @B's platform sole into a sleek elevated design"
 
 Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
 
@@ -2892,6 +2947,7 @@ async def suggest_ghost_nodes(request: Request):
         body = await request.json()
         brief = body.get("brief", "Explore shoe design variations")
         num_suggestions = body.get("num_suggestions", 3)
+        canvas_screenshot = body.get("canvas_screenshot")  # base64 JPEG of semantic scatter-plot
 
         # Get canvas digest for gap + cluster context
         digest_res = await get_canvas_digest()
@@ -2940,9 +2996,18 @@ async def suggest_ghost_nodes(request: Request):
                 if f.get("value"):
                     ghosts_fields_section += f"- {f['label']}: {f['value']}\n"
 
-        prompt = f"""You are an AI design partner helping a shoe designer explore their creative space.
+        # Canvas screenshot visual instruction
+        canvas_map_instruction = ""
+        if canvas_screenshot:
+            canvas_map_instruction = "\nI'm also attaching a visual scatter-plot of all current designs in semantic space. Each dot is a shoe. Use it to identify sparse/empty regions and target those for suggestions."
 
-Design brief: "{brief}"{ghosts_fields_section}
+        prompt = f"""##ABSOLUTE RULE — READ FIRST##
+{_get_shoe_type_constraint()}
+Every suggestion MUST strictly match this shoe type. This overrides all other instructions. No exceptions.
+
+You are an AI design partner helping a shoe designer explore their creative space.
+
+Design brief: "{brief}"{ghosts_fields_section}{canvas_map_instruction}
 
 Current semantic canvas axes:
 - X-axis: {x_neg} (left) → {x_pos} (right)
@@ -2951,15 +3016,14 @@ Current semantic canvas axes:
 {gap_context}
 {cluster_context}
 
-Based on the design brief and the unexplored zones above, suggest {num_suggestions} SPECIFIC shoe designs the designer should create next.
-
-CRITICAL CONSTRAINT: Stay within the EXACT same shoe category/silhouette as the design brief. {_get_shoe_type_constraint()} Do NOT suggest a completely different shoe type. Only explore variations in aesthetics, materials, textures, colors, and style details — NEVER change the core shoe silhouette/function.
+Based on the design brief and unexplored zones, suggest {num_suggestions} SPECIFIC shoe designs the designer should create next.
+Prioritize areas of the semantic canvas that have few or no existing designs — the goal is to EXPAND the design space, not cluster around existing work.
 
 Each suggestion should:
-1. Be a concrete, visually descriptive shoe prompt (not vague — mention materials, style, color, surface details)
+1. Be a concrete, visually descriptive shoe prompt (mention materials, style, color, surface details)
 2. Start with the shoe type explicitly (e.g. "A basketball shoe with...")
-3. Target an area of the design space that isn't yet explored
-4. Push the design brief forward in an interesting direction
+3. Target a sparse or empty area of the canvas (use the scatter-plot if attached, or the gap descriptions above)
+4. Contrast meaningfully with existing clusters — push into new aesthetic territory
 5. Be directly generatable by an AI image model
 
 Return EXACTLY {num_suggestions} suggestions as JSON:
@@ -2976,7 +3040,7 @@ Return EXACTLY {num_suggestions} suggestions as JSON:
   ]
 }}
 
-Be bold and specific. If no design brief is set, infer interesting directions from the axis labels."""
+Be bold and specific. Push into corners of the design space that are visually empty."""
 
         # Call Gemini
         if not gemini_api_key:
@@ -2998,7 +3062,19 @@ Be bold and specific. If no design brief is set, infer interesting directions fr
             return {"ghosts": ghosts}
 
         model = genai.GenerativeModel("gemini-2.5-flash-lite")
-        response = model.generate_content(prompt)
+
+        # Build multimodal content — attach canvas scatter-plot if provided
+        ghosts_content: list = [prompt]
+        if canvas_screenshot:
+            try:
+                _hdr, _b64 = canvas_screenshot.split(",", 1)
+                _img_bytes = base64.b64decode(_b64)
+                _canvas_img = Image.open(BytesIO(_img_bytes))
+                ghosts_content.append(_canvas_img)
+            except Exception:
+                pass  # fall back to text-only if screenshot is malformed
+
+        response = model.generate_content(ghosts_content)
         text = response.text.strip()
 
         # Parse JSON from response
@@ -3116,6 +3192,7 @@ class ConcurrentPromptRequest(BaseModel):
     user_prompt: str
     brief: Optional[str] = None
     reference_image_urls: Optional[List[str]] = []
+    canvas_screenshot: Optional[str] = None  # base64 JPEG of semantic scatter-plot
 
 @app.post("/api/agent/concurrent-prompt")
 async def concurrent_ghost_prompt(request: ConcurrentPromptRequest):
@@ -3149,34 +3226,36 @@ async def concurrent_ghost_prompt(request: ConcurrentPromptRequest):
         axis_y = state.axis_labels.get("y", ["dark", "colorful"])
         axis_info = f"X axis: {axis_x[0]} ↔ {axis_x[1]}, Y axis: {axis_y[0]} ↔ {axis_y[1]}"
 
-        # Extract explicit shoe type from structured brief fields
-        shoe_type_line = ""
-        for f in (state.brief_fields or []):
-            key = (f.get("key") or "").lower()
-            val = (f.get("value") or "").strip()
-            if val and ("shoe" in key or "type" in key or "silhouette" in key or "category" in key):
-                shoe_type_line = f"\nEXPLICIT SHOE TYPE: {val}. You MUST output a {val} — no other shoe type is acceptable."
-                break
+        # Extract explicit shoe type constraint (hard rule)
+        shoe_type_constraint = _get_shoe_type_constraint()
 
-        prompt = f"""You are a creative design exploration AI for shoe design.
+        # Canvas screenshot context
+        canvas_map_instruction = ""
+        if request.canvas_screenshot:
+            canvas_map_instruction = "\nI'm also attaching a visual map of the current semantic canvas (scatter plot of all designs in 2D space). Use it to pick a direction that contrasts with the existing cluster and fills an empty region."
+
+        prompt = f"""##ABSOLUTE RULE — READ FIRST##
+{shoe_type_constraint}
+Every suggestion MUST be this exact shoe type. This overrides all other instructions. No exceptions.
+
+You are a creative design exploration AI for shoe design.
 
 The user just generated a shoe with this prompt:
 "{request.user_prompt}"
-{brief_section}{shoe_type_line}
+{brief_section}{canvas_map_instruction}
 
 SEMANTIC AXES (canvas dimensions):
 {axis_info}
 
 TASK:
-Suggest ONE alternative shoe design that takes a meaningfully different direction within the SAME shoe category.
+Suggest ONE alternative shoe design that takes a meaningfully different direction within the SAME shoe category AND targets an area of the semantic canvas that is less populated (sparse or empty region).
 
-CRITICAL CONSTRAINT: Do NOT change the shoe type or silhouette. The output MUST be the same kind of shoe as the user's prompt and design brief describe. If the canvas is about basketball shoes, suggest another basketball shoe. If it's a boot, suggest another boot. If it's a runner, suggest another runner. Only vary aesthetics, materials, textures, colors, surface details, or mood — NEVER the core shoe silhouette/function. Violating this rule makes the suggestion useless.
-
-The alternative should:
-1. Contrast meaningfully in style, material, or mood — but stay within the same shoe category
+Guidelines:
+1. Contrast meaningfully in style, material, or mood — stay within the same shoe category
 2. Be specific and concrete (not generic)
 3. Start the prompt with the shoe type (e.g. "A basketball shoe with...")
 4. Be under 20 words
+5. If a canvas map is attached, look for empty/sparse areas and target those
 
 Return JSON ONLY (no markdown):
 {{
@@ -3191,7 +3270,7 @@ key_shifts should be 2-3 concise contrasts like "leather → mesh" or "muted →
 
         model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
-        # Include reference images for visual context (multimodal)
+        # Build multimodal content: prompt + reference shoes + canvas map
         content: list = [prompt]
         if request.reference_image_urls:
             for url in request.reference_image_urls[:3]:  # limit to 3 refs
@@ -3203,6 +3282,15 @@ key_shifts should be 2-3 concise contrasts like "leather → mesh" or "muted →
                         content.append(pil_img)
                     except Exception:
                         pass
+        # Attach canvas scatter-plot so Gemini sees spatial distribution
+        if request.canvas_screenshot:
+            try:
+                header, b64data = request.canvas_screenshot.split(",", 1)
+                img_bytes = base64.b64decode(b64data)
+                canvas_img = Image.open(BytesIO(img_bytes))
+                content.append(canvas_img)
+            except Exception:
+                pass
         response = model.generate_content(content)
         text = response.text.strip()
 

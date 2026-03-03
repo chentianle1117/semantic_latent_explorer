@@ -1,0 +1,5 @@
+{"type": "session_start", "timestamp": "2026-02-27T17:00:26.682070", "canvas_id": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "canvas_name": "0227 Evan User Test", "participant_id": "Evan", "study_session": null}
+{"type": "design_brief_change", "timestamp": "2026-02-27T17:00:29.167183", "data": {"brief": "I'm crafting the next evolution in running footwear, a shoe that feels like a seamless extension of the athlete's will. Imagine a design that anticipates every stride, offering a hyper-responsive ride that's both incredibly lightweight and powerfully propulsive, embodying the very spirit of what's next."}}
+{"type": "axis_change", "timestamp": "2026-02-27T17:00:29.169167", "data": {"axisLabels": {"x": ["rugged", "lightweight"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T17:04:53.702282", "data": {"brief": "I'm crafting the next evolution of hiking shoe for trail, a shoe. The shoe should be on a design spectrum of Rugged to Lightweight, captur"}}
+{"type": "session_end", "timestamp": "2026-02-27T17:05:06.338340", "canvas_id": "cdef4fab-cca7-42ee-857c-3ad0dea327c6"}

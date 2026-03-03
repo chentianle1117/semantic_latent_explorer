@@ -1,0 +1,10 @@
+{"type": "session_start", "timestamp": "2026-02-27T16:32:49.598816", "canvas_id": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "canvas_name": "0227 Evan User Test", "participant_id": "Evan", "study_session": null}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:32:51.112578", "data": {"brief": "I'm crafting the next evolution in running footwear, a shoe that feels like a seamless extension of the athlete's will. Imagine a design that anticipates every stride, offering a hyper-responsive ride that's both incredibly lightweight and powerfully propulsive, embodying the very spirit of what's next."}}
+{"type": "axis_change", "timestamp": "2026-02-27T16:34:53.450931", "data": {"axisLabels": {"x": ["rugged", "lightweight"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-02-27T16:35:09.471612", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:35:10.031534", "data": {"selectedIds": [2, 1], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:35:10.393000", "data": {"selectedIds": [], "count": 0}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:35:59.055359", "data": {"brief": "I'm crafting the next evolution in running footwear, a shoe that feels like a seamless extension of the athlete's will. Imagine a design that anticipates every stride, offering a hyper-responsive ride that's both incredibly lightweight and powerfully propulsive, embodying the very spirit of what's next."}}
+{"type": "generation", "timestamp": "2026-02-27T16:35:59.058038", "data": {"imageIds": [0, 1, 2, 3, 4], "count": 5, "prompt": "Reference images"}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T16:36:40.143636", "data": {"fromCanvasId": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "toCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-02-27T16:36:40.156506", "canvas_id": "cdef4fab-cca7-42ee-857c-3ad0dea327c6"}

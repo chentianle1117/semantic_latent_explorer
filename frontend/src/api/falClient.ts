@@ -105,6 +105,22 @@ const MOOD_BOARD_DIVERSITY_SUFFIXES = [
   ", focused shoe detail study vs wide overview contrast, different annotation style, fresh design hierarchy",
 ];
 
+/**
+ * Extract a hard shoe-type constraint string from the user's structured brief fields.
+ * Only constrains shoe_type and silhouette — not material/color/mood which users may want to vary.
+ * Returns empty string if no relevant fields are filled.
+ */
+export function extractBriefConstraint(briefFields: Array<{ key: string; label: string; value: string }>): string {
+  const get = (key: string) => briefFields.find(f => f.key === key)?.value?.trim() || '';
+  const shoeType = get('shoe_type');
+  const silhouette = get('silhouette');
+  if (!shoeType && !silhouette) return '';
+  const parts: string[] = [];
+  if (shoeType) parts.push(`This MUST be a ${shoeType}`);
+  if (silhouette) parts.push(`${shoeType ? 'with' : 'This MUST have'} a ${silhouette} silhouette`);
+  return parts.join(', ') + '. Do not change the shoe type or silhouette — only vary aesthetics, materials, colors, and surface details';
+}
+
 // Configure fal.ai with API key from environment
 const FAL_API_KEY = import.meta.env.VITE_FAL_API_KEY;
 
@@ -127,6 +143,7 @@ export interface FalTextToImageRequest {
   aspect_ratio?: "21:9" | "1:1" | "4:3" | "3:2" | "2:3" | "5:4" | "4:5" | "3:4" | "16:9" | "9:16";
   sync_mode?: boolean;
   genConfig?: GenerationConfig;  // realm/view configuration
+  briefConstraint?: string;      // hard shoe-type constraint from design brief
 }
 
 export interface FalImageEditRequest {
@@ -137,6 +154,7 @@ export interface FalImageEditRequest {
   aspect_ratio?: "21:9" | "1:1" | "4:3" | "3:2" | "2:3" | "5:4" | "4:5" | "3:4" | "16:9" | "9:16";
   sync_mode?: boolean;
   genConfig?: GenerationConfig;  // realm/view configuration
+  briefConstraint?: string;      // hard shoe-type constraint from design brief
 }
 
 export interface FalImageFile {
@@ -178,8 +196,10 @@ class FalClient {
         systemPrompt = SHOE_VIEW_PROMPTS[view] ?? SHOE_VIEW_PROMPTS['side'];
       }
 
-      // Combine system prompt with user prompt
-      const basePrompt = `${systemPrompt}, ${request.prompt}`;
+      // Brief constraint is the TOP-MOST priority — placed first so image models parse it before anything else
+      const basePrompt = (request.briefConstraint && cfg?.realm !== 'mood-board')
+        ? `STRICT REQUIREMENT — ${request.briefConstraint}. ${systemPrompt}, ${request.prompt}`
+        : `${systemPrompt}, ${request.prompt}`;
       console.log("Base prompt:", basePrompt);
       console.log(`Generating ${numImages} images individually for maximum diversity`);
 
@@ -272,7 +292,15 @@ class FalClient {
         // Standard shoe iteration from reference
         const view = cfg?.shoeView || 'side';
         const systemPrompt = SHOE_VIEW_PROMPTS[view] ?? SHOE_VIEW_PROMPTS['side'];
-        basePrompt = `${systemPrompt}, ${request.prompt}`;
+        // Constraint FIRST — ensures image model reads it before any styling instructions
+        basePrompt = [
+          request.briefConstraint ? `STRICT REQUIREMENT — ${request.briefConstraint}` : null,
+          systemPrompt,
+          `Use the reference image(s) as DESIGN INSPIRATION — extract their color palette, textures, patterns, mood, and design language.`,
+          `Do NOT literally copy or paste elements from the references onto the shoe.`,
+          `Instead, create a new shoe design that is INSPIRED BY the aesthetic qualities of the references.`,
+          request.prompt,
+        ].filter(Boolean).join('. ');
       }
 
       const numImages = Math.min(request.num_images || 1, 8);

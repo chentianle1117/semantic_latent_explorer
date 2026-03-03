@@ -191,8 +191,14 @@ class APIClient {
     await axios.post(`${API_BASE}/agent/update-brief-fields`, { fields });
   }
 
+  // Synthesize natural language brief from structured fields (fields → text direction)
+  async synthesizeBrief(fields: Array<{ key: string; label: string; value: string }>): Promise<{ brief: string }> {
+    const response = await axios.post(`${API_BASE}/agent/synthesize-brief`, { fields });
+    return response.data;
+  }
+
   // Get ghost node suggestions for unexplored gaps
-  async suggestGhosts(brief: string, numSuggestions: number = 3): Promise<{
+  async suggestGhosts(brief: string, numSuggestions: number = 3, canvasScreenshot?: string): Promise<{
     ghosts: Array<{
       id: number;
       coordinates: [number, number];
@@ -203,7 +209,8 @@ class APIClient {
   }> {
     const response = await axios.post(`${API_BASE}/agent/suggest-ghosts`, {
       brief,
-      num_suggestions: numSuggestions
+      num_suggestions: numSuggestions,
+      canvas_screenshot: canvasScreenshot,
     });
     return response.data;
   }
@@ -244,7 +251,8 @@ class APIClient {
     tags: { text: string; source: string; color: string }[],
     referenceImageIds: number[],
     brief: string,
-    realm: string = 'shoe'
+    realm: string = 'shoe',
+    generationMode: 'scratch' | 'single-ref' | 'multi-ref' = 'single-ref'
   ): Promise<{ prompt: string }> {
     const response = await axios.post(`${API_BASE}/agent/refine-prompt`, {
       prompt,
@@ -252,6 +260,7 @@ class APIClient {
       reference_image_ids: referenceImageIds,
       brief,
       realm,
+      generation_mode: generationMode,
     });
     return response.data;
   }
@@ -266,7 +275,7 @@ class APIClient {
   }
 
   // Generate an alternative prompt for concurrent ghost (Behavior B)
-  async getConcurrentPrompt(userPrompt: string, brief: string | null, referenceImageUrls: string[]): Promise<{
+  async getConcurrentPrompt(userPrompt: string, brief: string | null, referenceImageUrls: string[], canvasScreenshot?: string): Promise<{
     prompt: string;
     reasoning: string;
     your_design_was?: string;
@@ -277,6 +286,7 @@ class APIClient {
       user_prompt: userPrompt,
       brief: brief ?? '',
       reference_image_urls: referenceImageUrls,
+      canvas_screenshot: canvasScreenshot,
     });
     return response.data;
   }

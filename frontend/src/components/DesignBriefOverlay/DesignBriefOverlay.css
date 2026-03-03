@@ -50,6 +50,14 @@
   border-left-color: rgba(0, 210, 255, 0.9);
 }
 
+/* Flash highlight when text was just synthesized from structured fields */
+.dbo-brief-synced {
+  border-left-color: rgba(100, 220, 140, 0.9) !important;
+  background: rgba(63, 185, 80, 0.07);
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
 .dbo-inline-textarea {
   width: 100%;
   background: transparent;
@@ -268,6 +276,11 @@
   background: rgba(64, 210, 90, 0.12);
   border-color: rgba(64, 210, 90, 0.4);
   color: rgba(64, 210, 90, 0.9);
+}
+
+.dbo-params-save:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .dbo-fields-toggle {

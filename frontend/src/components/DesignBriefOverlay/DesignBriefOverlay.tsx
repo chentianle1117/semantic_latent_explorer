@@ -42,6 +42,8 @@ export const DesignBriefOverlay: React.FC = () => {
   const [fieldsExpanded, setFieldsExpanded] = useState(true);
   const [paramsSaved, setParamsSaved] = useState(false); // flash on save
   const [briefSaved, setBriefSaved] = useState(false);   // flash on brief save
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [textJustSynced, setTextJustSynced] = useState(false); // brief text was just updated from fields
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fieldSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -136,10 +138,32 @@ export const DesignBriefOverlay: React.FC = () => {
     }, 800);
   };
 
-  // Explicit "Save" button for parameters — fires immediately, NO re-interpretation
-  const handleSaveParams = () => {
+  // Explicit "Save" button for parameters — saves fields AND synthesizes brief text from them
+  const handleSaveParams = async () => {
     const current = useAppStore.getState().briefFields;
+    // Save fields to backend
     apiClient.updateBriefFields(current).catch(() => {});
+    // Synthesize natural language brief from the current fields (fields → text direction)
+    const filled = current.filter((f) => f.value.trim());
+    if (filled.length > 0) {
+      setIsSynthesizing(true);
+      try {
+        const result = await apiClient.synthesizeBrief(current);
+        if (result.brief) {
+          // Update the textarea AND store without triggering re-interpretation
+          lastInterpretedRef.current = result.brief;
+          setLocalBrief(result.brief);
+          setDesignBrief(result.brief);
+          apiClient.updateDesignBrief(result.brief).catch(() => {});
+          setTextJustSynced(true);
+          setTimeout(() => setTextJustSynced(false), 2000);
+        }
+      } catch (e) {
+        console.debug("[Brief] Synthesis failed:", e);
+      } finally {
+        setIsSynthesizing(false);
+      }
+    }
     setParamsSaved(true);
     setTimeout(() => setParamsSaved(false), 1500);
   };
@@ -163,7 +187,7 @@ export const DesignBriefOverlay: React.FC = () => {
     <div className={`design-brief-overlay ${isAgentUsingBrief ? "dbo-agent-active" : ""}`} data-tour="brief">
 
       {/* ── Inline editable brief ── */}
-      <div className={`dbo-brief-container${isFocused ? " dbo-brief-focused" : ""}`}>
+      <div className={`dbo-brief-container${isFocused ? " dbo-brief-focused" : ""}${textJustSynced ? " dbo-brief-synced" : ""}`}>
         <div className="dbo-label-row">
           <span className="dbo-label">AI Agent Context</span>
           {isAgentUsingBrief && (
@@ -218,9 +242,10 @@ export const DesignBriefOverlay: React.FC = () => {
                 <button
                   className={`dbo-params-save ${paramsSaved ? "saved" : ""}`}
                   onClick={handleSaveParams}
-                  title="Save parameter updates"
+                  disabled={isSynthesizing}
+                  title="Save parameters and sync text"
                 >
-                  {paramsSaved ? "✓ Saved" : "Save"}
+                  {isSynthesizing ? "Syncing…" : paramsSaved ? "✓ Saved" : "Save & Sync"}
                 </button>
               )}
               <button

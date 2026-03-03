@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
 import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
@@ -28,16 +28,35 @@ import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useEventLog } from "./hooks/useEventLog";
 import { apiClient } from "./api/client";
-import { falClient } from "./api/falClient";
+import { falClient, extractBriefConstraint, SATELLITE_VIEWS } from "./api/falClient";
 import { generateAllViews } from "./utils/generateAllViews";
-import { SATELLITE_VIEWS } from "./api/falClient";
 import "./styles/app.css";
+
+// Build brief constraint with optional per-generation shoe type override (highest priority).
+// Falls back to briefFields.shoe_type from global AI context when no override provided.
+function buildBriefConstraint(shoeTypeOverride?: string): string {
+  const fields = useAppStore.getState().briefFields;
+  const silhouette = fields.find(f => f.key === 'silhouette')?.value?.trim() || '';
+  const shoeType = shoeTypeOverride?.trim() || fields.find(f => f.key === 'shoe_type')?.value?.trim() || '';
+  if (!shoeType && !silhouette) return '';
+  const parts: string[] = [];
+  if (shoeType) parts.push(`This MUST be a ${shoeType}`);
+  if (silhouette) parts.push(`${shoeType ? 'with' : 'This MUST have'} a ${silhouette} silhouette`);
+  return parts.join(', ') + '. Do not change the shoe type or silhouette — only vary aesthetics, materials, colors, and surface details';
+}
 
 export const App: React.FC = () => {
   // floatingPanelPos removed — actions now in RightInspector
   const [showTextToImageDialog, setShowTextToImageDialog] = useState(false);
   const [showMoodBoardDialog, setShowMoodBoardDialog] = useState(false);
   const [showPromptDialog, setShowPromptDialog] = useState(false);
+
+  // Ref always reflects current dialog open state — avoids stale closure bugs in async callbacks
+  const anyDialogOpenRef = useRef(false);
+  useEffect(() => {
+    anyDialogOpenRef.current = showPromptDialog || showTextToImageDialog || showMoodBoardDialog;
+  }, [showPromptDialog, showTextToImageDialog, showMoodBoardDialog]);
+
   const [promptDialogImageId, setPromptDialogImageId] = useState<number | null>(
     null
   );
@@ -81,6 +100,7 @@ export const App: React.FC = () => {
     state.images.filter((img) => img.visible)
   );
   const selectedImageIds = useAppStore((state) => state.selectedImageIds);
+  const hiddenImageIds = useAppStore((state) => state.hiddenImageIds);
   const isInitialized = useAppStore((state) => state.isInitialized);
 
   // Determine the dominant realm of currently selected images (for dial button labels)
@@ -229,26 +249,33 @@ export const App: React.FC = () => {
     );
   };
 
-  const handleMultiViewSave = async (updatedViews: Record<ShoeViewType, ImageData | null>) => {
+  const handleMultiViewSave = async (
+    updatedViews: Record<ShoeViewType, ImageData | null>,
+    editedViews: Set<ShoeViewType>,
+  ) => {
     if (!multiViewTarget) return;
     const sideId = multiViewTarget.sideImage.id;
     const prompt = multiViewTarget.sideImage.prompt ?? '';
 
-    // Collect changed views (skip unchanged base64)
-    const changedEntries: [ShoeViewType, ImageData][] = [];
+    // Only process views that were actually edited by the user (not normalization-only changes)
+    const satelliteEntries: [ShoeViewType, ImageData][] = [];
     for (const [view, imgData] of Object.entries(updatedViews) as [ShoeViewType, ImageData | null][]) {
       if (!imgData) continue;
-      if (view === 'side') {
-        if (imgData.base64_image === multiViewTarget.sideImage.base64_image) continue;
-      } else {
-        const origSat = multiViewTarget.satellites.find(s => s.shoe_view === view);
-        if (origSat && imgData.base64_image === origSat.base64_image) continue;
-      }
-      changedEntries.push([view, imgData]);
+      if (!editedViews.has(view as ShoeViewType)) continue; // skip non-edited views
+      if (view === 'side') continue; // side view handled separately below
+      satelliteEntries.push([view as ShoeViewType, imgData]);
     }
 
-    // Nothing changed — just close
-    if (changedEntries.length === 0) {
+    // Update side view in-place if it was edited (keeps same ID, position, and parent links)
+    const sideEdited = editedViews.has('side') && updatedViews['side'];
+    if (sideEdited) {
+      useAppStore.getState().updateImage(sideId, {
+        base64_image: updatedViews['side']!.base64_image,
+      });
+    }
+
+    // Nothing else to save — just close
+    if (satelliteEntries.length === 0) {
       setMultiViewTarget(null);
       return;
     }
@@ -258,8 +285,7 @@ export const App: React.FC = () => {
 
     try {
       // Remove old satellites that are being replaced (hide them)
-      for (const [view] of changedEntries) {
-        if (view === 'side') continue; // don't remove the side view
+      for (const [view] of satelliteEntries) {
         const origSat = multiViewTarget.satellites.find(s => s.shoe_view === view);
         if (origSat) {
           useAppStore.getState().removeImage(origSat.id);
@@ -267,32 +293,30 @@ export const App: React.FC = () => {
       }
 
       let done = 0;
-      for (const [view, imgData] of changedEntries) {
+      for (const [view, imgData] of satelliteEntries) {
         // Upload to fal.ai storage, then save via backend
         const blob = await (await fetch(`data:image/png;base64,${imgData.base64_image}`)).blob();
-        const file = new File([blob], `${view}-${sideId}.jpg`, { type: 'image/jpeg' });
+        const file = new File([blob], `${view}-${sideId}.png`, { type: 'image/png' });
         const url = await falClient.uploadFile(file);
 
         const result = await apiClient.addExternalImages({
           images: [{ url }],
           prompt,
           generation_method: 'reference',
-          remove_background: true,
+          remove_background: false, // Already processed by MVE pipeline (rembg already applied)
           realm: 'shoe',
-          shoe_view: view === 'side' ? undefined : view,
-          parent_side_id: view === 'side' ? undefined : sideId,
-          parent_ids: view === 'side' ? [] : [sideId],
+          shoe_view: view,
+          parent_side_id: sideId,
+          parent_ids: [sideId],
         });
         mergeImages(result.images);
 
         done++;
-        setGenerationProgress(10 + Math.round((done / changedEntries.length) * 80));
+        setGenerationProgress(10 + Math.round((done / satelliteEntries.length) * 80));
       }
 
       // Enable visibility for any new satellite views
-      const viewsToEnable = changedEntries
-        .filter(([v]) => v !== 'side')
-        .map(([v]) => v);
+      const viewsToEnable = satelliteEntries.map(([v]) => v);
       if (viewsToEnable.length > 0) {
         useAppStore.getState().enableSatelliteViews(viewsToEnable);
       }
@@ -350,6 +374,7 @@ export const App: React.FC = () => {
           num_images: countPerPrompt,
           aspect_ratio: "1:1",
           output_format: "jpeg",
+          briefConstraint: extractBriefConstraint(useAppStore.getState().briefFields),
         });
 
         console.log(
@@ -503,18 +528,17 @@ export const App: React.FC = () => {
     }
   };
 
-  // Get all selected images for the prompt dialog
-  // 3/4 satellite views resolve to their parent side view (side view is source of truth)
-  const promptDialogImages = useMemo(() => {
-    const sourceIds = selectedImageIds.length > 0
-      ? selectedImageIds
-      : promptDialogImageId !== null
-      ? [promptDialogImageId]
-      : [];
+  // Snapshot of reference images for the prompt dialog — set once when dialog opens,
+  // NOT live-updated from selectedImageIds (prevents background generation from hijacking refs)
+  const [promptDialogImages, setPromptDialogImages] = useState<ImageData[]>([]);
+
+  // Helper: resolve selected IDs to side-view images (3/4 satellites → parent)
+  const resolveRefImages = useCallback((sourceIds: number[]) => {
     if (sourceIds.length === 0) return [];
     const resolvedIds = new Set<number>();
+    const allImgs = useAppStore.getState().images;
     for (const id of sourceIds) {
-      const img = images.find(i => i.id === id);
+      const img = allImgs.find(i => i.id === id);
       if (!img) continue;
       if (img.shoe_view && img.shoe_view !== 'side' && img.parent_side_id != null && img.parent_side_id > 0) {
         resolvedIds.add(img.parent_side_id);
@@ -522,8 +546,8 @@ export const App: React.FC = () => {
         resolvedIds.add(id);
       }
     }
-    return images.filter(img => resolvedIds.has(img.id));
-  }, [selectedImageIds, promptDialogImageId, images]);
+    return allImgs.filter(img => resolvedIds.has(img.id));
+  }, []);
 
   const handleGenerateFromReferenceClick = () => {
     // Use selected images, or if none selected, single image ID will be set
@@ -532,6 +556,11 @@ export const App: React.FC = () => {
       console.warn("No images selected for reference generation");
       return;
     }
+    // Snapshot reference images NOW — immune to later selection changes
+    const sourceIds = selectedImageIds.length > 0
+      ? selectedImageIds
+      : promptDialogImageId !== null ? [promptDialogImageId] : [];
+    setPromptDialogImages(resolveRefImages(sourceIds));
     setShowPromptDialog(true);
   };
 
@@ -539,6 +568,7 @@ export const App: React.FC = () => {
     referenceIds: number[],
     prompt: string,
     numImages: number = 1,
+    shoeType?: string,
   ) => {
     console.log(
       `Generating from ${referenceIds.length} reference(s) with prompt: "${prompt}", count: ${numImages}`
@@ -616,6 +646,7 @@ export const App: React.FC = () => {
         num_images: numImages,
         aspect_ratio: "1:1",
         output_format: "jpeg",
+        briefConstraint: buildBriefConstraint(shoeType),
       });
       ps.addLogLine(`✓ fal.ai returned ${result.images.length} image${result.images.length > 1 ? 's' : ''}`);
       ps.updateProgress(50);
@@ -662,7 +693,11 @@ export const App: React.FC = () => {
         : [];
 
       if (sideIds.length > 0) {
-        useAppStore.getState().setSelectedImageIds(sideIds);
+        // Only auto-select if no generation dialog is currently open
+        const anyDialogOpen = anyDialogOpenRef.current;
+        if (!anyDialogOpen) {
+          useAppStore.getState().setSelectedImageIds(sideIds);
+        }
         useAppStore.getState().setImagesLayer(sideIds, 'default');
         const curIsolated = useAppStore.getState().isolatedImageIds;
         if (curIsolated !== null) {
@@ -787,6 +822,8 @@ export const App: React.FC = () => {
       useProgressStore.getState().updateProgress(50, "Reprojecting images...");
       const state = await apiClient.getState();
 
+      // Snapshot current axes before replacing
+      useAppStore.getState().pushAxisHistory();
       // Update both axis labels AND images with new coordinates
       useAppStore.getState().setAxisLabels(state.axis_labels);
       setImages(state.images);
@@ -813,6 +850,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // If Multi-View Editor is open, close it instead of other actions
+        if (multiViewTarget) {
+          setMultiViewTarget(null);
+          return;
+        }
         setPromptDialogImageId(null);
         setShowPromptDialog(false);
         // floatingPanelPos removed
@@ -823,7 +865,7 @@ export const App: React.FC = () => {
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [clearSelection]);
+  }, [clearSelection, multiViewTarget]);
   // Radial dial: Space key = toggle (stays open until Space again or Escape or click outside)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -962,7 +1004,7 @@ export const App: React.FC = () => {
             {showTextToImageDialog && (
               <TextToImageDialog
                 onClose={() => setShowTextToImageDialog(false)}
-                onGenerate={async (prompt, count) => {
+                onGenerate={async (prompt, count, shoeType) => {
                   setShowTextToImageDialog(false);
                   setIsGenerating(true);
                   const ps = useProgressStore.getState();
@@ -993,6 +1035,7 @@ export const App: React.FC = () => {
                       num_images: count,
                       output_format: "jpeg",
                       genConfig: { realm: 'shoe', shoeView: 'side' },
+                      briefConstraint: buildBriefConstraint(shoeType),
                     });
                     ps.addLogLine(`✓ fal.ai returned ${result.images.length} image${result.images.length > 1 ? 's' : ''}`);
                     ps.updateProgress(25);
@@ -1021,7 +1064,10 @@ export const App: React.FC = () => {
                       : [];
 
                     if (sideIds.length > 0) {
-                      useAppStore.getState().setSelectedImageIds(sideIds);
+                      const anyDialogOpen = anyDialogOpenRef.current;
+                      if (!anyDialogOpen) {
+                        useAppStore.getState().setSelectedImageIds(sideIds);
+                      }
                       useAppStore.getState().setImagesLayer(sideIds, 'default');
                       const curIsolated = useAppStore.getState().isolatedImageIds;
                       if (curIsolated !== null) {
@@ -1214,7 +1260,10 @@ export const App: React.FC = () => {
 
                     if (addResult?.images?.length > 0) {
                       const newIds = addResult.images.map((img: any) => img.id);
-                      useAppStore.getState().setSelectedImageIds(newIds);
+                      const anyDialogOpen = anyDialogOpenRef.current;
+                      if (!anyDialogOpen) {
+                        useAppStore.getState().setSelectedImageIds(newIds);
+                      }
                       // Assign to mood-boards layer
                       useAppStore.getState().setImagesLayer(newIds, 'mood-boards');
                       const curIsolated = useAppStore.getState().isolatedImageIds;
@@ -1327,7 +1376,7 @@ export const App: React.FC = () => {
               : selectedRealmContext === 'mixed'
               ? "Render from Board"
               : selectedImageIds.length > 0
-              ? "Iterate Shoe"
+              ? "Iterate from Reference"
               : "New Shoe",
             description:
               selectedRealmContext === 'mood-board' || selectedRealmContext === 'mixed'
@@ -1410,6 +1459,27 @@ export const App: React.FC = () => {
                 store.setIsolatedImageIds(null);
               } else if (selectedImageIds.length > 0) {
                 store.setIsolatedImageIds([...selectedImageIds]);
+              }
+            },
+          },
+          {
+            id: "hide",
+            icon: "👁️",
+            label: hiddenImageIds.length > 0 && selectedImageIds.length === 0
+              ? `Unhide All (${hiddenImageIds.length})`
+              : "Hide",
+            description:
+              selectedImageIds.length > 0
+                ? `Temporarily hide ${selectedImageIds.length} selected image(s)`
+                : hiddenImageIds.length > 0
+                ? `Unhide all ${hiddenImageIds.length} hidden image(s)`
+                : "No images selected to hide",
+            category: "view",
+            onClick: () => {
+              if (selectedImageIds.length > 0) {
+                useAppStore.getState().hideImages([...selectedImageIds]);
+              } else if (hiddenImageIds.length > 0) {
+                useAppStore.getState().unhideAll();
               }
             },
           },

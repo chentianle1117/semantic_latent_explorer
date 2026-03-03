@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { useAppStore } from "../../store/appStore";
 import type { ImageData } from "../../types";
+import { apiClient } from "../../api/client";
 import "./GenealogyLens.css";
 
 interface GenealogyLensProps {
@@ -179,6 +180,10 @@ export const GenealogyLens: React.FC<GenealogyLensProps> = ({ selectedImageIds }
   }
 
   const handleNodeClick = (nodeId: number) => {
+    const fromIds = selectedImageIds;
+    const clickedNode = nodes.get(nodeId);
+    const level = clickedNode ? (clickedNode.level < 0 ? 'parent' : clickedNode.level > 0 ? 'child' : 'selected') : 'unknown';
+    apiClient.logEvent('genealogy_navigate', { clickedNodeId: nodeId, fromNodeIds: fromIds, nodeLevel: level });
     setSelectedImageIds([nodeId]);
     setFlyToImageId(nodeId);
   };

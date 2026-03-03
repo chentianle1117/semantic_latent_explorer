@@ -4,7 +4,8 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry, BriefField, BriefSuggestedParam, MinimapDot, ViewportRect } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry, BriefField, BriefSuggestedParam, MinimapDot, ViewportRect, MultiViewHistoryEntry } from '../types';
+import { apiClient } from '../api/client';
 
 interface AppStore extends AppState {
   // Actions
@@ -32,6 +33,8 @@ interface AppStore extends AppState {
   clearImageOverrides: () => void;
 
   setAxisLabels: (labels: { x: [string, string]; y: [string, string]; z?: [string, string] }) => void;
+  pushAxisHistory: () => void; // Snapshot current axisLabels into history before changing
+  restoreAxisFromHistory: (index: number) => void; // Restore a specific history entry
 
   setCanvasBounds: (bounds: CanvasBounds | null) => void;
   resetCanvasBounds: () => void; // Trigger rescale on next render
@@ -124,6 +127,11 @@ interface AppStore extends AppState {
   // Isolate mode
   setIsolatedImageIds: (ids: number[] | null) => void;
 
+  // Hide images (blacklist, separate from delete)
+  hideImages: (ids: number[]) => void;
+  unhideImages: (ids: number[]) => void;
+  unhideAll: () => void;
+
   // Shoe view filter toggles
   toggleSatelliteView: (viewType: string) => void;
   enableSatelliteViews: (views: string[]) => void;
@@ -161,6 +169,10 @@ interface AppStore extends AppState {
   loadOnboardingState: (canvasId: string) => void;
   showSectionTransition: (key: string | null) => void;
 
+  // Multi-View Editor history
+  pushMultiViewHistory: (sideId: number, entry: MultiViewHistoryEntry) => void;
+  clearMultiViewHistory: (sideId: number) => void;
+
   // Bottom drawer tab — in store so handleClearCanvas can collapse it
   drawerActiveTab: 'history' | 'lineage' | null;
   setDrawerActiveTab: (tab: 'history' | 'lineage' | null) => void;
@@ -177,6 +189,7 @@ const initialState: AppState = {
     y: ['dark', 'colorful'],
     z: ['casual', 'elegant'],  // New: default z-axis labels
   },
+  axisHistory: [],
   selectedImageIds: [],
   hoveredImageId: null,
   hoveredGroupId: null,
@@ -257,6 +270,7 @@ const initialState: AppState = {
   ] as CanvasLayer[],
   imageLayerMap: {} as Record<number, string>,
   isolatedImageIds: null,
+  hiddenImageIds: [] as number[],
 
   // Star ratings
   imageRatings: {} as Record<number, number>,
@@ -284,6 +298,9 @@ const initialState: AppState = {
 
   // Shoe view filter toggles
   visibleSatelliteViews: {} as Record<string, boolean>,  // all off by default
+
+  // Multi-View Editor history (keyed by side image ID)
+  multiViewHistory: {} as Record<number, MultiViewHistoryEntry[]>,
 
   // Onboarding tutorial
   onboardingActive: false,
@@ -407,6 +424,16 @@ export const useAppStore = create<AppStore>((set) => ({
 
   // Axis labels
   setAxisLabels: (labels) => set({ axisLabels: labels }),
+  pushAxisHistory: () => set((state) => {
+    const snapshot = { labels: { ...state.axisLabels }, timestamp: Date.now() };
+    const history = [snapshot, ...state.axisHistory].slice(0, 10);
+    return { axisHistory: history };
+  }),
+  restoreAxisFromHistory: (index) => set((state) => {
+    const entry = state.axisHistory[index];
+    if (!entry) return {};
+    return { axisLabels: entry.labels };
+  }),
 
   // Canvas bounds
   setCanvasBounds: (bounds) => set({ canvasBounds: bounds }),
@@ -608,17 +635,40 @@ export const useAppStore = create<AppStore>((set) => ({
   // Isolate mode
   setIsolatedImageIds: (ids) => set({ isolatedImageIds: ids }),
 
+  // Hide images (blacklist, separate from delete)
+  hideImages: (ids) => set((state) => ({
+    hiddenImageIds: [...new Set([...state.hiddenImageIds, ...ids])],
+    selectedImageIds: state.selectedImageIds.filter(id => !ids.includes(id)),
+  })),
+  unhideImages: (ids) => set((state) => ({
+    hiddenImageIds: state.hiddenImageIds.filter(id => !ids.includes(id)),
+  })),
+  unhideAll: () => set({ hiddenImageIds: [] }),
+
   // Satellite view filter toggles
   toggleSatelliteView: (viewType) => set((s) => {
     const current = s.visibleSatelliteViews[viewType];
     // 'side' defaults to visible (undefined → treat as true); satellites default to hidden (undefined → false)
     const wasVisible = viewType === 'side' ? current !== false : !!current;
+    apiClient.logEvent('satellite_view_toggle', { viewType, visible: !wasVisible });
     return { visibleSatelliteViews: { ...s.visibleSatelliteViews, [viewType]: !wasVisible } };
   }),
   enableSatelliteViews: (views) => set((s) => {
     const updated = { ...s.visibleSatelliteViews };
     for (const v of views) updated[v] = true;
     return { visibleSatelliteViews: updated };
+  }),
+
+  // Multi-View Editor history
+  pushMultiViewHistory: (sideId, entry) => set((s) => {
+    const prev = s.multiViewHistory[sideId] || [];
+    // Cap at 10 snapshots per shoe to limit memory
+    const updated = [...prev, entry].slice(-10);
+    return { multiViewHistory: { ...s.multiViewHistory, [sideId]: updated } };
+  }),
+  clearMultiViewHistory: (sideId) => set((s) => {
+    const { [sideId]: _, ...rest } = s.multiViewHistory;
+    return { multiViewHistory: rest };
   }),
 
   // Star ratings

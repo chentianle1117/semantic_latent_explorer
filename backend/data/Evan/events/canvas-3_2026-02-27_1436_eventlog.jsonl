@@ -1,0 +1,81 @@
+{"type": "session_start", "timestamp": "2026-02-27T14:36:22.863237", "canvas_id": "99b2c9e4-b1d5-4ec0-a435-203d4133d3e9", "canvas_name": "Canvas 3", "participant_id": "Evan", "study_session": null}
+{"type": "axis_change", "timestamp": "2026-02-27T14:36:22.975649", "data": {"axisLabels": {"x": ["low", "high"], "y": ["dark", "colorful"], "z": ["casual", "elegant"]}}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T14:36:33.362157", "data": {"tag": "chiseled edges", "category": "form language", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T14:36:33.959539", "data": {"tag": "integrated tongue", "category": "components", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T14:36:41.959872", "data": {"tag": "Textured suede", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T14:36:42.275059", "data": {"tag": "Muted natural hues", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T14:36:42.544862", "data": {"tag": "Molded form", "category": "silhouette", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-27T14:36:45.447221", "data": {"prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form.", "imageCount": 2, "selectedTagCount": 0}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:01.263704", "data": {"imageIds": [0, 1], "count": 2, "prompt": "Sculptural football shoe: @form language's chiseled edges meet @components' integrated tongue. Aged leather, carved sole, low-fi concept art."}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:09.890973", "data": {"selectedIds": [0], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:09.892969", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:09.895347", "data": {"selectedIds": [0], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:10.880767", "data": {"imageIds": [2, 3], "count": 2, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:12.385483", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:29.803195", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:32.563397", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:32.578570", "data": {"imageIds": [4], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:35.757666", "data": {"imageIds": [5], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:43.078667", "data": {"imageIds": [6], "count": 1, "prompt": "A football shoe with vibrant, contrasting leather panels and a sleek, aerodynamic silhouette."}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:43.095794", "data": {"imageIds": [7], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:45.986980", "data": {"imageIds": [8], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:48.894605", "data": {"imageIds": [9], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:52.992348", "data": {"imageIds": [10], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:56.386055", "data": {"selectedIds": [6], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T14:37:56.403137", "data": {"imageIds": [11], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:56.476254", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:57.146449", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:37:58.064960", "data": {"selectedIds": [1, 6], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:38:08.441590", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:38:15.631688", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T14:38:15.646487", "data": {"imageIds": [12], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:38:16.423235", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:38:18.666328", "data": {"selectedIds": [2], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T14:38:28.667661", "data": {"imageIds": [13], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:38:38.746191", "data": {"imageIds": [14], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:38:42.623000", "data": {"imageIds": [15], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:38:45.228539", "data": {"imageIds": [16], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:38:48.683899", "data": {"imageIds": [17], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:38:53.649402", "data": {"imageIds": [18], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:27.011458", "data": {"imageIds": [19], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:29.869729", "data": {"imageIds": [20], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:32.307069", "data": {"imageIds": [21], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:34.655054", "data": {"imageIds": [22], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:37.483533", "data": {"imageIds": [23], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:40.504931", "data": {"imageIds": [24], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:40:40.506985", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:40:40.508983", "data": {"selectedIds": [2], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:43.901588", "data": {"imageIds": [25], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:46.228708", "data": {"imageIds": [26], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:48.692513", "data": {"imageIds": [27], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:40:48.695055", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:40:52.023470", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:40:52.026470", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:40:52.028478", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:52.033713", "data": {"imageIds": [28], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:54.453109", "data": {"imageIds": [29], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:56.659282", "data": {"imageIds": [30], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:40:58.973081", "data": {"imageIds": [31], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:41:01.750248", "data": {"imageIds": [32], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "generation", "timestamp": "2026-02-27T14:41:03.853363", "data": {"imageIds": [33], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:41:03.855573", "data": {"selectedIds": [0, 1], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T14:41:18.290590", "data": {"imageIds": [34], "count": 1, "prompt": "Modify the reference shoe with textured suede, muted natural hues, and a sculpted, molded form."}}
+{"type": "selection", "timestamp": "2026-02-27T14:41:18.292893", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:41:18.295298", "data": {"selectedIds": [0], "count": 1}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T14:41:30.166808", "data": {"tag": "sculpted curves", "category": "form language", "action": "select"}}
+{"type": "selection", "timestamp": "2026-02-27T14:42:02.024647", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T14:42:07.547622", "data": {"imageIds": [35, 36], "count": 2, "prompt": "A football shoe concept: @sculpted curves flowing through traditional materials. Organic, gestural form meeting grounded sole. Earthy tones, tactile textures."}}
+{"type": "selection", "timestamp": "2026-02-27T14:42:09.618618", "data": {"selectedIds": [35], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:42:13.799592", "data": {"selectedIds": [35, 36], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:42:14.433361", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:42:15.509534", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:42:22.741309", "data": {"selectedIds": [36, 35], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T14:42:36.956765", "data": {"imageIds": [37], "count": 1, "prompt": "A football shoe with bold geometric lines, synthetic leathers, and vibrant color blocking."}}
+{"type": "selection", "timestamp": "2026-02-27T14:43:24.292100", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:43:25.026444", "data": {"selectedIds": [37], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:48:31.193560", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:48:31.991190", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:48:32.724621", "data": {"selectedIds": [37], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:48:34.873772", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T14:48:39.653622", "data": {"fromCanvasId": "99b2c9e4-b1d5-4ec0-a435-203d4133d3e9", "toCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-02-27T14:48:39.656622", "canvas_id": "99b2c9e4-b1d5-4ec0-a435-203d4133d3e9"}

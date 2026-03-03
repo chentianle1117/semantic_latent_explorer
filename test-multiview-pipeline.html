@@ -77,13 +77,49 @@
   .norm-view img { display: block; background: white; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; }
   .norm-view .nv-label { font-size: 10px; color: rgba(0,210,255,0.7); text-transform: uppercase; letter-spacing: 0.05em; }
   .norm-view .nv-dims { font-size: 9px; color: rgba(150,165,180,0.4); font-family: 'Consolas', monospace; }
-  .rembg-grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; background: #111820; padding: 16px; border-radius: 8px; }
-  .rembg-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .rembg-cell .checker { background-image: linear-gradient(45deg, #888 25%, transparent 25%), linear-gradient(-45deg, #888 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #888 75%), linear-gradient(-45deg, transparent 75%, #888 75%); background-size: 12px 12px; background-position: 0 0, 0 6px, 6px -6px, -6px 0px; border-radius: 4px; }
-  .rembg-cell img { display: block; border-radius: 4px; }
-  .rembg-cell .rc-label { font-size: 10px; color: rgba(63,185,80,0.8); text-transform: uppercase; letter-spacing: 0.05em; }
   .tag-warn { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 3px; background: rgba(255,160,64,0.2); color: #ffa040; border: 1px solid rgba(255,160,64,0.3); margin-left: 8px; }
   .tag-ok { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 3px; background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); margin-left: 8px; }
+  /* 3x3 multi-view grid matching main app layout */
+  .mve-grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1.8fr 0.8fr;
+    grid-template-rows: 1fr 1.15fr 1fr;
+    grid-template-areas:
+      "medial  top      front"
+      "qfront  side     back"
+      "qback   outsole  info";
+    gap: 6px;
+    background: rgba(13,17,23,0.8);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px;
+    max-width: 900px;
+  }
+  .mve-cell {
+    position: relative;
+    border: 2px solid rgba(255,255,255,0.06);
+    border-radius: 8px;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .mve-cell img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
+  .mve-cell .mve-label {
+    position: absolute; bottom: 4px; left: 6px;
+    font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: rgba(0,210,255,0.8); background: rgba(0,0,0,0.65); padding: 1px 6px; border-radius: 3px;
+  }
+  .mve-cell .mve-dims {
+    position: absolute; bottom: 4px; right: 6px;
+    font-size: 8px; color: rgba(150,165,180,0.5); background: rgba(0,0,0,0.6); padding: 1px 5px; border-radius: 3px;
+    font-family: 'Consolas', monospace;
+  }
+  .mve-cell--empty { border-style: dashed; border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
+  .mve-cell--info { background: transparent; border-color: transparent; display: flex; flex-direction: column; justify-content: center; padding: 8px; }
+  .mve-cell--info .info-line { font-size: 10px; color: rgba(150,165,180,0.6); margin: 2px 0; }
 </style>
 </head>
 <body>
@@ -126,6 +162,26 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Step 0.5: Generate Medial View (standalone test) -->
+<div class="step" id="step-medial">
+  <div class="step-header"><div class="step-status"></div><h2>Step 0.5: Generate Medial View (standalone)</h2></div>
+  <p style="font-size:11px;color:rgba(150,165,180,0.5);margin-bottom:10px">
+    Generates the medial (inner arch) side independently using only the side view as reference. This tests whether the model can produce a genuinely different inner-side view.
+  </p>
+  <div class="prompt-section">
+    <label>Medial View Prompt (editable):</label>
+    <textarea id="medialPrompt" rows="10"></textarea>
+  </div>
+  <div class="config-row">
+    <label>Aspect Ratio:</label>
+    <input type="text" id="medialAR" value="4:3" style="min-width:80px;flex:0" />
+    <label style="color:#96a5b4;font-size:11px">image_urls: [sideView]</label>
+  </div>
+  <button id="btnMedial" disabled>Generate Medial View</button>
+  <div id="medialResult" style="margin-top:12px"></div>
+  <div class="log" id="medialLog" style="display:none"></div>
 </div>
 
 <!-- Blob Detection Tuning -->
@@ -183,7 +239,7 @@
     <label style="color:#96a5b4;font-size:11px">image_urls: [template, sideView, 3/4-front, 3/4-back]</label>
   </div>
   <div class="config-row">
-    <label>Auto-retry if &lt;5 views (max):</label>
+    <label>Auto-retry if &lt;4 views (max):</label>
     <input type="text" id="maxRetries" value="2" style="min-width:50px;flex:0;max-width:60px" />
   </div>
   <button id="btnMulti" disabled>Generate Multi-View Sheet</button>
@@ -205,19 +261,6 @@
   <div id="normResult"></div>
 </div>
 
-<!-- Step 6: Remove Background -->
-<div class="step" id="step-rembg">
-  <div class="step-header"><div class="step-status"></div><h2>Step 6: Remove Background (rembg via backend)</h2></div>
-  <p style="font-size:11px;color:rgba(150,165,180,0.4);margin-bottom:8px">Each normalized view is sent to the backend for background removal. Displayed on checkered pattern to show transparency.</p>
-  <div class="log" id="rembgLog" style="display:none"></div>
-  <div id="rembgResult"></div>
-</div>
-
-<!-- Step 7: Final all views -->
-<div class="step" id="step-final">
-  <div class="step-header"><div class="step-status"></div><h2>Step 7: All Raw Slices (reference)</h2></div>
-  <div class="sliced-views" id="finalViews"></div>
-</div>
 
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -231,41 +274,56 @@ let slicedQuarterViews = {};
 let slicedMultiViews = {};
 let quarterFrontUrl = null;
 let quarterBackUrl = null;
+let medialImageUrl = null;        // standalone medial generation result (raw fal.ai url)
 let normalizedViews = {};         // { view: { url, w, h } }
 
 // (fixed-grid cell constants removed — blob detection only)
 
 // ─── Prompt builders ─────────────────────────────────────────────────────────
+function buildMedialPrompt(desc) {
+  return [
+    'Generate the MEDIAL (inner side) view of this shoe. The reference image shows the LATERAL (outer) side view.',
+    '',
+    'The medial side is the OPPOSITE side of the shoe — the side that faces the other foot when worn. It looks DIFFERENT from the lateral side:',
+    '- The arch area is visible — the sole curves UP in the middle (the medial arch). The lateral side is flatter.',
+    '- The inner ankle collar is often higher or shaped differently than the outer side.',
+    '- Stitching, panels, overlays, and logos are asymmetric — the inner side may have fewer overlays, different panel shapes, or no brand logo.',
+    '- If the shoe has a medial post or stability feature, it is visible on this side only.',
+    '',
+    'The toe points to the LEFT (the shoe is flipped horizontally compared to the lateral side view, as if you walked around to the other side).',
+    'Show the complete shoe from toe to heel. Pure white (#ffffff) background. No text, labels, borders, or shadows.',
+    desc ? 'Shoe: ' + desc : '',
+  ].filter(Boolean).join('\n');
+}
+
 function buildQuarterPrompt(desc) {
   return [
-    'Generate two three-quarter angle views of the shoe using the template for positioning.',
-    'CRITICAL: Pure white (#ffffff) background everywhere. No bounding boxes, borders, gray lines, text, or shadows.',
-    'The reference photo shows a right-foot shoe from the standard side view.',
-    'LEFT (3/4-front): Rotate camera ~45° counterclockwise from the side view, facing the front-lateral corner. Toe points RIGHT and slightly toward camera. Shows lateral side, toe box, and top surface.',
-    'RIGHT (3/4-back): Rotate camera ~45° clockwise from the side view, facing the heel-medial corner. Toe points LEFT and away from camera. Shows medial side, heel counter, and top surface.',
-    'Same shoe design, pure white background, no outlines, no shadows.',
+    'Generate two three-quarter angle isometric views of the shoe from the reference photo. Place them side by side matching the EXACT positions and orientations shown in the template image. The template shows generic shoe lasts just to indicate placement and angle — do NOT copy the last shape, only match the orientation.',
+    '',
+    'IMPORTANT: Both shoes must sit FLAT on the ground with the sole resting on a surface — like a product photo on a table. The camera looks down at roughly 20-30 degrees from eye level. Do NOT show the shoes floating, tilted, or airborne.',
+    '',
+    'LEFT: 3/4 front view. Toe points LEFT, heel faces RIGHT. The OUTER/LATERAL side of the shoe faces the viewer — the side without the arch. Camera sees the toe box, the outer side, and the top opening.',
+    '',
+    'RIGHT: 3/4 back view. Toe points RIGHT, heel faces LEFT. The INNER/MEDIAL side of the shoe faces the viewer — the arch side is visible. Camera sees the heel counter, the inner arch area, and the top opening.',
+    '',
+    'Render the actual shoe from the reference photo in these two orientations. Pure white (#ffffff) background. No borders, bounding boxes, gray lines, text, labels, or shadows.',
     desc ? 'Shoe: ' + desc : '',
-  ].filter(Boolean).join(' ');
+  ].filter(Boolean).join('\n');
 }
 
 function buildMultiPrompt(desc) {
   return [
-    'Generate a multi-view shoe reference sheet following the FIRST template image layout EXACTLY.',
-    'CRITICAL: Place EXACTLY 5 shoe views in 2 rows — no 2×2 grid.',
+    'Generate a 2x2 multi-view shoe reference sheet matching the template layout EXACTLY. The template shows a shoe last only to indicate placement and orientation — do NOT copy the last shape.',
     '',
-    'TOP ROW (2 large views):',
-    '  [1] LEFT: MEDIAL view — the INNER side of a right-foot shoe, toe pointing LEFT. This is the side that faces the OTHER foot. The medial inner arch/lining area is visible. This view is DIFFERENT from the lateral/outer side view — do not just mirror it.',
-    '  [2] RIGHT: TOP-DOWN view — camera looks straight down onto the shoe from above.',
+    'Top-left — FRONT view (portrait, smaller): camera faces the toe box straight on from the front.',
+    'Top-right — TOP-DOWN view (landscape, larger): camera looks straight down at the shoe from above, showing the top of the shoe with the laces and tongue visible. Toe points RIGHT.',
     '',
-    'BOTTOM ROW (3 views, MUST have all three):',
-    '  [3] BOTTOM-LEFT: FRONT/TOE view — camera faces the toe box head-on.',
-    '  [4] BOTTOM-CENTER: REAR/HEEL view — camera faces the heel counter from behind.',
-    '  [5] BOTTOM-RIGHT: OUTSOLE view — shoe flipped upside-down, full tread pattern visible.',
+    'Bottom-left — BACK view (portrait, smaller): camera faces the heel counter straight on from behind.',
+    'Bottom-right — OUTSOLE view (landscape, larger): the shoe is FLIPPED UPSIDE DOWN so the RUBBER TREAD PATTERN on the bottom of the sole faces the camera. You should see the grip texture, rubber lugs, and tread grooves — NOT the top of the shoe, NOT the laces, NOT the insole. Imagine holding the shoe sole-up and photographing the bottom. Toe points RIGHT.',
     '',
-    'ALL 5 VIEWS ARE REQUIRED. The bottom row MUST have THREE views [3][4][5].',
-    'Use the side, 3/4-front, and 3/4-back reference images to understand the complete 3D form.',
-    'Pure white (#ffffff) background everywhere. No bounding boxes, no borders, no gray lines, no text, no shadows.',
-    'Same shoe design in all views — only camera angle changes.',
+    'The left column is narrower (portrait front + back), the right column is wider (landscape top + bottom). Match this layout from the template.',
+    'Use the reference images to understand the shoe design. Render the same shoe from each angle.',
+    'Do NOT add any text, labels, numbers, captions, or annotations. No borders, bounding boxes, dividing lines, grid lines, or shadows. The four views should float on a continuous pure white (#ffffff) background with NO lines or rules separating them.',
     desc ? 'Shoe: ' + desc : '',
   ].filter(Boolean).join('\n');
 }
@@ -293,10 +351,10 @@ async function falUpload(blob, filename) {
   return file_url;
 }
 async function falGenerate(prompt, imageUrls, aspectRatio, logId) {
-  log(logId,'Calling fal.ai... may take 30-60s');
-  const r = await fetch('https://fal.run/fal-ai/nano-banana/edit', {
+  log(logId,'Calling fal.ai nano-banana-2/edit... may take 30-60s');
+  const r = await fetch('https://fal.run/fal-ai/nano-banana-2/edit', {
     method:'POST', headers:{'Authorization':'Key '+getApiKey(),'Content-Type':'application/json'},
-    body: JSON.stringify({prompt, image_urls:imageUrls, num_images:1, output_format:'jpeg', aspect_ratio:aspectRatio}),
+    body: JSON.stringify({prompt, image_urls:imageUrls, num_images:1, output_format:'png', aspect_ratio:aspectRatio, resolution:'1K'}),
   });
   if (!r.ok) throw new Error('fal.ai ('+r.status+'): '+await r.text());
   const d = await r.json();
@@ -406,14 +464,6 @@ async function ensureWhiteBackground(dataUrl) {
   return { url: finalUrl, bgType, rembgApplied };
 }
 
-/**
- * Remove background from a normalized view via backend rembg.
- * Returns the rembg PNG dataUrl (with transparency).
- */
-async function removeBackgroundView(dataUrl) {
-  return await callRembg(dataUrl);
-}
-
 // ─── Generic utilities ────────────────────────────────────────────────────────
 function log(logId, msg) {
   const el = document.getElementById(logId);
@@ -509,6 +559,134 @@ function detectBlobs(imageData, W, H, params, logId) {
   return {blobs:sorted,fg:closed,rows};
 }
 
+// ─── Gutter-based 2×2 sheet splitter ─────────────────────────────────────────
+// Instead of Union-Find (which fails when dark views bridge together),
+// scan for the widest horizontal and vertical white gutters to split into 4 quadrants.
+function sliceSheetByGutter(imageData, W, H, params, logId) {
+  const WT = params?.whiteTh ?? 240;
+  const data = imageData.data;
+  if (logId) log(logId, 'gutterSlice: WHITE_THRESH='+WT+' image='+W+'×'+H);
+
+  // For each row, count how many pixels are "white" (all channels >= WT)
+  const rowWhite = new Float64Array(H);
+  for (let y=0; y<H; y++) {
+    let wc=0;
+    for (let x=0; x<W; x++) {
+      const i=(y*W+x)*4;
+      if (data[i]>=WT && data[i+1]>=WT && data[i+2]>=WT) wc++;
+    }
+    rowWhite[y] = wc / W;  // fraction of white pixels in this row
+  }
+
+  // For each column, count how many pixels are "white"
+  const colWhite = new Float64Array(W);
+  for (let x=0; x<W; x++) {
+    let wc=0;
+    for (let y=0; y<H; y++) {
+      const i=(y*W+x)*4;
+      if (data[i]>=WT && data[i+1]>=WT && data[i+2]>=WT) wc++;
+    }
+    colWhite[x] = wc / H;
+  }
+
+  // Find the best horizontal gutter: a run of rows near the vertical center
+  // where most pixels are white (fraction > 0.85)
+  const gutterTh = 0.85;
+  const margin = Math.round(H * 0.15); // search middle 70% of image
+
+  let bestHGutter = null, bestHLen = 0;
+  for (let y=margin; y<H-margin; y++) {
+    if (rowWhite[y] < gutterTh) continue;
+    let yEnd = y;
+    while (yEnd < H-margin && rowWhite[yEnd] >= gutterTh) yEnd++;
+    const len = yEnd - y;
+    if (len > bestHLen) { bestHLen = len; bestHGutter = { y0: y, y1: yEnd, mid: Math.round((y+yEnd)/2) }; }
+    y = yEnd;
+  }
+
+  let bestVGutter = null, bestVLen = 0;
+  const marginX = Math.round(W * 0.15);
+  for (let x=marginX; x<W-marginX; x++) {
+    if (colWhite[x] < gutterTh) continue;
+    let xEnd = x;
+    while (xEnd < W-marginX && colWhite[xEnd] >= gutterTh) xEnd++;
+    const len = xEnd - x;
+    if (len > bestVLen) { bestVLen = len; bestVGutter = { x0: x, x1: xEnd, mid: Math.round((x+xEnd)/2) }; }
+    x = xEnd;
+  }
+
+  if (logId) {
+    log(logId, 'H-gutter: ' + (bestHGutter ? 'y='+bestHGutter.y0+'-'+bestHGutter.y1+' ('+bestHLen+'px)' : 'NONE'));
+    log(logId, 'V-gutter: ' + (bestVGutter ? 'x='+bestVGutter.x0+'-'+bestVGutter.x1+' ('+bestVLen+'px)' : 'NONE'));
+  }
+
+  if (!bestHGutter || !bestVGutter) {
+    if (logId) log(logId, 'FALLBACK: no clear gutters, using center split');
+    bestHGutter = bestHGutter || { y0: Math.round(H/2)-1, y1: Math.round(H/2)+1, mid: Math.round(H/2) };
+    bestVGutter = bestVGutter || { x0: Math.round(W/2)-1, x1: Math.round(W/2)+1, mid: Math.round(W/2) };
+  }
+
+  // 4 quadrants: top-left, top-right, bottom-left, bottom-right (row-major)
+  const splitY = bestHGutter.mid, splitX = bestVGutter.mid;
+  const quads = [
+    { x0: 0,      y0: 0,      x1: splitX, y1: splitY },  // top-left
+    { x0: splitX, y0: 0,      x1: W,      y1: splitY },  // top-right
+    { x0: 0,      y0: splitY, x1: splitX, y1: H      },  // bottom-left
+    { x0: splitX, y0: splitY, x1: W,      y1: H      },  // bottom-right
+  ];
+
+  // For each quadrant, compute the tight foreground bbox
+  const blobs = [];
+  for (let q=0; q<4; q++) {
+    const {x0,y0,x1,y1} = quads[q];
+    let bx0=x1, by0=y1, bx1=x0, by1=y0, count=0;
+    for (let y=y0; y<y1; y++) {
+      for (let x=x0; x<x1; x++) {
+        const i=(y*W+x)*4;
+        if (data[i]<WT || data[i+1]<WT || data[i+2]<WT) {
+          bx0=Math.min(bx0,x); by0=Math.min(by0,y);
+          bx1=Math.max(bx1,x); by1=Math.max(by1,y);
+          count++;
+        }
+      }
+    }
+    if (count > 0) {
+      blobs.push({x0:bx0,y0:by0,x1:bx1,y1:by1,area:count,cx:(bx0+bx1)/2,cy:(by0+by1)/2});
+      if (logId) log(logId, '  Q'+q+': ('+bx0+','+by0+')-('+bx1+','+by1+') '+(bx1-bx0)+'×'+(by1-by0));
+    } else {
+      blobs.push({x0,y0,x1,y1,area:0,cx:(x0+x1)/2,cy:(y0+y1)/2});
+      if (logId) log(logId, '  Q'+q+': EMPTY — using full quadrant');
+    }
+  }
+
+  // Build a simple foreground mask for display
+  const fg = new Uint8Array(W*H);
+  for (let i=0; i<W*H; i++) {
+    const r=data[i*4],g=data[i*4+1],b=data[i*4+2];
+    fg[i]=(r<WT||g<WT||b<WT)?1:0;
+  }
+
+  return {blobs, fg, splitX, splitY};
+}
+
+async function sliceSheetByGutterMethod(imgUrl, viewLabels, params, logId) {
+  const img=await loadImage(imgUrl), W=img.naturalWidth, H=img.naturalHeight;
+  const canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
+  const {blobs,fg,splitX,splitY}=sliceSheetByGutter(ctx.getImageData(0,0,W,H),W,H,params,logId);
+  if (blobs.length<viewLabels.length && logId) log(logId,'WARNING: expected '+viewLabels.length+', got '+blobs.length);
+  const results={},blobMeta=[];
+  for (let i=0;i<Math.min(blobs.length,viewLabels.length);i++) {
+    const b=blobs[i],tightW=b.x1-b.x0+1,tightH=b.y1-b.y0+1;
+    const sx=Math.max(0,b.x0-2),sy=Math.max(0,b.y0-2),ex=Math.min(W,b.x1+2),ey=Math.min(H,b.y1+2);
+    canvas.width=ex-sx;canvas.height=ey-sy;ctx.clearRect(0,0,ex-sx,ey-sy);
+    ctx.drawImage(img,sx,sy,ex-sx,ey-sy,0,0,ex-sx,ey-sy);
+    results[viewLabels[i]]=canvas.toDataURL('image/jpeg',0.92);
+    blobMeta.push({view:viewLabels[i],x0:sx,y0:sy,x1:ex,y1:ey,blobX0:b.x0,blobY0:b.y0,blobX1:b.x1,blobY1:b.y1,tightW,tightH});
+  }
+  return {results,blobMeta,fgMask:fg,width:W,height:H,detectedCount:blobs.length};
+}
+
 async function getTightBbox(dataUrl, whiteTh) {
   whiteTh = whiteTh||240;
   const img=await loadImage(dataUrl), W=img.naturalWidth, H=img.naturalHeight;
@@ -563,7 +741,18 @@ async function normalizeAllViews() {
   }
 
   await n('side',sideImageDataUrl,ref_W,ref_H,'reference');
-  for (const k of ['medial','top','outsole']) {
+  // Medial from standalone generation (not from multi-view sheet)
+  if (medialImageUrl) {
+    const medialDataUrl = await (async () => {
+      const img = await loadImage(medialImageUrl);
+      const c = document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+      const ctx = c.getContext('2d'); ctx.drawImage(img,0,0);
+      return c.toDataURL('image/jpeg',0.92);
+    })();
+    const b=await getTightBbox(medialDataUrl,whiteTh);
+    await n('medial',medialDataUrl,ref_W,Math.round(b.h*ref_W/b.w),'width→ref_W='+ref_W);
+  }
+  for (const k of ['top','outsole']) {
     if (!slicedMultiViews[k]) continue;
     const b=await getTightBbox(slicedMultiViews[k],whiteTh);
     await n(k,slicedMultiViews[k],ref_W,Math.round(b.h*ref_W/b.w),'width→ref_W='+ref_W);
@@ -663,6 +852,19 @@ async function handleFile(file) {
   dropZone.innerHTML = '<strong>Processing background...</strong>';
 
   try {
+    // Reset ALL state from previous shoe
+    sideImageUrl = null;
+    quarterSheetUrl = null;
+    multiSheetUrl = null;
+    medialImageUrl = null;
+    quarterFrontUrl = null;
+    quarterBackUrl = null;
+    slicedQuarterViews = {};
+    slicedMultiViews = {};
+    normalizedViews = {};
+    quarterTemplateUrl = null;
+    multiTemplateUrl = null;
+
     const {url, bgType, rembgApplied} = await ensureWhiteBackground(rawDataUrl);
     sideImageDataUrl = url;
 
@@ -680,8 +882,10 @@ async function handleFile(file) {
     setStep('step-input','done');
 
     const desc=document.getElementById('shoePrompt').value.trim();
+    document.getElementById('medialPrompt').value=buildMedialPrompt(desc);
     document.getElementById('quarterPrompt').value=buildQuarterPrompt(desc);
     document.getElementById('multiPrompt').value=buildMultiPrompt(desc);
+    document.getElementById('btnMedial').disabled=false;
     document.getElementById('btnQuarter').disabled=false;
   } catch(e) {
     dropZone.innerHTML='<span style="color:#f85149">Error preprocessing: '+e.message+'</span>';
@@ -690,8 +894,47 @@ async function handleFile(file) {
 }
 document.getElementById('shoePrompt').addEventListener('input',()=>{
   const desc=document.getElementById('shoePrompt').value.trim();
+  document.getElementById('medialPrompt').value=buildMedialPrompt(desc);
   document.getElementById('quarterPrompt').value=buildQuarterPrompt(desc);
   document.getElementById('multiPrompt').value=buildMultiPrompt(desc);
+});
+
+// ─── Step 0.5: Generate Medial View ──────────────────────────────────────────
+document.getElementById('btnMedial').addEventListener('click', async function() {
+  if (!sideImageDataUrl){alert('Load a side view first');return;}
+  if (!getApiKey()){alert('Enter API key');return;}
+  setStep('step-medial','active'); this.disabled=true;
+  document.getElementById('medialResult').innerHTML='';
+  document.getElementById('medialLog').textContent='';
+  try {
+    // Upload side view if not already uploaded
+    if (!sideImageUrl) {
+      log('medialLog','Uploading preprocessed side view...');
+      sideImageUrl=await falUpload(await dataUrlToBlob(sideImageDataUrl),'side-view.jpg');
+      log('medialLog','Side URL: '+sideImageUrl);
+    }
+    const prompt=document.getElementById('medialPrompt').value;
+    const ar=document.getElementById('medialAR').value.trim()||'4:3';
+    const imageUrls=[sideImageUrl];
+    log('medialLog','image_urls: [sideView]\naspect_ratio: '+ar+'\nPrompt:\n'+prompt+'\n');
+    const resultUrl=await falGenerate(prompt,imageUrls,ar,'medialLog');
+    medialImageUrl=resultUrl;
+    const img=await loadImage(resultUrl);
+    // Show side-by-side comparison
+    let h='<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">';
+    h+='<div><h3 style="color:#96a5b4;font-size:11px;margin-bottom:6px">LATERAL (reference)</h3>';
+    h+='<div class="image-box" style="max-width:380px"><img src="'+sideImageDataUrl+'" style="background:white" /></div></div>';
+    h+='<div><h3 style="color:#00d2ff;font-size:11px;margin-bottom:6px">MEDIAL (generated)</h3>';
+    h+='<div class="image-box" style="max-width:380px"><img src="'+resultUrl+'" style="background:white" />';
+    h+='<span class="dims">'+img.naturalWidth+'×'+img.naturalHeight+'</span></div></div>';
+    h+='</div>';
+    document.getElementById('medialResult').innerHTML=h;
+    setStep('step-medial','done');
+    this.disabled=false;
+  } catch(e) {
+    log('medialLog','ERROR: '+e.message);
+    setStep('step-medial','error'); this.disabled=false;
+  }
 });
 
 // ─── Step 1: Generate 3/4 Sheet ───────────────────────────────────────────────
@@ -790,8 +1033,8 @@ document.getElementById('btnMulti').addEventListener('click', async function() {
 // ─── Step 4: Slice + Auto-retry ────────────────────────────────────────────────
 async function doSliceMultiWithRetry(imageUrls,prompt,ar,attempt,maxR) {
   const detected=await doSliceMulti();
-  if (detected<5 && attempt<maxR) {
-    log('multiLog','\n⚠ Only '+detected+'/5 views. Auto-retry '+(attempt+2)+'/'+(maxR+1)+'...');
+  if (detected<4 && attempt<maxR) {
+    log('multiLog','\n⚠ Only '+detected+'/4 views. Auto-retry '+(attempt+2)+'/'+(maxR+1)+'...');
     setStep('step-multi','active');
     try {
       multiSheetUrl=await falGenerate(prompt,imageUrls,ar,'multiLog');
@@ -812,14 +1055,15 @@ async function doSliceMulti() {
   document.getElementById('btnResliceMulti').disabled=true;
   try {
     const img=await loadImage(multiSheetUrl),W=img.naturalWidth,H=img.naturalHeight;
-    const params=getTuningParams(),viewLabels=['medial','top','front','back','outsole'];
-    const {results,blobMeta,fgMask,detectedCount}=await sliceSheetByBlobs(multiSheetUrl,viewLabels,params,'multiSliceLog');
+    const params=getTuningParams(),viewLabels=['front','top','back','outsole'];
+    // Use gutter-based splitting for 2×2 multi-view sheet (more robust for dark shoes)
+    const {results,blobMeta,fgMask,detectedCount}=await sliceSheetByGutterMethod(multiSheetUrl,viewLabels,params,'multiSliceLog');
     showBlobOverlay('multiSliceResult',multiSheetUrl,blobMeta,W,H,fgMask);
-    showSliced('multiSliceResult',results,'Blob Detection ('+detectedCount+'/5 detected)');
+    showSliced('multiSliceResult',results,'Gutter Split ('+detectedCount+'/4 detected)');
     slicedMultiViews=results;
-    setStep('step-multi-slice',detectedCount>=5?'done':'error');
+    setStep('step-multi-slice',detectedCount>=4?'done':'error');
     document.getElementById('btnResliceMulti').disabled=false;
-    if (detectedCount>=5) await runNormalizeAndRembg();
+    if (detectedCount>=4) await runNormalize();
     return detectedCount;
   } catch(e) {
     container.innerHTML+='<p style="color:#f85149">Error: '+e.message+'</p>';
@@ -829,88 +1073,61 @@ async function doSliceMulti() {
 document.getElementById('btnResliceMulti').addEventListener('click',async()=>{
   if(!multiSheetUrl)return;
   const c=await doSliceMulti();
-  if(c>0) await runNormalizeAndRembg();
+  if(c>0) await runNormalize();
 });
 
-// ─── Step 5: Normalize ────────────────────────────────────────────────────────
-async function runNormalizeAndRembg() {
+// ─── Step 5: Normalize + 3x3 Grid ───────────────────────────────────────────
+async function runNormalize() {
   setStep('step-normalize','active');
   document.getElementById('normLog').textContent='';
   document.getElementById('normResult').innerHTML='';
   try {
     normalizedViews = await normalizeAllViews();
-    const ORDER=['side','medial','top','outsole','front','back','3/4-front','3/4-back'];
-    const RULES={side:'reference',medial:'width=shoe_length',top:'width=shoe_length',outsole:'width=shoe_length',front:'width=shoe_width',back:'width=shoe_width','3/4-front':'height=shoe_height','3/4-back':'height=shoe_height'};
-    // Use ONE uniform display scale from the side view so all views keep their real proportions
-    const sideNorm = normalizedViews['side'];
-    const uniScale = sideNorm ? Math.min(1, 280 / Math.max(sideNorm.w, sideNorm.h)) : 0.3;
-    let h='<div class="norm-strip">';
-    for (const key of ORDER) {
-      if (!normalizedViews[key]) continue;
-      const {url,w,h:nh}=normalizedViews[key];
-      const dW=Math.round(w*uniScale),dH=Math.round(nh*uniScale);
-      h+='<div class="norm-view"><img src="'+url+'" style="width:'+dW+'px;height:'+dH+'px" />';
-      h+='<div class="nv-label">'+key+'</div><div class="nv-dims">'+w+'×'+nh+'</div>';
-      h+='<div class="nv-dims" style="color:rgba(255,160,64,0.5)">'+RULES[key]+'</div></div>';
+
+    // 3x3 grid layout matching the main app's MultiViewEditor:
+    //   medial    | top      | front
+    //   3/4-front | side     | back
+    //   3/4-back  | outsole  | info
+    const GRID = [
+      { area:'medial',  key:'medial' },
+      { area:'top',     key:'top' },
+      { area:'front',   key:'front' },
+      { area:'qfront',  key:'3/4-front' },
+      { area:'side',    key:'side' },
+      { area:'back',    key:'back' },
+      { area:'qback',   key:'3/4-back' },
+      { area:'outsole', key:'outsole' },
+    ];
+
+    let h='<div class="mve-grid">';
+    for (const {area, key} of GRID) {
+      const v = normalizedViews[key];
+      if (v) {
+        h+='<div class="mve-cell" style="grid-area:'+area+'">';
+        h+='<img src="'+v.url+'" />';
+        h+='<span class="mve-label">'+key+'</span>';
+        h+='<span class="mve-dims">'+v.w+'×'+v.h+'</span>';
+        h+='</div>';
+      } else {
+        h+='<div class="mve-cell mve-cell--empty" style="grid-area:'+area+'">';
+        h+='<span style="font-size:10px;color:rgba(150,165,180,0.3)">'+key+'</span>';
+        h+='</div>';
+      }
     }
+    // Info cell (bottom-right)
+    const sN=normalizedViews['side'];
+    h+='<div class="mve-cell--info" style="grid-area:info">';
+    h+='<div class="info-line">'+Object.keys(normalizedViews).length+'/8 views</div>';
+    if (sN) h+='<div class="info-line">ref: '+sN.w+'×'+sN.h+'</div>';
     h+='</div>';
+    h+='</div>';
+
     document.getElementById('normResult').innerHTML=h;
     setStep('step-normalize','done');
-    await runRembgAll();
   } catch(e) {
     document.getElementById('normResult').innerHTML='<p style="color:#f85149">Normalize error: '+e.message+'</p>';
     setStep('step-normalize','error');
   }
-}
-
-// ─── Step 6: Remove Background ───────────────────────────────────────────────
-async function runRembgAll() {
-  setStep('step-rembg','active');
-  document.getElementById('rembgLog').textContent='';
-  document.getElementById('rembgResult').innerHTML='';
-  const logId='rembgLog';
-  const ORDER=['side','medial','top','outsole','front','back','3/4-front','3/4-back'];
-
-  // Uniform display scale from side view (same as normalization step)
-  const sideN=normalizedViews['side'];
-  const rScale=sideN ? Math.min(1, 260/Math.max(sideN.w, sideN.h)) : 0.3;
-
-  let h='<div class="rembg-grid">';
-  const results={};
-  for (const key of ORDER) {
-    if (!normalizedViews[key]) continue;
-    log(logId,'Removing background: '+key+'...');
-    const {w,h:nh}=normalizedViews[key];
-    const dW=Math.round(w*rScale),dH=Math.round(nh*rScale);
-    try {
-      const rembgUrl=await removeBackgroundView(normalizedViews[key].url);
-      results[key]=rembgUrl;
-      h+='<div class="rembg-cell"><div class="checker" style="width:'+dW+'px;height:'+dH+'px;position:relative">';
-      h+='<img src="'+rembgUrl+'" style="position:absolute;top:0;left:0;width:'+dW+'px;height:'+dH+'px" /></div>';
-      h+='<div class="rc-label">'+key+'</div></div>';
-      log(logId,'  ✓ '+key);
-    } catch(e) {
-      log(logId,'  ✗ '+key+': '+e.message);
-      h+='<div class="rembg-cell"><img src="'+normalizedViews[key].url+'" style="width:'+dW+'px;height:'+dH+'px;background:white;border-radius:4px" />';
-      h+='<div class="rc-label" style="color:#f85149">'+key+' (rembg failed)</div></div>';
-    }
-  }
-  h+='</div>';
-  document.getElementById('rembgResult').innerHTML=h;
-  setStep('step-rembg','done');
-
-  // Step 7: raw slices for reference
-  showFinalRaw();
-}
-
-// ─── Step 7: Final raw ────────────────────────────────────────────────────────
-function showFinalRaw() {
-  setStep('step-final','done');
-  const all={'side':sideImageDataUrl,...slicedQuarterViews,...slicedMultiViews};
-  let h='';
-  for(const[v,url] of Object.entries(all))
-    h+='<div class="sliced-view"><img src="'+url+'" style="max-width:220px" /><div class="sv-label">'+v+'</div></div>';
-  document.getElementById('finalViews').innerHTML=h;
 }
 </script>
 </body>

@@ -8,6 +8,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ImageData, ShoeViewType } from '../../types';
 import { generateAllViews, updateAllViews } from '../../utils/generateAllViews';
 import { apiClient } from '../../api/client';
+import { useAppStore } from '../../store/appStore';
 import { normalizeAllViewScales, type NormalizedView } from '../../utils/normalizeViewScale';
 import { ALL_VIEWS } from './propagationOrder';
 
@@ -34,6 +35,8 @@ export interface UseMultiViewStateReturn {
   setEditPrompt: (s: string) => void;
   isUpdating: Record<ShoeViewType, boolean>;
   history: MultiViewSnapshot[];
+  /** Set of view types that were actually edited by the user (not just normalized) */
+  editedViews: Set<ShoeViewType>;
   revertToSnapshot: (index: number) => void;
   handleUpdate: () => Promise<void>;
   isBusy: boolean;
@@ -106,6 +109,7 @@ export function useMultiViewState(
   sideImage: ImageData,
   satellites: ImageData[],
 ): UseMultiViewStateReturn {
+  const sideId = sideImage.id;
   const initialRef = useRef(initViewImages(sideImage, satellites));
   // Original side base64 — used as normalization reference for ALL versions
   const originalSideBase64Ref = useRef(sideImage.base64_image);
@@ -117,7 +121,26 @@ export function useMultiViewState(
   const [displayScale, setDisplayScale] = useState(0);
   const [editPrompt, setEditPrompt] = useState('');
   const [isUpdating, setIsUpdating] = useState<Record<ShoeViewType, boolean>>({} as any);
-  const [history, setHistory] = useState<MultiViewSnapshot[]>([]);
+  // Initialize history from Zustand store (persists across dialog open/close)
+  const [history, setHistory] = useState<MultiViewSnapshot[]>(() => {
+    const stored = useAppStore.getState().multiViewHistory[sideId];
+    if (!stored || stored.length === 0) return [];
+    // Reconstruct MultiViewSnapshot from stored lightweight entries
+    return stored.map(entry => ({
+      timestamp: new Date(entry.timestamp),
+      prompt: entry.prompt,
+      editedView: 'side' as ShoeViewType,
+      views: Object.fromEntries(
+        ALL_VIEWS.map(v => [v, entry.viewBases[v] ? {
+          ...sideImage,
+          id: -1,
+          base64_image: entry.viewBases[v]!,
+          shoe_view: v,
+        } : null])
+      ) as Record<ShoeViewType, ImageData | null>,
+    }));
+  });
+  const [editedViews, setEditedViews] = useState<Set<ShoeViewType>>(new Set());
   const [isBusy, setIsBusy] = useState(false);
   const [progressLabel, setProgressLabel] = useState('');
 
@@ -183,7 +206,18 @@ export function useMultiViewState(
       editedView,
       views: { ...views },
     }]);
-  }, []);
+    // Persist lightweight version to Zustand store (survives dialog close/reopen)
+    const viewBases: Record<string, string | null> = {};
+    for (const v of ALL_VIEWS) {
+      viewBases[v] = views[v]?.base64_image ?? null;
+    }
+    useAppStore.getState().pushMultiViewHistory(sideId, {
+      timestamp: Date.now(),
+      prompt,
+      sideBase64: views['side']?.base64_image ?? '',
+      viewBases,
+    });
+  }, [sideId]);
 
   const revertToSnapshot = useCallback((index: number) => {
     if (index < 0) {
@@ -280,6 +314,12 @@ export function useMultiViewState(
       setViewDims(newDims);
       setDisplayScale(computeDisplayScale(newDims));
       pushSnapshot(editPrompt.trim(), 'side', updatedViews);
+      // Mark all generated views as user-edited (distinguishes from normalization-only changes)
+      setEditedViews(prev => {
+        const next = new Set(prev);
+        for (const vt of Object.keys(generatedViews)) next.add(vt as ShoeViewType);
+        return next;
+      });
       setProgressLabel('');
     } catch (e) {
       console.error('Multi-view update failed:', e);
@@ -298,6 +338,7 @@ export function useMultiViewState(
     setEditPrompt,
     isUpdating,
     history,
+    editedViews,
     revertToSnapshot,
     handleUpdate,
     isBusy,

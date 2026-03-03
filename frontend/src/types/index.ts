@@ -37,6 +37,16 @@ export interface ViewAnalysisResponse {
   suggested_edits: EditSuggestion[];
 }
 
+/** Lightweight MVE history entry (stores side thumbnail + prompt, not all 8 views) */
+export interface MultiViewHistoryEntry {
+  timestamp: number; // Date.now()
+  prompt: string;
+  /** base64 of the side view at this snapshot (for thumbnail display) */
+  sideBase64: string;
+  /** All 8 view base64s keyed by ShoeViewType (for full revert) */
+  viewBases: Record<string, string | null>;
+}
+
 export interface ImageData {
   id: number;
   group_id: string;
@@ -81,6 +91,11 @@ export interface AxisLabels {
   z?: [string, string];  // Optional z-axis for 3D mode
 }
 
+export interface AxisLabelSnapshot {
+  labels: AxisLabels;
+  timestamp: number; // Date.now()
+}
+
 export interface CanvasBounds {
   xMin: number;
   xMax: number;
@@ -94,6 +109,7 @@ export interface AppState {
   images: ImageData[];
   historyGroups: HistoryGroup[];
   axisLabels: AxisLabels;
+  axisHistory: AxisLabelSnapshot[]; // Past axis label sets (max 10)
   selectedImageIds: number[];
   hoveredImageId: number | null;
   hoveredGroupId: string | null;
@@ -164,6 +180,9 @@ export interface AppState {
   // Isolate mode: when set, only these image IDs are shown at full opacity
   isolatedImageIds: number[] | null;
 
+  // Hidden images: temporarily hidden (blacklist), separate from deletion
+  hiddenImageIds: number[];
+
   // Star ratings: imageId → 1-5 (0 or absent = unrated)
   imageRatings: Record<number, number>;
   // Star filter: null = show all, 1-5 = show only images with rating >= this
@@ -193,6 +212,9 @@ export interface AppState {
 
   // Shoe view filter toggles — per-view visibility (side defaults visible, satellites default hidden)
   visibleSatelliteViews: Record<string, boolean>;  // keyed by ShoeViewType; side: false=hidden; satellites: true=visible
+
+  // Multi-View Editor history (keyed by side image ID, persists across dialog open/close)
+  multiViewHistory: Record<number, MultiViewHistoryEntry[]>;
 
   // Onboarding tutorial
   onboardingActive: boolean;
@@ -299,7 +321,10 @@ export interface CanvasMeta {
 }
 
 export interface EventLogEntry {
-  type: 'generation' | 'axis_change' | 'canvas_save' | 'canvas_switch';
+  type: 'generation' | 'axis_change' | 'canvas_save' | 'canvas_switch'
+    | 'selection' | 'design_brief_change' | 'delete' | 'file_upload'
+    | 'prompt_submit' | 'suggestion_click' | 'star_rating'
+    | 'image_hide' | 'image_restore' | 'layer_visibility_change';
   timestamp: string;
   data?: Record<string, any>;
 }

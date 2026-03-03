@@ -1,0 +1,6 @@
+{"type": "session_start", "timestamp": "2026-03-02T16:04:54.560752", "canvas_id": "cc858e1e-3ee3-401c-af45-9bebc854ced7", "canvas_name": "tasks", "participant_id": "Evan", "study_session": null}
+{"type": "canvas_switch", "timestamp": "2026-03-02T16:04:54.565172", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "new", "newName": "tasks"}}
+{"type": "session_end", "timestamp": "2026-03-02T16:04:54.567922", "canvas_id": "cc858e1e-3ee3-401c-af45-9bebc854ced7"}
+{"type": "session_start", "timestamp": "2026-03-02T16:04:54.571788", "canvas_id": "4f947f3a-ed98-4bac-a5b6-8e7dc3d37ee7", "canvas_name": "tasks", "participant_id": "Evan", "study_session": null}
+{"type": "canvas_switch", "timestamp": "2026-03-02T16:04:54.575223", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "new", "newName": "Canvas 3"}}
+{"type": "session_end", "timestamp": "2026-03-02T16:04:54.579054", "canvas_id": "4f947f3a-ed98-4bac-a5b6-8e7dc3d37ee7"}

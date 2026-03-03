@@ -22,7 +22,7 @@ interface MultiViewEditorProps {
   sideViewImage: ImageData;
   satelliteViews: ImageData[];
   onClose: () => void;
-  onSave: (updatedViews: Record<ShoeViewType, ImageData | null>) => void;
+  onSave: (updatedViews: Record<ShoeViewType, ImageData | null>, editedViews: Set<ShoeViewType>) => void;
 }
 
 /** Grid area name for each view type */
@@ -99,6 +99,7 @@ export const MultiViewEditor: React.FC<MultiViewEditorProps> = ({
     setEditPrompt,
     isUpdating,
     history,
+    editedViews,
     revertToSnapshot,
     handleUpdate,
     isBusy,
@@ -108,7 +109,7 @@ export const MultiViewEditor: React.FC<MultiViewEditorProps> = ({
   const filledCount = ALL_VIEWS.filter(v => viewImages[v] !== null).length;
 
   const handleSave = () => {
-    onSave(viewImages);
+    onSave(viewImages, editedViews);
   };
 
   return (

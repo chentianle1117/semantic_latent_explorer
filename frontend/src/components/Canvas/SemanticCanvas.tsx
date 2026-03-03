@@ -383,6 +383,8 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const hoveredGroupId = useAppStore((state) => state.hoveredGroupId);
   const hoveredImageId = useAppStore((state) => state.hoveredImageId);
   const axisLabels = useAppStore((state) => state.axisLabels);
+  const axisHistory = useAppStore((state) => state.axisHistory);
+  const hiddenImageIds = useAppStore((state) => state.hiddenImageIds);
   const expandedConcepts = useAppStore((state) => state.expandedConcepts);
   const canvasBounds = useAppStore((state) => state.canvasBounds);
   const ghostNodes = useAppStore((state) => state.ghostNodes);
@@ -409,8 +411,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const layerVisMap: Record<string, boolean> = {};
     const layerOrder: Record<string, number> = {};
     layers.forEach((l, i) => { layerVisMap[l.id] = l.visible; layerOrder[l.id] = i; });
+    const hiddenSet = new Set(hiddenImageIds);
     const filtered = allImages.filter((img) => {
       if (!img.visible) return false;
+      if (hiddenSet.has(img.id)) return false;
       const lid = imageLayerMap[img.id] ?? "default";
       if (!(layerVisMap[lid] ?? true)) return false;
       // Only show side views on the semantic canvas — satellites are shown in the inspector
@@ -425,7 +429,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       if (bIdx !== aIdx) return bIdx - aIdx; // descending layer index: references first, shoes last
       return a.id - b.id; // ascending ID within layer: older images render first (behind newer)
     });
-  }, [allImages, layers, imageLayerMap]);
+  }, [allImages, layers, imageLayerMap, hiddenImageIds]);
 
   // Rubber-band selection state
   // mode: 'window'   (drag →, solid blue)   = must fully contain the shoe
@@ -535,9 +539,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         const layerVisMap: Record<string, boolean> = {};
         state.layers.forEach((l) => { layerVisMap[l.id] = l.visible; });
         const isolateSet = state.isolatedImageIds !== null ? new Set(state.isolatedImageIds) : null;
+        const hiddenSet = new Set(state.hiddenImageIds);
         const visibleIdSet = new Set<number>();
         state.images.forEach((img) => {
           if (!img.visible) return;
+          if (hiddenSet.has(img.id)) return;
           const lid = state.imageLayerMap[img.id] ?? "default";
           if (!(layerVisMap[lid] ?? true)) return;
           if (isolateSet !== null && !isolateSet.has(img.id)) return;
@@ -610,6 +616,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   // Always-current ref for visualSettings (used by native event handlers that can't read React state)
   const visualSettingsRef = React.useRef(visualSettings);
   React.useEffect(() => { visualSettingsRef.current = visualSettings; }, [visualSettings]);
+
+  // Axis history dropdown
+  const [axisHistoryOpen, setAxisHistoryOpen] = React.useState(false);
 
   // ResizeObserver: force a re-render when the SVG container gains non-zero size.
   // This recovers the canvas if the initial render fired while the container had width=0.
@@ -1628,8 +1637,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       const el = d3.select(this);
 
       // Compound: if fails any active filter, dim to near-invisible
-      // AND disable pointer-events so they don't block clicks on visible items
-      if (!starPasses || !isolatePasses) {
+      // EXCEPTION: selected shoes always stay visible (full opacity)
+      const isSelected = selectedImageIds.includes(d.id);
+      if ((!starPasses || !isolatePasses) && !isSelected) {
         el.transition().duration(250).attr("opacity", 0.05);
         el.style("pointer-events", "none");
         return;
@@ -1642,7 +1652,6 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       // Only selected shoes get full opacity; everything else dims equally.
       // Parent/child relationships are shown via genealogy lines, not opacity.
       if (selectedImageIds.length > 0) {
-        const isSelected = selectedImageIds.includes(d.id);
         // Selection dimming: selected=1.0, unselected=0.3 on <g>
         // The <image> element inside already carries the per-image or global imageOpacity
         const opacity = isSelected ? 1.0 : 0.3;
@@ -1918,7 +1927,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
-            onClick={() => useAppStore.getState().setStarFilter(starFilter === n ? null : n)}
+            onClick={() => {
+              const newFilter = starFilter === n ? null : n;
+              apiClient.logEvent('star_filter_toggle', { filterLevel: newFilter, previousLevel: starFilter });
+              useAppStore.getState().setStarFilter(newFilter);
+            }}
             title={starFilter === n ? "Clear filter" : `Show only ${n}-star shoes`}
             style={{
               background: "none",
@@ -1942,7 +1955,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         ))}
         {starFilter !== null && (
           <button
-            onClick={() => useAppStore.getState().setStarFilter(null)}
+            onClick={() => {
+              apiClient.logEvent('star_filter_toggle', { filterLevel: null, previousLevel: starFilter });
+              useAppStore.getState().setStarFilter(null);
+            }}
             title="Clear star filter"
             style={{
               background: "none",
@@ -1961,6 +1977,43 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           </button>
         )}
       </div>
+
+      {/* Hidden images indicator */}
+      {hiddenImageIds.length > 0 && (
+        <div style={{
+          position: "absolute",
+          top: 52,
+          right: 16,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 10px",
+          background: "rgba(13, 17, 23, 0.82)",
+          backdropFilter: "blur(8px)",
+          border: "1px solid rgba(180,140,255,0.35)",
+          borderRadius: 8,
+          pointerEvents: "auto",
+          fontSize: 11,
+          color: "rgba(200,180,255,0.85)",
+        }}>
+          <span>Hidden: {hiddenImageIds.length}</span>
+          <button
+            onClick={() => useAppStore.getState().unhideAll()}
+            title="Unhide all hidden images"
+            style={{
+              background: "rgba(180,140,255,0.15)",
+              border: "1px solid rgba(180,140,255,0.3)",
+              borderRadius: 4,
+              color: "rgba(200,180,255,0.9)",
+              fontSize: 10,
+              padding: "1px 6px",
+              cursor: "pointer",
+            }}
+          >
+            Unhide All
+          </button>
+        </div>
+      )}
 
       {/* View filter panel removed — only side views shown on canvas */}
 
@@ -1982,6 +2035,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           positiveLabel={axisLabels.x[1]}
           onUpdate={async (negative, positive) => {
             try {
+              useAppStore.getState().pushAxisHistory();
               useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
               await apiClient.updateAxes({
                 x_negative: negative,
@@ -2014,6 +2068,117 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
           />
         </div>
       </div>
+
+      {/* Axis history dropdown — bottom-left near axis intersection */}
+      {axisHistory.length > 0 && (
+        <div style={{
+          position: "absolute",
+          bottom: 12,
+          left: 86,
+          pointerEvents: "auto",
+          zIndex: 5,
+        }}>
+          <button
+            onClick={() => setAxisHistoryOpen(!axisHistoryOpen)}
+            title="Axis history"
+            style={{
+              background: axisHistoryOpen ? 'rgba(140,180,255,0.2)' : 'rgba(30,35,50,0.7)',
+              border: '1px solid rgba(140,180,255,0.3)',
+              borderRadius: 6,
+              color: 'rgba(200,215,230,0.85)',
+              fontSize: 11,
+              padding: '3px 8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <span style={{ fontSize: 13 }}>&#x21BA;</span>
+            Axes ({axisHistory.length})
+          </button>
+          {axisHistoryOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                marginBottom: 4,
+                background: 'rgba(22,26,35,0.95)',
+                border: '1px solid rgba(140,180,255,0.25)',
+                borderRadius: 8,
+                padding: 6,
+                minWidth: 220,
+                maxHeight: 260,
+                overflowY: 'auto',
+                backdropFilter: 'blur(12px)',
+              }}
+              onMouseLeave={() => setAxisHistoryOpen(false)}
+            >
+              <div style={{ fontSize: 10, color: 'rgba(160,175,195,0.7)', padding: '2px 6px 6px', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4 }}>
+                Previous axis configurations
+              </div>
+              {axisHistory.map((entry) => {
+                const ago = Math.round((Date.now() - entry.timestamp) / 60000);
+                const timeLabel = ago < 1 ? 'just now' : ago < 60 ? `${ago}m ago` : `${Math.round(ago / 60)}h ago`;
+                return (
+                  <button
+                    key={entry.timestamp}
+                    onClick={async () => {
+                      setAxisHistoryOpen(false);
+                      try {
+                        useAppStore.getState().pushAxisHistory(); // snapshot current before restoring
+                        const labels = entry.labels;
+                        useProgressStore.getState().showProgress("reprojecting", "Restoring axes...", false);
+                        await apiClient.updateAxes({
+                          x_negative: labels.x[0],
+                          x_positive: labels.x[1],
+                          y_negative: labels.y[0],
+                          y_positive: labels.y[1],
+                        });
+                        useProgressStore.getState().updateProgress(70, "Updating canvas...");
+                        const state = await apiClient.getState();
+                        useAppStore.getState().resetCanvasBounds();
+                        useAppStore.getState().setAxisLabels(state.axis_labels);
+                        useAppStore.getState().setImages(state.images);
+                        if (state.expanded_concepts) useAppStore.getState().setExpandedConcepts(state.expanded_concepts);
+                        useProgressStore.getState().updateProgress(100);
+                        useProgressStore.getState().hideProgress();
+                      } catch (err) {
+                        useProgressStore.getState().hideProgress();
+                        alert(`Failed to restore axes: ${err}`);
+                      }
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 'none',
+                      borderRadius: 5,
+                      padding: '5px 8px',
+                      cursor: 'pointer',
+                      color: 'rgba(200,215,230,0.9)',
+                      fontSize: 11,
+                      lineHeight: 1.4,
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(140,180,255,0.12)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                  >
+                    <div style={{ fontWeight: 500 }}>
+                      X: {entry.labels.x[0]} — {entry.labels.x[1]}
+                    </div>
+                    <div style={{ fontWeight: 500 }}>
+                      Y: {entry.labels.y[0]} — {entry.labels.y[1]}
+                    </div>
+                    <div style={{ fontSize: 9, color: 'rgba(160,175,195,0.5)', marginTop: 1 }}>{timeLabel}</div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Y-Axis scale slider: same fixed-size pattern as right-edge size slider, mirrored to left */}
       <div data-tour="axis-scale-y" style={{
@@ -2059,6 +2224,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
             positiveLabel={axisLabels.y[1]}
             onUpdate={async (negative, positive) => {
               try {
+                useAppStore.getState().pushAxisHistory();
                 useProgressStore.getState().showProgress("reprojecting", "Computing embeddings & reprojecting...", false);
                 await apiClient.updateAxes({
                   x_negative: axisLabels.x[0],

@@ -1,0 +1,123 @@
+{"type": "session_start", "timestamp": "2026-03-02T16:09:21.978034", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0", "canvas_name": "Onboarding", "participant_id": "Evan", "study_session": null}
+{"type": "generation", "timestamp": "2026-03-02T16:09:25.773235", "data": {"imageIds": [47, 49, 50, 51, 52, 53, 56, 58, 61, 63, 64, 67, 72, 78, 79, 84, 85, 86, 87, 88, 89], "count": 21, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "axis_change", "timestamp": "2026-03-02T16:09:25.775769", "data": {"axisLabels": {"x": ["performance-driven", "style-led"], "y": ["heritage", "avant-garde"], "z": ["casual", "elegant"]}}}
+{"type": "generation", "timestamp": "2026-03-02T16:10:39.945176", "data": {"imageIds": [24, 30, 32, 33, 34, 36, 43, 44, 45, 47, 49, 50, 51, 52, 53, 56, 58, 61, 63, 64, 67, 72, 78, 79, 84, 85, 86, 87, 88, 89], "count": 30, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:10:39.946544", "data": {"brief": "This is a football boot designed for lightning-fast turf play, evoking the aggressive speed and dynamism of the Nike Mercurial line. The striking colorway of electric blue and vibrant pink will make a bold statement, pushing the boundaries of athletic aesthetics."}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:12:43.249762", "data": {"brief": "I want a futuristic minimal shoe with solid geometry contours and 3D printable parts with matt black, gray blue and neon green color theme"}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:13:45.028408", "data": {"brief": "I'm envisioning a futuristic, minimalist sneaker that plays with solid geometric contours. We'll contrast a matte black and muted gray-blue palette with sharp neon green accents, all grounded by a striking sole that's both chunky and unexpectedly thin. The materials will lean into that dichotomy too, blending glossy finishes with matte textures for a truly modern feel."}}
+{"type": "selection", "timestamp": "2026-03-02T16:14:18.757632", "data": {"selectedIds": [88], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:14:34.483929", "data": {"selectedIds": [88, 36], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:14:49.997052", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:14:55.053963", "data": {"selectedIds": [84, 85, 86, 87, 89], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T16:14:58.020839", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:15:00.778689", "data": {"selectedIds": [84, 85, 86, 87, 89], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T16:15:05.433493", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:15:14.886293", "data": {"selectedIds": [86, 87, 89], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T16:15:15.658473", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:15:16.495201", "data": {"selectedIds": [33], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:15:18.614014", "data": {"selectedIds": [33, 36, 85, 86, 87, 88, 89], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T16:16:01.032025", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:16:04.277673", "data": {"selectedIds": [30], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:16:08.727566", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:16:09.850923", "data": {"selectedIds": [30], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:16:10.695194", "data": {"selectedIds": [33, 34], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:16:12.751503", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:16:14.213349", "data": {"selectedIds": [44, 45], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T16:17:18.042234", "data": {"imageIds": [24, 30, 32, 33, 34, 36, 43, 44, 45, 47, 49, 50, 51, 52, 53, 56, 58, 61, 63, 64, 67, 72, 78, 79, 84, 85, 86, 87, 88, 89], "count": 30, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:17:18.043749", "data": {"brief": "I'm envisioning a futuristic, minimalist sneaker that plays with solid geometric contours. We'll contrast a matte black and muted gray-blue palette with sharp neon green accents, all grounded by a striking sole that's both chunky and unexpectedly thin. The materials will lean into that dichotomy too, blending glossy finishes with matte textures for a truly modern feel."}}
+{"type": "selection", "timestamp": "2026-03-02T16:18:29.989788", "data": {"selectedIds": [33], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:18:32.335233", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:18:33.325336", "data": {"selectedIds": [63], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:18:35.925566", "data": {"selectedIds": [33], "count": 1}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T16:19:10.861816", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": false}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T16:19:10.866181", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T16:19:16.136536", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": false}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T16:19:17.697281", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "selection", "timestamp": "2026-03-02T16:20:18.232313", "data": {"selectedIds": [33, 30], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:20:30.948872", "data": {"selectedIds": [33, 30, 36], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T16:20:34.886820", "data": {"selectedIds": [33, 30], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:20:41.780039", "data": {"selectedIds": [30, 36, 52, 53], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T16:20:43.076374", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:20:45.122944", "data": {"selectedIds": [33], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:20:49.612107", "data": {"selectedIds": [33, 36], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:21:01.748341", "data": {"selectedIds": [33, 36, 44], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T16:21:03.216778", "data": {"selectedIds": [33, 44], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:21:19.673669", "data": {"selectedIds": [33, 44, 36], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T16:21:49.517372", "data": {"selectedIds": [33, 44, 36, 45], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T16:21:50.961261", "data": {"selectedIds": [33, 36, 45], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T16:21:53.126813", "data": {"selectedIds": [33, 45], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:21:54.412821", "data": {"selectedIds": [33, 45, 36], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T16:22:15.275417", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:22:16.093317", "data": {"selectedIds": [33], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:24:54.670532", "data": {"selectedIds": [], "count": 0}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:25:47.087847", "data": {"tag": "Glossy synthetic", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:25:50.275428", "data": {"tag": "Matte leather", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:25:51.771094", "data": {"tag": "Matte black", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:25:52.608350", "data": {"tag": "Geometric", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:25:53.451737", "data": {"tag": "Futuristic", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:25:54.823020", "data": {"tag": "Minimalist", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:25:56.463118", "data": {"tag": "Angular", "category": "silhouette", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-03-02T16:27:14.035538", "data": {"prompt": "Create a futuristic, minimalist sneaker featuring glossy synthetic and matte leather in matte black, with angular geometric contours and sharp neon green accents.  Design featuring a chunky yet thin sole.", "imageCount": 2, "selectedTagCount": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:40.316256", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:41.999372", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:43.183672", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:44.113821", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:45.194533", "data": {"selectedIds": [44], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:47.243778", "data": {"selectedIds": [44, 45], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:49.269765", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:50.566022", "data": {"selectedIds": [45, 44], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:51.736350", "data": {"selectedIds": [44], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:55.812499", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:57.015699", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:27:59.324792", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-03-02T16:28:43.413242", "data": {"imageIds": [90, 91], "count": 2, "prompt": "Create a futuristic, minimalist sneaker featuring glossy synthetic and matte leather in matte black, with angular geometric contours and sharp neon green accents.  Design featuring a chunky yet thin sole."}}
+{"type": "selection", "timestamp": "2026-03-02T16:28:43.414923", "data": {"selectedIds": [90, 91], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:28:51.597716", "data": {"selectedIds": [30], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:28:52.552538", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:29:11.655951", "data": {"selectedIds": [91], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:29:11.657695", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:29:11.658729", "data": {"selectedIds": [90], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:29:14.424343", "data": {"selectedIds": [90, 91], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:29:17.164055", "data": {"selectedIds": [91], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:29:18.057404", "data": {"selectedIds": [91, 90], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T16:31:44.706057", "data": {"imageIds": [92, 93], "count": 2, "prompt": "Fuse black upper, neon green accents, glossy panels, matte sections, geometric contours, chunky translucent sole's black upper and neon green accents with black upper, neon green piping, layered design, textured materials, sculpted sole, athletic silhouette's layered design for a futuristic sneaker with geometric contours."}}
+{"type": "selection", "timestamp": "2026-03-02T16:31:44.707063", "data": {"selectedIds": [92, 93], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T16:31:52.295496", "data": {"imageIds": [94], "count": 1, "prompt": "A futuristic, minimalist sneaker with organic contours, matte textures, and vibrant neon green."}}
+{"type": "axis_change", "timestamp": "2026-03-02T16:33:16.097800", "data": {"axisLabels": {"x": ["Chunky", "slim"], "y": ["dark", "colorful"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-02T16:33:44.038912", "data": {"selectedIds": [92], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:34:24.511924", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:35:37.728612", "data": {"selectedIds": [93], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:36:54.297850", "data": {"selectedIds": [], "count": 0}}
+{"type": "image_hide", "timestamp": "2026-03-02T16:36:54.300652", "data": {"imageIds": [93], "count": 1}}
+{"type": "image_restore", "timestamp": "2026-03-02T16:37:01.991017", "data": {"imageIds": [93], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:37:04.409336", "data": {"selectedIds": [93], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:39:22.843107", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:39:23.716773", "data": {"selectedIds": [93], "count": 1}}
+{"type": "star_rating", "timestamp": "2026-03-02T16:39:47.066765", "data": {"imageIds": [93], "rating": 4, "previousRating": 0}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:39:52.166758", "data": {"filterLevel": 4, "previousLevel": null}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:39:56.626281", "data": {"filterLevel": 1, "previousLevel": 4}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:39:57.155631", "data": {"filterLevel": 2, "previousLevel": 1}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:39:57.692379", "data": {"filterLevel": 3, "previousLevel": 2}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:39:58.631197", "data": {"filterLevel": 4, "previousLevel": 3}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:39:59.248587", "data": {"filterLevel": 5, "previousLevel": 4}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:40:01.744362", "data": {"filterLevel": 4, "previousLevel": 5}}
+{"type": "selection", "timestamp": "2026-03-02T16:41:00.184109", "data": {"selectedIds": [91], "count": 1}}
+{"type": "axis_suggestion_apply", "timestamp": "2026-03-02T16:41:55.241018", "data": {"xAxis": "matte - glossy", "yAxis": "low - high contrast", "reasoning": "'Matte - glossy' directly addresses the material dichotomy. 'Low - high contrast' explores how the matte black, gray-blue, and neon green will be balanced, from subtle shifts to dramatic juxtapositions."}}
+{"type": "axis_change", "timestamp": "2026-03-02T16:42:25.250611", "data": {"axisLabels": {"x": ["matte", "glossy"], "y": ["low", "high contrast"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-02T16:42:52.324122", "data": {"selectedIds": [53, 64, 67], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T16:42:53.278338", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:43:25.732159", "data": {"selectedIds": [93], "count": 1}}
+{"type": "generation", "timestamp": "2026-03-02T16:45:01.268494", "data": {"imageIds": [95], "count": 1, "prompt": "A futuristic, minimalist sneaker featuring solid geometric contours. The upper is primarily a high-gloss gray-blue with matte black panels defining sharp lines. Neon green is used for extreme accents on the inner sole edges and a subtle heel pull-tab. The sole is unexpectedly thin and chunky, a matte black with a glossy neon green razor-thin stripe around its perimeter."}}
+{"type": "generation", "timestamp": "2026-03-02T16:45:12.777103", "data": {"imageIds": [96], "count": 1, "prompt": "A futuristic, minimalist sneaker with bold geometric contours. The entire shoe is constructed with a high-gloss finish in matte black, while sharp, angular overlays in muted gray-blue create strong visual breaks. The sole is designed to be both chunky and surprisingly thin, with a matte black base and an explosive, glossy neon green geometric pattern across its surface."}}
+{"type": "selection", "timestamp": "2026-03-02T16:45:20.031376", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:45:24.507476", "data": {"selectedIds": [93], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:45:25.523464", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:45:45.183543", "data": {"selectedIds": [93], "count": 1}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T16:45:54.225532", "data": {"filterLevel": null, "previousLevel": 4}}
+{"type": "selection", "timestamp": "2026-03-02T16:46:06.025887", "data": {"selectedIds": [93, 95], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:46:30.899840", "data": {"selectedIds": [93], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:46:31.880666", "data": {"selectedIds": [93, 95], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T16:46:43.094447", "data": {"selectedIds": [95], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:46:43.096239", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T16:46:43.099438", "data": {"selectedIds": [95], "count": 1}}
+{"type": "session_end", "timestamp": "2026-03-02T16:47:24.924573", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0"}

@@ -1,0 +1,82 @@
+{"type": "session_start", "timestamp": "2026-02-27T16:36:47.557024", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0", "canvas_name": "Onboarding", "participant_id": "Evan", "study_session": null}
+{"type": "generation", "timestamp": "2026-02-27T16:36:57.695535", "data": {"imageIds": [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83], "count": 55, "prompt": "Sculptural football shoe featuring woven mesh upper, natural fiber, earthy tones, layered sole, textured outsole, organic form's woven mesh upper and patchwork leather, stitched seams, blocky silhouette, cork midsole, raw edges, traditional material's patchwork leather panels, with patchwork leather, stitched seams, blocky silhouette, cork midsole, raw edges, traditional material's stitched seams and woven mesh upper, natural fiber, earthy tones, layered sole, textured outsole, organic form's layered sole."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:36:57.699800", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "axis_change", "timestamp": "2026-02-27T16:36:57.701695", "data": {"axisLabels": {"x": ["fast", "slow"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "generation", "timestamp": "2026-02-27T16:37:46.434771", "data": {"imageIds": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83], "count": 60, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:37:46.437811", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "generation", "timestamp": "2026-02-27T16:37:53.839797", "data": {"imageIds": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83], "count": 60, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:37:53.843530", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "selection", "timestamp": "2026-02-27T16:38:05.849954", "data": {"selectedIds": [23, 25, 26, 27, 28, 29, 31, 35, 37, 38, 39, 40, 42, 46, 48, 54, 55, 57, 59, 60, 62, 65, 66, 68, 69, 70, 71, 73, 74, 75, 76, 77, 78, 80, 81, 82, 83], "count": 37}}
+{"type": "selection", "timestamp": "2026-02-27T16:38:21.422639", "data": {"selectedIds": [], "count": 0}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:39:51.870801", "data": {"brief": "create a global football boot that is tuned for performance on turf."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:40:53.452375", "data": {"brief": "This is a football boot designed for lightning-fast turf play, evoking the aggressive speed and dynamism of the Nike Mercurial line. The striking colorway of electric blue and vibrant pink will make a bold statement, pushing the boundaries of athletic aesthetics."}}
+{"type": "selection", "timestamp": "2026-02-27T16:41:03.382969", "data": {"selectedIds": [34], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:41:28.809653", "data": {"selectedIds": [34, 36], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:41:31.652653", "data": {"selectedIds": [34, 36, 47], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T16:41:55.242869", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:41:58.032514", "data": {"selectedIds": [33, 34], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:42:15.972415", "data": {"selectedIds": [43], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:42:23.745636", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:42:49.925847", "data": {"selectedIds": [30], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:43:06.641718", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:43:08.292077", "data": {"selectedIds": [53], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:43:11.168122", "data": {"selectedIds": [30], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:43:26.339807", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:43:37.869927", "data": {"selectedIds": [43], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:43:46.800413", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:44:22.351847", "data": {"selectedIds": [24, 30, 32, 33, 34, 36, 43, 44, 45, 47, 49, 50, 51, 52, 53, 56, 58, 61, 63, 64, 67, 72, 79], "count": 23}}
+{"type": "selection", "timestamp": "2026-02-27T16:44:34.512872", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:44:35.349440", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:44:44.176889", "data": {"selectedIds": [45, 53], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:45:16.406888", "data": {"selectedIds": [45, 53, 43], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T16:45:17.391517", "data": {"selectedIds": [45, 53, 43, 30], "count": 4}}
+{"type": "selection", "timestamp": "2026-02-27T16:47:05.359977", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:47:08.125539", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:47:08.719157", "data": {"selectedIds": [], "count": 0}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:48:25.856831", "data": {"tag": "knit construction", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:48:31.079116", "data": {"tag": "sock-like fit", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:48:33.719814", "data": {"tag": "turbo speed", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:48:34.371491", "data": {"tag": "Mercurial inspired", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:48:35.952496", "data": {"tag": "turf ready", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:48:39.074967", "data": {"tag": "explosive traction", "category": "details", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-27T16:49:02.521177", "data": {"prompt": "Modify the Mercurial-inspired turf boot with knit construction, sock-like fit, and electric blue/vibrant pink to enhance turbo speed and explosive traction for turf play.", "imageCount": 2, "selectedTagCount": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:49:25.844421", "data": {"selectedIds": [84, 85], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T16:49:25.846385", "data": {"imageIds": [84, 85], "count": 2, "prompt": "Modify the Mercurial-inspired turf boot with knit construction, sock-like fit, and electric blue/vibrant pink to enhance turbo speed and explosive traction for turf play."}}
+{"type": "selection", "timestamp": "2026-02-27T16:49:35.833796", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:49:43.149829", "data": {"selectedIds": [85], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:50:01.228514", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:50:06.572093", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:50:08.010739", "data": {"selectedIds": [36, 85], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:51:10.828862", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:51:13.186721", "data": {"selectedIds": [84], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:51:18.041007", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T16:51:28.602882", "data": {"imageIds": [86, 87], "count": 2, "prompt": "green suede, organic lines, metallic heel, translucent sole, low-cut collar, molded studs's molded studs and organic lines combined with electric blue, vibrant pink, knit sock collar, lightning graphics, high-top silhouette, gradient accents's knit sock collar, electric blue, and vibrant pink lightning graphics."}}
+{"type": "selection", "timestamp": "2026-02-27T16:51:28.604227", "data": {"selectedIds": [86, 87], "count": 2}}
+{"type": "axis_change", "timestamp": "2026-02-27T16:52:20.269706", "data": {"axisLabels": {"x": ["fast", "fitted"], "y": ["dark", "colorful"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-02-27T16:52:41.851292", "data": {"selectedIds": [87], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:53:28.472392", "data": {"selectedIds": [87, 50], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:53:32.013437", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:53:32.541417", "data": {"selectedIds": [50], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:53:35.425852", "data": {"selectedIds": [50, 67], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:53:39.296834", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:53:42.281199", "data": {"selectedIds": [51], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:53:48.438455", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:54:17.432372", "data": {"selectedIds": [50], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:55:20.758413", "data": {"selectedIds": [50, 63], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:55:22.471010", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:55:23.896718", "data": {"selectedIds": [63], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:55:24.528628", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:55:25.517454", "data": {"selectedIds": [87], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:55:52.842553", "data": {"selectedIds": [43], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T16:57:40.919275", "data": {"imageIds": [88], "count": 1, "prompt": "A football boot for lightning-fast turf play, constructed with a seamless, bio-mimicking synthetic upper that hugs the foot, featuring a sharp geometric pattern in electric blue and hot pink, with a strategically placed matte black heel counter for aggressive contrast and stability."}}
+{"type": "axis_change", "timestamp": "2026-02-27T16:58:27.988804", "data": {"axisLabels": {"x": ["performance-driven", "style-led"], "y": ["heritage", "avant-garde"], "z": ["casual", "elegant"]}}}
+{"type": "generation", "timestamp": "2026-02-27T16:58:27.991324", "data": {"imageIds": [88], "count": 1, "prompt": "A football boot for lightning-fast turf play, constructed with a seamless, bio-mimicking synthetic upper that hugs the foot, featuring a sharp geometric pattern in electric blue and hot pink, with a strategically placed matte black heel counter for aggressive contrast and stability."}}
+{"type": "selection", "timestamp": "2026-02-27T16:59:05.524424", "data": {"selectedIds": [43, 88], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:59:09.169524", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T16:59:13.387805", "data": {"imageIds": [89], "count": 1, "prompt": "A football boot for lightning-fast turf play, featuring a highly textured, ultra-form-fitting knitted upper in a gradient of electric blue transitioning to vibrant pink, with subtle reflective silver accents that mimic the shimmer of electricity."}}
+{"type": "selection", "timestamp": "2026-02-27T16:59:15.037739", "data": {"selectedIds": [88], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:59:17.835114", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:59:22.823234", "data": {"selectedIds": [88], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:59:26.805922", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T17:00:11.425302", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "toCanvasId": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-02-27T17:00:11.438761", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0"}

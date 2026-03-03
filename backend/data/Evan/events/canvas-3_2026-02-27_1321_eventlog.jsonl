@@ -1,0 +1,4 @@
+{"type": "session_start", "timestamp": "2026-02-27T13:21:43.182701", "canvas_id": "99b2c9e4-b1d5-4ec0-a435-203d4133d3e9", "canvas_name": "Canvas 3", "participant_id": "Evan", "study_session": null}
+{"type": "design_brief_change", "timestamp": "2026-02-27T13:21:44.758167", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T13:21:47.121496", "data": {"fromCanvasId": "99b2c9e4-b1d5-4ec0-a435-203d4133d3e9", "toCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-02-27T13:21:47.125887", "canvas_id": "99b2c9e4-b1d5-4ec0-a435-203d4133d3e9"}

@@ -5,11 +5,12 @@ import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
 import { SuggestionsPanel, CATEGORY_COLORS } from '../SuggestionsPanel/SuggestionsPanel';
 import type { PillDef } from '../../utils/renderPills';
 import '../PromptDialog/PromptDialog.css';
+import '../PromptDialog/PromptDialogRef.css';
 import './TextToImageDialog.css';
 
 interface TextToImageDialogProps {
   onClose: () => void;
-  onGenerate: (prompt: string, count: number) => void;
+  onGenerate: (prompt: string, count: number, shoeType?: string) => void;
 }
 
 export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
@@ -24,8 +25,18 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   // All available pills from SuggestionsPanel (kept for future use)
   const [_availablePills, setAvailablePills] = useState<PillDef[]>([]);
 
+  // Shoe type override — highest-priority hard constraint, pre-filled from AI context
+  const briefFields = useAppStore((s) => s.briefFields);
+  const [shoeType, setShoeType] = useState(
+    () => briefFields.find(f => f.key === 'shoe_type')?.value?.trim() ?? ''
+  );
+
   // Refine state
   const [isRefining, setIsRefining] = useState(false);
+  const [preRefineState, setPreRefineState] = useState<{
+    freeText: string;
+    selectedTags: Map<string, string>;
+  } | null>(null);
   const designBrief = useAppStore((s) => s.designBrief);
 
   // Tutorial guide: show when the tutorial spotlight is on a generation step
@@ -50,7 +61,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
       imageCount,
       selectedTagCount: selectedTags.size,
     });
-    onGenerate(composedPrompt, imageCount);
+    onGenerate(composedPrompt, imageCount, shoeType.trim() || undefined);
     onClose();
   };
 
@@ -91,9 +102,17 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
     });
   };
 
+  const handleUndoRefine = () => {
+    if (!preRefineState) return;
+    setFreeText(preRefineState.freeText);
+    setSelectedTags(preRefineState.selectedTags);
+    setPreRefineState(null);
+  };
+
   // Refine prompt via AI — directly replaces freeText
   const handleRefine = async () => {
     if (!composedPrompt || isRefining) return;
+    setPreRefineState({ freeText, selectedTags: new Map(selectedTags) });
     setIsRefining(true);
     try {
       const tags = Array.from(selectedTags.entries()).map(([text, catKey]) => ({
@@ -105,7 +124,9 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
         composedPrompt,
         tags,
         [],
-        designBrief || ''
+        designBrief || '',
+        'shoe',
+        'scratch'
       );
       // Directly update: clear chips, put refined text in freeText
       setSelectedTags(new Map());
@@ -131,6 +152,19 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
         {/* Left panel: chip prompt area + count */}
         <div className="dialog prompt-dialog-main">
           <h2>Generate from Text</h2>
+
+          {/* ── Shoe Type override — highest-priority constraint ── */}
+          <div className="shoe-type-row" title="This overrides the AI context shoe type for this generation only">
+            <span className="shoe-type-icon">⚡</span>
+            <label className="shoe-type-label">Shoe Type</label>
+            <input
+              type="text"
+              className="shoe-type-input"
+              placeholder="slide, trail runner, sneaker…"
+              value={shoeType}
+              onChange={e => setShoeType(e.target.value)}
+            />
+          </div>
 
           {/* ── Tutorial guide banner ── */}
           {showTutorialGuide && (
@@ -210,7 +244,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
               />
 
               {/* Refine button row */}
-              {composedPrompt && (
+              {(composedPrompt || preRefineState) && (
                 <div className="ttd-refine-row">
                   <button
                     className={`ttd-refine-btn${showTutorialGuide ? ' ttd-btn-pulse' : ''}`}
@@ -220,6 +254,15 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
                   >
                     {isRefining ? 'Refining...' : 'Refine Prompt'}
                   </button>
+                  {preRefineState && (
+                    <button
+                      className="ttd-refine-btn ttd-undo-btn"
+                      onClick={handleUndoRefine}
+                      title="Revert to your original prompt before refinement"
+                    >
+                      Undo Refine
+                    </button>
+                  )}
                 </div>
               )}
             </div>

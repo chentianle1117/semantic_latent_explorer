@@ -74,6 +74,13 @@ export const MoodBoardDialog: React.FC<MoodBoardDialogProps> = ({
       alert('Please enter a prompt or select tags');
       return;
     }
+    apiClient.logEvent('mood_board_submit', {
+      prompt,
+      count: imageCount,
+      style,
+      hasStyleRef: !!styleRefUrl,
+      selectedTagCount: selectedTags.size,
+    });
     onGenerate(prompt, imageCount, style, styleRefUrl ?? undefined);
     onClose();
   };

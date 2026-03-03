@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from "re
 import { useAppStore } from "../../store/appStore";
 import { getRealmAwareLabel } from "../../utils/generationCategories";
 import { SHOE_VIEW_LABELS } from "../../api/falClient";
+import { apiClient } from "../../api/client";
 import type { ImageData } from "../../types";
 import "./RightInspector.css";
 
@@ -491,11 +492,15 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                         className={`star-btn ${filled ? "star-filled" : "star-empty"}`}
                         onClick={() => {
                           const newRating = currentRating === n ? 0 : n;
-                          if (selectedImageIds.length > 1) {
-                            selectedImageIds.forEach((id) => setImageRating(id, newRating));
-                          } else {
-                            setImageRating(inspectedImage.id, newRating);
-                          }
+                          const targetIds = selectedImageIds.length > 1
+                            ? [...selectedImageIds]
+                            : [inspectedImage.id];
+                          targetIds.forEach((id) => setImageRating(id, newRating));
+                          apiClient.logEvent('star_rating', {
+                            imageIds: targetIds,
+                            rating: newRating,
+                            previousRating: currentRating,
+                          });
                         }}
                         title={`Rate ${n} star${n > 1 ? "s" : ""}`}
                       >

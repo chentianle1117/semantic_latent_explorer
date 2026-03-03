@@ -100,12 +100,7 @@ export function useAutoComplete(): void {
       const el = document.querySelector('[data-tour="tab-lineage"]');
       if (el && el.classList.contains('active')) {
         completeStep('a-lineage-tab');
-        // Collapse drawer after 2s so user sees the tree, then layers bar is revealed for next step
-        setTimeout(() => {
-          if (useAppStore.getState().completedSteps.includes('a-lineage-tab')) {
-            useAppStore.getState().setDrawerActiveTab(null);
-          }
-        }, 2000);
+        // Do NOT auto-collapse the drawer — user controls when to close it
       }
     };
     const obs = new MutationObserver(check);

@@ -1,0 +1,108 @@
+{"type": "session_start", "timestamp": "2026-02-27T16:13:55.520079", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0", "canvas_name": "Onboarding", "participant_id": "Evan", "study_session": null}
+{"type": "generation", "timestamp": "2026-02-27T16:13:58.548311", "data": {"imageIds": [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 43, 44, 45], "count": 17, "prompt": "Sculptural football shoe featuring woven mesh upper, natural fiber, earthy tones, layered sole, textured outsole, organic form's woven mesh upper and patchwork leather, stitched seams, blocky silhouette, cork midsole, raw edges, traditional material's patchwork leather panels, with patchwork leather, stitched seams, blocky silhouette, cork midsole, raw edges, traditional material's stitched seams and woven mesh upper, natural fiber, earthy tones, layered sole, textured outsole, organic form's layered sole."}}
+{"type": "axis_change", "timestamp": "2026-02-27T16:13:58.554178", "data": {"axisLabels": {"x": ["fast", "slow"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T16:13:58.557120", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:11.985567", "data": {"selectedIds": [30], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:12.585913", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:15.605038", "data": {"selectedIds": [44, 45], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:17.398798", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:17.885761", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:18.474019", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:19.361031", "data": {"selectedIds": [44], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:20.555056", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:20.860391", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:21.311123", "data": {"selectedIds": [36, 33], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:22.240456", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:22.644888", "data": {"selectedIds": [42], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:22.946935", "data": {"selectedIds": [42, 30], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:23.555037", "data": {"selectedIds": [42, 30, 34], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:24.414746", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:26.137971", "data": {"selectedIds": [42, 43], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:26.496637", "data": {"selectedIds": [40], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:27.038825", "data": {"selectedIds": [38, 39], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:28.261139", "data": {"selectedIds": [36, 37], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:28.667588", "data": {"selectedIds": [35], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:29.601055", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:29.893204", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:30.555663", "data": {"selectedIds": [32, 25], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:31.618307", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:32.205572", "data": {"selectedIds": [27], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:32.670905", "data": {"selectedIds": [27, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:33.310128", "data": {"selectedIds": [], "count": 0}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:14:36.663340", "data": {"tag": "supple suede", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:14:36.993396", "data": {"tag": "off-white", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:14:37.683196", "data": {"tag": "refined sport", "category": "style", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-27T16:14:40.797572", "data": {"prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic.", "imageCount": 1, "selectedTagCount": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:47.272244", "data": {"selectedIds": [43], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:49.366346", "data": {"selectedIds": [43, 42], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:52.601452", "data": {"selectedIds": [43, 42, 45], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:52.605535", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:52.609058", "data": {"selectedIds": [30], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:52.611448", "data": {"selectedIds": [30, 36], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T16:14:53.271492", "data": {"imageIds": [46], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:53.272971", "data": {"selectedIds": [46], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:53.278233", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:53.541675", "data": {"selectedIds": [27], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:54.912103", "data": {"selectedIds": [27, 28], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:14:55.928090", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T16:15:14.516947", "data": {"imageIds": [47], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:15:18.006292", "data": {"selectedIds": [46], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T16:15:18.029194", "data": {"imageIds": [48], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:15:21.981508", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T16:15:21.997126", "data": {"imageIds": [49], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:15:22.597018", "data": {"selectedIds": [46], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T16:15:24.898661", "data": {"imageIds": [50], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:15:27.841160", "data": {"imageIds": [51], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:15:30.786923", "data": {"imageIds": [52], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:15:33.932305", "data": {"imageIds": [53], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:10.458912", "data": {"imageIds": [54], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:11.988168", "data": {"imageIds": [55], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:15.623020", "data": {"imageIds": [56], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:17.237045", "data": {"imageIds": [57], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:18.468855", "data": {"imageIds": [58], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:19.398578", "data": {"imageIds": [59], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:20.196129", "data": {"imageIds": [60], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:22.384787", "data": {"imageIds": [61], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:24.033456", "data": {"imageIds": [62], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:25.134906", "data": {"imageIds": [63], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:26.168358", "data": {"imageIds": [64], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:19:26.169872", "data": {"selectedIds": [44, 45], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:26.185665", "data": {"imageIds": [65], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:19:26.625598", "data": {"selectedIds": [44, 45, 46], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T16:19:27.620747", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:27.638944", "data": {"imageIds": [66], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:19:27.909056", "data": {"selectedIds": [46], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T16:19:29.092092", "data": {"imageIds": [67], "count": 1, "prompt": "Modify the reference shoe with supple suede in an off-white hue, updating its form to a more refined sport aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:19:35.513901", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:19:35.955241", "data": {"selectedIds": [46], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T16:21:25.521767", "data": {"selectedIds": [46, 43], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:21:26.450836", "data": {"selectedIds": [], "count": 0}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:21:33.390349", "data": {"tag": "oxidized copper", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:21:34.071607", "data": {"tag": "natural canvas", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:21:35.792489", "data": {"tag": "modern heritage", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T16:21:36.498050", "data": {"tag": "architectural sole", "category": "details", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-27T16:21:38.582990", "data": {"prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic.", "imageCount": 2, "selectedTagCount": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:21:43.330778", "data": {"selectedIds": [46], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:10.726795", "data": {"imageIds": [68, 69], "count": 2, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:22:10.729307", "data": {"selectedIds": [68, 69], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:29.587328", "data": {"imageIds": [70], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:32.682778", "data": {"imageIds": [71], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:35.809327", "data": {"imageIds": [72], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:38.331855", "data": {"imageIds": [73], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:43.015084", "data": {"imageIds": [74], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:45.688865", "data": {"imageIds": [75], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:22:50.315374", "data": {"imageIds": [76], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:23:10.105512", "data": {"imageIds": [77], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:23:13.890199", "data": {"imageIds": [78], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:23:16.901133", "data": {"imageIds": [79], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:23:20.239929", "data": {"imageIds": [80], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:23:24.166339", "data": {"imageIds": [81], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "generation", "timestamp": "2026-02-27T16:23:27.163539", "data": {"imageIds": [82], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:23:30.827291", "data": {"selectedIds": [68, 69, 46], "count": 3}}
+{"type": "generation", "timestamp": "2026-02-27T16:23:30.846347", "data": {"imageIds": [83], "count": 1, "prompt": "Update the reference shoe with oxidized copper accents, natural canvas uppers, and an architectural sole, embodying a modern heritage aesthetic."}}
+{"type": "selection", "timestamp": "2026-02-27T16:23:30.911853", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T16:23:31.932605", "data": {"selectedIds": [68, 69], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T16:26:08.814552", "data": {"selectedIds": [28, 29, 30, 31, 35, 37, 38, 39, 40, 42, 68, 69], "count": 12}}
+{"type": "selection", "timestamp": "2026-02-27T16:26:09.370854", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T16:32:35.212445", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "toCanvasId": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-02-27T16:32:35.214661", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0"}

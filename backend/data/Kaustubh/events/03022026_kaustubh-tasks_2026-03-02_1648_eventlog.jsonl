@@ -1,0 +1,326 @@
+{"type": "session_start", "timestamp": "2026-03-02T16:48:36.089467", "canvas_id": "ad7be14f-608b-4170-bbb3-caf1798389a1", "canvas_name": "Kaustubh Tasks", "participant_id": "Kaustubh", "study_session": "03/02/2026"}
+{"type": "selection", "timestamp": "2026-03-02T16:51:17.384600", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T16:51:19.807892", "data": {"selectedIds": [], "count": 0}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:57:55.677224", "data": {"brief": "\"Rugged + Lightweight\" shoe which can either be a train shoe or a performance runner."}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:58:29.617862", "data": {"brief": "\"Rugged + Lightweight\" shoe which can either be a train shoe or a performance runner. A Trail Shoe: Built for off-road utility but feeling unexpectedly light.\nA Performance Runner: Built for speed but retaining rugged outdoor cues. I want a shoe which follows the idea of being rugged yet light weight."}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:59:16.911874", "data": {"brief": "I'm envisioning a trail running shoe that's surprisingly lightweight, blending a rugged aesthetic with a modern, classic silhouette. The design will play with vibrant mono-color palettes, all anchored by a sole that's both substantial and agile, offering performance on any terrain."}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:40.603054", "data": {"tag": "Modern classic", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:41.492902", "data": {"tag": "Streamlined profile", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:42.627284", "data": {"tag": "Lime green", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:43.466417", "data": {"tag": "Vivid orange", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:44.100603", "data": {"tag": "Electric blue", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:46.106185", "data": {"tag": "Reinforced overlays", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:46.900397", "data": {"tag": "Water-resistant upper", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:49.647100", "data": {"tag": "Durable synthetics", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:52.922395", "data": {"tag": "Ripstop mesh", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:54.648041", "data": {"tag": "Lightweight knit", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-02T16:59:56.011694", "data": {"tag": "Monochromatic scheme", "category": "color", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-03-02T17:00:01.400324", "data": {"prompt": "Modern classic, Streamlined profile, Lime green, Vivid orange, Electric blue, Reinforced overlays, Water-resistant upper, Durable synthetics, Ripstop mesh, Lightweight knit, Monochromatic scheme, Lightweight mono-color trail runner, chunky agile sole, modern classic silhouette.", "imageCount": 2, "selectedTagCount": 11}}
+{"type": "generation", "timestamp": "2026-03-02T17:00:29.870591", "data": {"imageIds": [9, 10], "count": 2, "prompt": "Modern classic, Streamlined profile, Lime green, Vivid orange, Electric blue, Reinforced overlays, Water-resistant upper, Durable synthetics, Ripstop mesh, Lightweight knit, Monochromatic scheme, Lightweight mono-color trail runner, chunky agile sole, modern classic silhouette."}}
+{"type": "selection", "timestamp": "2026-03-02T17:00:29.872552", "data": {"selectedIds": [9, 10], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:00:34.668206", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:00:41.717939", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:00:41.753139", "data": {"selectedIds": [10, 9], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T17:01:07.306756", "data": {"imageIds": [11], "count": 1, "prompt": "Modern classic, a luxury trail runner with deep emerald suede, brushed gold accents, and a refined Vibram sole."}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:09.539152", "data": {"selectedIds": [10, 9, 11], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:11.338586", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:12.770298", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:13.633940", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:16.043918", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:29.865425", "data": {"selectedIds": [3, 4], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:30.578072", "data": {"selectedIds": [3, 4, 8], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:31.045277", "data": {"selectedIds": [3, 4, 8, 5], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:32.090586", "data": {"selectedIds": [3, 4, 8, 5, 6], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:33.790398", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:01:40.643813", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 8, 11], "count": 9}}
+{"type": "selection", "timestamp": "2026-03-02T17:02:15.226865", "data": {"selectedIds": [], "count": 0}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T17:02:49.525849", "data": {"brief": "I'm envisioning a performance running shoe that seamlessly bridges the gap between technical trail capability and everyday street style. The design will feature a modern silhouette with a nod to classic running shoe lines, offering a vibrant color palette alongside a clean, monochromatic option. Underfoot, a versatile sole will strike a balance, providing a satisfyingly chunky feel for rugged terrain while maintaining a slim profile for responsive road feel."}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:12.068931", "data": {"selectedIds": [10], "count": 1}}
+{"type": "axis_change", "timestamp": "2026-03-02T17:03:18.502477", "data": {"axisLabels": {"x": ["Trail running", "Performance"], "y": ["heritage", "avant-garde"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:18.504654", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:18.506238", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:21.611814", "data": {"selectedIds": [12, 13], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T17:03:21.613343", "data": {"imageIds": [12, 13], "count": 2, "prompt": "Blend chunky sole, lime green accents, geometric tread, white outsole, organic shape, lightweight sole's lime green chunky sole with deep green, suede upper, gold accent, classic silhouette, chunky sole, minimalist design's deep green suede upper and gold accent for a modern, classic silhouette."}}
+{"type": "delete", "timestamp": "2026-03-02T17:03:21.616975", "data": {"deletedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:21.619780", "data": {"selectedIds": [], "count": 0}}
+{"type": "image_hide", "timestamp": "2026-03-02T17:03:21.621699", "data": {"imageIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:21.623258", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:28.588305", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:29.632199", "data": {"selectedIds": [9], "count": 1}}
+{"type": "delete", "timestamp": "2026-03-02T17:03:34.440586", "data": {"deletedIds": [9], "count": 1}}
+{"type": "image_hide", "timestamp": "2026-03-02T17:03:34.442570", "data": {"imageIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:34.443610", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:35.504617", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:42.060680", "data": {"selectedIds": [11, 13], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:43.400424", "data": {"selectedIds": [11, 13, 1], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:46.254792", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:46.923569", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:47.952193", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:03:53.445977", "data": {"selectedIds": [11], "count": 1}}
+{"type": "generation", "timestamp": "2026-03-02T17:04:07.085531", "data": {"imageIds": [14], "count": 1, "prompt": "A modern, classic shoe with a matte black leather upper, subtle grey detailing, and a smooth, streamlined sole."}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:11.830747", "data": {"selectedIds": [11, 14], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:13.068189", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:13.944319", "data": {"selectedIds": [11, 1], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:14.992628", "data": {"selectedIds": [11, 1, 14], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:16.285379", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:17.027563", "data": {"selectedIds": [14], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:18.085654", "data": {"selectedIds": [14, 4], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:18.956061", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:20.154158", "data": {"selectedIds": [14], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:20.877434", "data": {"selectedIds": [14, 13], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:23.780010", "data": {"selectedIds": [13], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:24.783222", "data": {"selectedIds": [13, 14], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:25.654703", "data": {"selectedIds": [13, 14, 1], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:26.563440", "data": {"selectedIds": [], "count": 0}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:04:35.563714", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": false}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:04:40.738521", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "selection", "timestamp": "2026-03-02T17:04:47.684421", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 8], "count": 9}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:04:59.254387", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": false}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:05:02.920298", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:05:04.380014", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": false}]}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:05.646133", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:06.336834", "data": {"selectedIds": [14], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:09.655002", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:10.334334", "data": {"selectedIds": [14], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:16.356758", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:17.181711", "data": {"selectedIds": [14], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:21.703824", "data": {"selectedIds": [14, 2], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:05:37.235173", "data": {"selectedIds": [14, 2, 12], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:06:06.179348", "data": {"selectedIds": [], "count": 0}}
+{"type": "axis_change", "timestamp": "2026-03-02T17:06:26.321854", "data": {"axisLabels": {"x": ["Trail running", "Performance"], "y": ["mono color", "vibrant"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-02T17:06:40.321920", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:06:48.500205", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:06:49.613209", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:06:59.020557", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:06:59.974420", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:07:16.303058", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:07:17.576561", "data": {"selectedIds": [11], "count": 1}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:07:20.349699", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "selection", "timestamp": "2026-03-02T17:07:28.072598", "data": {"selectedIds": [11, 3], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:07:29.552065", "data": {"selectedIds": [11, 3, 7], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:08:28.677094", "data": {"selectedIds": [11, 3, 7, 1], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:08:35.801968", "data": {"selectedIds": [11, 3, 7, 1, 5], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:09:05.089243", "data": {"selectedIds": [11, 7, 1, 5], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:09:06.460357", "data": {"selectedIds": [11, 1, 5], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:09:11.044299", "data": {"selectedIds": [11, 5], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T17:09:20.703999", "data": {"imageIds": [15, 16], "count": 2, "prompt": "Blend white mesh, layered texture, geometric pattern, minimalist, tonal, performance fabric's organic paneling and 3D relief, organic form, sculptural, monochromatic white, grid texture, tactile surface's textured grid pattern into the upper of green suede, classic silhouette, gold accent, chunky sole, off-white midsole, laced shoe."}}
+{"type": "selection", "timestamp": "2026-03-02T17:09:23.196267", "data": {"selectedIds": [15, 16], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:09:26.168161", "data": {"selectedIds": [15], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:09:27.112955", "data": {"selectedIds": [15, 16], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T17:10:44.196710", "data": {"imageIds": [17], "count": 1, "prompt": "A modern, classic running shoe blending recycled grey knit, perforated leather accents, reflective detailing, and a segmented sole."}}
+{"type": "selection", "timestamp": "2026-03-02T17:10:44.199347", "data": {"selectedIds": [15, 16, 14], "count": 3}}
+{"type": "generation", "timestamp": "2026-03-02T17:10:58.828966", "data": {"imageIds": [18], "count": 1, "prompt": "A modern, classic performance running shoe with an all-black ripstop nylon upper, subtly textured with tonal geometric patterns. The shoe features a striking, almost iridescent purple swoosh and matching outsole accents. The sole is a substantial, sculpted black foam with a visible air unit, providing both a rugged feel and a slim, responsive road contact."}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:02.031209", "data": {"selectedIds": [15, 16, 14, 18], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:08.226354", "data": {"selectedIds": [6, 18], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:11.973062", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:12.564435", "data": {"selectedIds": [18], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:19.559318", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:20.406857", "data": {"selectedIds": [18], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:22.215158", "data": {"selectedIds": [18, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:11:24.231080", "data": {"selectedIds": [18, 7, 3], "count": 3}}
+{"type": "generation", "timestamp": "2026-03-02T17:12:52.663571", "data": {"imageIds": [19], "count": 1, "prompt": "A modern, classic performance running shoe with a seamless engineered mesh upper in electric lime green and neon orange accents, featuring a reflective silver logo. The sole is a chunky, segmented white rubber with a visible carbon fiber plate integrated into the midsole, offering high-performance road grip and a sleek, streamlined profile."}}
+{"type": "selection", "timestamp": "2026-03-02T17:12:54.164482", "data": {"selectedIds": [18, 7, 3, 19], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:12:56.656362", "data": {"selectedIds": [7, 3, 19], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:12:58.079989", "data": {"selectedIds": [7, 3, 19, 18], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:09.835520", "data": {"selectedIds": [3, 19, 18], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:09.837426", "data": {"selectedIds": [19, 18], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:09.980017", "data": {"selectedIds": [19], "count": 1}}
+{"type": "generation", "timestamp": "2026-03-02T17:13:12.368546", "data": {"imageIds": [20, 21], "count": 2, "prompt": "Change the texture and color of upper of black shoe, purple swoosh, air bubble sole, performance silhouette, mesh upper, classic running lines inspired by white leather, white mesh, layered construction, abstract pattern, textured panels, monochromatic and midsole of black shoe, purple swoosh, air bubble sole, performance silhouette, mesh upper, classic running lines inspired by white relief, 3d texture, geometric pattern, sculptural form, monochromatic, organic shape"}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:12.382243", "data": {"selectedIds": [20, 21], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:12.384491", "data": {"selectedIds": [20], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:12.386586", "data": {"selectedIds": [20, 21], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:12.969452", "data": {"selectedIds": [21], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:14.863891", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:15.475027", "data": {"selectedIds": [20], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:17.727178", "data": {"selectedIds": [20, 17], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:13:26.756840", "data": {"selectedIds": [20, 21], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-02T17:13:59.306681", "data": {"imageIds": [22], "count": 1, "prompt": "A modern, classic shoe with rugged suede upper, earthy tones, and a thick, decoupled sole."}}
+{"type": "selection", "timestamp": "2026-03-02T17:14:23.719312", "data": {"selectedIds": [22], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:14:27.225615", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:14:29.195775", "data": {"selectedIds": [22], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:14:33.216155", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:14:33.860818", "data": {"selectedIds": [22], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:14:44.284051", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:14:45.471626", "data": {"selectedIds": [22], "count": 1}}
+{"type": "axis_change", "timestamp": "2026-03-02T17:15:23.755773", "data": {"axisLabels": {"x": ["Trail shoe", "Performance Runner"], "y": ["mono color", "vibrant"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:29.819852", "data": {"selectedIds": [22, 21], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:30.747268", "data": {"selectedIds": [22], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:31.693211", "data": {"selectedIds": [22, 21], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:40.511276", "data": {"selectedIds": [22, 21, 19], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:46.640785", "data": {"selectedIds": [22, 19], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:52.870946", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:56.963603", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:15:58.060945", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:02.734267", "data": {"selectedIds": [19, 18], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:03.265627", "data": {"selectedIds": [19, 18, 22], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:04.914169", "data": {"selectedIds": [19, 18, 22, 21], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:06.229874", "data": {"selectedIds": [19, 18, 22, 21, 17], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:07.546953", "data": {"selectedIds": [19, 18, 22, 21, 17, 14], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:10.910945", "data": {"selectedIds": [19, 18, 21, 17, 14], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:11.632308", "data": {"selectedIds": [19, 18, 21, 17, 14, 22], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:18.540647", "data": {"selectedIds": [19, 18, 17, 14, 22], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:19.651394", "data": {"selectedIds": [19, 18, 17, 14, 22, 21], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:20.410967", "data": {"selectedIds": [19, 18, 17, 14, 22, 21, 20], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:21.130585", "data": {"selectedIds": [19, 17, 14, 22, 21, 20], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:21.888180", "data": {"selectedIds": [19, 17, 14, 22, 21, 20, 18], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:26.934552", "data": {"selectedIds": [19, 14, 22, 21, 20, 18], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:27.926675", "data": {"selectedIds": [19, 14, 22, 21, 20, 18, 17], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:31.217756", "data": {"selectedIds": [19, 14, 22, 21, 18, 17], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:31.697182", "data": {"selectedIds": [19, 14, 22, 18, 17], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:32.272433", "data": {"selectedIds": [19, 14, 18, 17], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:37.547019", "data": {"selectedIds": [19, 14, 18], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:16:37.550847", "data": {"selectedIds": [19, 14, 18, 17], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:05.397769", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:08.817381", "data": {"selectedIds": [19], "count": 1}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:17:16.326471", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": false}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-02T17:17:17.280934", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:19.816396", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 8], "count": 9}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:32.831180", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7], "count": 8}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:33.507750", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 7], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:34.059362", "data": {"selectedIds": [0, 2, 3, 4, 5, 7], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:37.277178", "data": {"selectedIds": [2, 3, 4, 5, 7], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:41.131205", "data": {"selectedIds": [2, 3, 4, 5, 7, 13], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:43.468206", "data": {"selectedIds": [2, 3, 4, 5, 7, 13, 19], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:46.259265", "data": {"selectedIds": [2, 3, 4, 5, 7, 19], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:49.393857", "data": {"selectedIds": [2, 3, 4, 5, 7, 19, 22], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:51.919971", "data": {"selectedIds": [2, 3, 4, 5, 7, 19], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:17:58.476340", "data": {"selectedIds": [2, 3, 4, 5, 7, 19, 17], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:03.975146", "data": {"selectedIds": [2, 3, 4, 5, 19, 17], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:09.173013", "data": {"selectedIds": [2, 3, 4, 5, 19, 17, 20], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:10.315907", "data": {"selectedIds": [2, 3, 4, 5, 19, 20], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:11.859869", "data": {"selectedIds": [2, 3, 4, 5, 19, 20, 17], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:14.770078", "data": {"selectedIds": [2, 3, 4, 5, 19, 20, 17, 22], "count": 8}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:20.227051", "data": {"selectedIds": [2, 3, 4, 5, 19, 17, 22], "count": 7}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:21.776924", "data": {"selectedIds": [2, 3, 4, 5, 19, 17], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:25.802485", "data": {"selectedIds": [2, 3, 4, 5, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:41.900528", "data": {"selectedIds": [2, 3, 4, 5], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:18:42.852232", "data": {"selectedIds": [2, 3, 4, 5, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:06.466225", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:07.788580", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:29.773524", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:41.643545", "data": {"selectedIds": [17, 19], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:47.628330", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:47.630310", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:47.631947", "data": {"selectedIds": [17], "count": 1}}
+{"type": "generation", "timestamp": "2026-03-02T17:20:50.897582", "data": {"imageIds": [23, 24], "count": 2, "prompt": "Make upper of vibrant green, orange accents, chunky white sole, classic running silhouette, perforated upper textured like layered panels, textured mesh, white leather, organic shapes, minimalist design and thin contour lines, topographic map, black and white, organic curves, detailed lines and make the midsole of vibrant green, orange accents, chunky white sole, classic running silhouette, perforated upper inspired by contour lines, topographic map, organic pattern, abstract texture, minimalist detail and chunky sole, organic tread, light yellow, unique sole pattern, sculpted midsole but make the midsole have a flowing pattern"}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:50.900331", "data": {"selectedIds": [23, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:20:51.841791", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:21:05.231328", "data": {"selectedIds": [24], "count": 1}}
+{"type": "generation", "timestamp": "2026-03-02T17:21:23.474009", "data": {"imageIds": [25], "count": 1, "prompt": "A modern, classic with suede and reflective accents, stark white sole, monochrome elegance."}}
+{"type": "selection", "timestamp": "2026-03-02T17:21:32.635033", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:21:39.449918", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:21:50.652480", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:03.891420", "data": {"selectedIds": [25], "count": 1}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:22:13.350698", "data": {"imageIds": [25], "rating": 5, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:15.160567", "data": {"selectedIds": [25, 17], "count": 2}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:22:18.240096", "data": {"imageIds": [25, 17], "rating": 4, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:20.713450", "data": {"selectedIds": [25, 17, 14], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:25.862917", "data": {"selectedIds": [25, 17, 14, 20], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:26.789769", "data": {"selectedIds": [25, 17, 14], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:27.671376", "data": {"selectedIds": [25, 17, 14, 20], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:30.720721", "data": {"selectedIds": [12, 15, 16, 18, 20], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:35.675772", "data": {"selectedIds": [12, 15, 16, 18, 20, 19], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:39.911719", "data": {"selectedIds": [12, 15, 16, 18, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:40.699648", "data": {"selectedIds": [12, 15, 16, 19], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:41.256223", "data": {"selectedIds": [12, 15, 16, 19, 25], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:42.444763", "data": {"selectedIds": [12, 15, 16, 19, 25, 20], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:43.432946", "data": {"selectedIds": [12, 15, 16, 19, 20], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:44.080682", "data": {"selectedIds": [12, 15, 16, 19, 20, 25], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:52.505096", "data": {"selectedIds": [12, 15, 16, 19, 20], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:53.330632", "data": {"selectedIds": [12, 15, 16, 19], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:54.298147", "data": {"selectedIds": [12, 15, 16, 19, 20], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:54.952098", "data": {"selectedIds": [12, 15, 19, 20], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:55.627234", "data": {"selectedIds": [12, 15, 19], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:56.344587", "data": {"selectedIds": [12, 15, 19, 20], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:57.212996", "data": {"selectedIds": [12, 15, 19, 20, 16], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:57.876355", "data": {"selectedIds": [12, 15, 19, 20], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:58.899178", "data": {"selectedIds": [12, 15, 20], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:22:59.630860", "data": {"selectedIds": [12, 15, 20, 19], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:08.940724", "data": {"selectedIds": [12, 15, 20], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:09.675706", "data": {"selectedIds": [12, 15, 20, 19], "count": 4}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:23:12.981391", "data": {"imageIds": [12, 15, 20, 19], "rating": 5, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:15.908047", "data": {"selectedIds": [12, 15, 20, 19, 24], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:16.762745", "data": {"selectedIds": [12, 15, 20, 19], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:39.841804", "data": {"selectedIds": [12, 15, 20, 19, 14], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:41.618121", "data": {"selectedIds": [12, 15, 20, 19, 14, 17], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:43.742555", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:47.833268", "data": {"selectedIds": [24], "count": 1}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:23:50.423167", "data": {"imageIds": [24], "rating": 4, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:51.959845", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:23:53.223427", "data": {"selectedIds": [23], "count": 1}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:23:54.577554", "data": {"imageIds": [23], "rating": 4, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:25:37.661514", "data": {"selectedIds": [23, 19], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:10.403277", "data": {"selectedIds": [23], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:11.174687", "data": {"selectedIds": [23, 19], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:29.159042", "data": {"selectedIds": [23], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:29.820374", "data": {"selectedIds": [23, 19], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:41.390024", "data": {"selectedIds": [23], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:42.135258", "data": {"selectedIds": [23, 19], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:48.500597", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:49.488234", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:57.647189", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:26:58.314873", "data": {"selectedIds": [19], "count": 1}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T17:27:51.973652", "data": {"brief": "I'm envisioning a versatile slide that transitions effortlessly from everyday comfort to a statement on stage. Think a bold, vibrant mono-color upper paired with either a substantial, fashion-forward chunky sole or a sleek, minimalist slim sole, offering distinct personalities for different moments."}}
+{"type": "selection", "timestamp": "2026-03-02T17:27:56.086388", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:27:56.884373", "data": {"selectedIds": [19], "count": 1}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T17:28:11.403667", "data": {"brief": "I'm envisioning a versatile slide that moves effortlessly from everyday wear to making a bold statement on stage. The design plays with contrast, offering options that are either incredibly vibrant and eye-catching or a sleek, sophisticated mono-color. Underfoot, the silhouette will be grounded by either a substantial, chunky sole for a modern edge or a refined, slim profile for a more minimalist feel."}}
+{"type": "axis_change", "timestamp": "2026-03-02T17:28:53.196110", "data": {"axisLabels": {"x": ["daily slides", "stage slides"], "y": ["mono color", "vibrant"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-02T17:28:56.845273", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:28:58.936901", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:29:13.791562", "data": {"selectedIds": [19, 1], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:29:16.687122", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:29:18.455905", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:29:19.158599", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:29:20.469581", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:29:22.113499", "data": {"selectedIds": [19, 4], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:29:22.926875", "data": {"selectedIds": [19, 4, 0], "count": 3}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T17:33:35.218637", "data": {"brief": "I'm envisioning a versatile slide that moves effortlessly from everyday wear to making a bold statement on stage. The design plays with contrast, offering options that are either incredibly vibrant and eye-catching or a sleek, sophisticated mono-color. Underfoot, the silhouette will be grounded by either a substantial, chunky sole for a modern edge or a refined, slim profile for a more minimalist feel."}}
+{"type": "generation", "timestamp": "2026-03-02T17:33:35.220136", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25], "count": 24, "prompt": "Reference images"}}
+{"type": "selection", "timestamp": "2026-03-02T17:33:37.060584", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:33:47.846025", "data": {"selectedIds": [19, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:33:50.332295", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:33:51.062144", "data": {"selectedIds": [24, 19], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:33:53.406861", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:13.596526", "data": {"selectedIds": [19, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:15.560683", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:16.273959", "data": {"selectedIds": [], "count": 0}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T17:34:17.486193", "data": {"filterLevel": 5, "previousLevel": null}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:29.885163", "data": {"selectedIds": [14], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:31.199743", "data": {"selectedIds": [], "count": 0}}
+{"type": "star_filter_toggle", "timestamp": "2026-03-02T17:34:33.179785", "data": {"filterLevel": null, "previousLevel": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:36.780240", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:38.021151", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:39.082894", "data": {"selectedIds": [19], "count": 1}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:34:40.786146", "data": {"imageIds": [19], "rating": 5, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:45.746519", "data": {"selectedIds": [19, 17], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:51.769580", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:54.144634", "data": {"selectedIds": [25], "count": 1}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:34:55.598989", "data": {"imageIds": [25], "rating": 5, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:57.592195", "data": {"selectedIds": [25, 14], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-02T17:34:58.449689", "data": {"selectedIds": [25, 14, 17], "count": 3}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:34:59.753459", "data": {"imageIds": [25, 14, 17], "rating": 4, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:03.583577", "data": {"selectedIds": [25, 14, 17, 24], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:04.794163", "data": {"selectedIds": [25, 14, 17], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:05.519426", "data": {"selectedIds": [25, 14, 17, 24], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:06.554773", "data": {"selectedIds": [25, 14, 17, 24, 23], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:07.745376", "data": {"selectedIds": [25, 14, 17, 23], "count": 4}}
+{"type": "star_rating", "timestamp": "2026-03-02T17:35:09.734918", "data": {"imageIds": [25, 14, 17, 23], "rating": 4, "previousRating": 0}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:13.206890", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:19.808407", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:20.440578", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:21.224048", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:22.735743", "data": {"selectedIds": [25, 14, 17, 23, 24], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:48.347390", "data": {"selectedIds": [25, 14, 17, 23, 24, 19], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:50.648018", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:51.330500", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:52.071385", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:53.108153", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:53.835689", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:54.319088", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:55.027123", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:55.659469", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:56.338627", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:57.960240", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:35:59.024174", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}
+{"type": "selection", "timestamp": "2026-03-02T17:36:00.989787", "data": {"selectedIds": [25, 14, 17, 23, 19, 24], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-02T17:36:01.906770", "data": {"selectedIds": [25, 14, 17, 23, 19], "count": 5}}

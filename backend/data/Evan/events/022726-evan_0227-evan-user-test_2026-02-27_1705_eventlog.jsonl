@@ -1,0 +1,200 @@
+{"type": "session_start", "timestamp": "2026-02-27T17:05:06.338340", "canvas_id": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "canvas_name": "0227 Evan User Test", "participant_id": "Evan", "study_session": "022726-Evan"}
+{"type": "design_brief_change", "timestamp": "2026-02-27T17:05:27.348614", "data": {"brief": "I'm crafting the next evolution of hiking shoe for trail, a shoe. The shoe should be on a design spectrum of Rugged to Lightweight, capturing the spirit of outdoors in the Pacific Northwest."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T17:06:06.096568", "data": {"brief": "I'm envisioning a rugged, trail-ready hiking shoe built for adventure, crafted from durable, waterproof synthetics that will keep feet dry through any adventure. It'll feature a responsive Vibram sole for superior grip on challenging terrain, all rendered in a sophisticated neutral palette that blends seamlessly with the natural environment."}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:24.858325", "data": {"tag": "Waterproof synthetics", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:27.147269", "data": {"tag": "Durable ripstop", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:29.505922", "data": {"tag": "TPU overlays", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:31.998723", "data": {"tag": "Olive green", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:32.887654", "data": {"tag": "Sand beige", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:34.048295", "data": {"tag": "Stone grey", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:36.853515", "data": {"tag": "Ankle support", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:37.486069", "data": {"tag": "Rugged construction", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:38.189567", "data": {"tag": "Rugged construction", "category": "silhouette", "action": "deselect"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:40.772276", "data": {"tag": "Rugged construction", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:44.915857", "data": {"tag": "Vibram sole", "category": "details", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:45.562317", "data": {"tag": "Deep lugs", "category": "details", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:48.866862", "data": {"tag": "Secure lacing system", "category": "details", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:50.662268", "data": {"tag": "Performance hiker", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T17:06:52.410630", "data": {"tag": "Outdoor inspired", "category": "style", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-27T17:07:01.667577", "data": {"prompt": "Modify the reference shoe with durable ripstop and TPU overlays for rugged construction. Update the Vibram sole with deep lugs. Adjust the secure lacing system and ankle support in an outdoor inspired, performance hiker style.", "imageCount": 3, "selectedTagCount": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:07:05.476102", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:07:06.487526", "data": {"selectedIds": [1, 2], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:07:09.373270", "data": {"selectedIds": [1, 2, 3], "count": 3}}
+{"type": "generation", "timestamp": "2026-02-27T17:07:36.565546", "data": {"imageIds": [5, 6, 7], "count": 3, "prompt": "Modify the reference shoe with durable ripstop and TPU overlays for rugged construction. Update the Vibram sole with deep lugs. Adjust the secure lacing system and ankle support in an outdoor inspired, performance hiker style."}}
+{"type": "selection", "timestamp": "2026-02-27T17:08:35.271776", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:09:17.598622", "data": {"selectedIds": [5, 6, 7], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T17:09:19.159536", "data": {"selectedIds": [8, 9, 10], "count": 3}}
+{"type": "generation", "timestamp": "2026-02-27T17:09:19.162902", "data": {"imageIds": [8, 9, 10], "count": 3, "prompt": "aggressive tread, technical sole, sculpted midsole, neutral tones, hiking sole, articulated design's aggressive tread and neutral tones on a hiking sole, with topographic lines, contour map, abstract pattern, black and white, graphic design, organic shapes's contour map detailing, and cork heel accent, waffle sole, natural texture, neutral colorway, fabric pull tab, layered sole's neutral colorway; waterproof, vibram outsole."}}
+{"type": "selection", "timestamp": "2026-02-27T17:09:19.656060", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:09:41.241113", "data": {"imageIds": [11], "count": 1, "prompt": "A hiking shoe with sleek, minimalist ripstop, a segmented sole, and integrated gaiter for alpine performance."}}
+{"type": "selection", "timestamp": "2026-02-27T17:10:13.021425", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:10:18.614810", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:10:19.373192", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:10:22.215512", "data": {"selectedIds": [10, 11], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:12:13.109171", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:12:13.791928", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:12:17.908140", "data": {"selectedIds": [11, 2], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:12:18.513792", "data": {"selectedIds": [11, 2, 3], "count": 3}}
+{"type": "generation", "timestamp": "2026-02-27T17:12:33.384252", "data": {"imageIds": [12, 13], "count": 2, "prompt": "Rugged trail shoe with topo map print, neutral tones, rugged sole, mesh upper, textured heel, low profile's neutral tones, topo map print, neutral tones, rugged sole, mesh upper, textured heel, low profile's rugged sole, high-top silhouette, zipper closure, geometric pattern, green accents, durable synthetic, chunky outsole's high-top silhouette, high-top silhouette, zipper closure, geometric pattern, green accents, durable synthetic, chunky outsole's durable synthetic, speed of topo map print, neutral tones, rugged sole, mesh upper, textured heel, low profile's midsole, and protection from high-top silhouette, zipper closure, geometric pattern, green accents, durable synthetic, chunky outsole's elements."}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:00.285243", "data": {"selectedIds": [12, 13], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:19.664735", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:20.527316", "data": {"selectedIds": [13], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:22.336535", "data": {"selectedIds": [13, 11], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:13:34.387559", "data": {"imageIds": [14, 15], "count": 2, "prompt": "topographical lines, contour map, natural pattern, organic curves, black and white's topographical lines and natural pattern on a high-top boot, zipper closure, rugged sole, synthetic upper, military green, geometric pattern's high-top boot with cork heel accent, waffle sole pattern, textured material, fabric loop detail, neutral tones's neutral tones and waffle sole pattern, plus high-top boot, zipper closure, rugged sole, synthetic upper, military green, geometric pattern's rugged sole."}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:35.342944", "data": {"selectedIds": [14, 15], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:41.062773", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:44.285840", "data": {"selectedIds": [13], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:13:45.271308", "data": {"selectedIds": [13, 11], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:14:39.027063", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:14:39.851170", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:14:41.991094", "data": {"selectedIds": [11, 0], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:14:58.388159", "data": {"imageIds": [16, 17], "count": 2, "prompt": "ensure that the boot keeps the lightweight feel of high-top boot, zipper closure, geometric patterns, rugged sole, bright green accents, synthetic material but add a waterproof mesh look to the upper"}}
+{"type": "selection", "timestamp": "2026-02-27T17:15:05.202906", "data": {"selectedIds": [16, 17], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:15:21.549569", "data": {"selectedIds": [16, 17, 11], "count": 3}}
+{"type": "generation", "timestamp": "2026-02-27T17:15:38.716951", "data": {"imageIds": [18, 19], "count": 2, "prompt": "A rugged trail shoe with textured fabric, green pattern, white background, soft material, waffle knit, lightweight feel's textured fabric, textured fabric, green pattern, white background, soft material, waffle knit, lightweight feel's lightweight feel, and textured fabric, green pattern, white background, soft material, waffle knit, lightweight feel's waffle knit, featuring high-top boot, rugged sole, zipper closure, laced front, grey synthetic, green accents's high-top boot silhouette and high-top boot, rugged sole, zipper closure, laced front, grey synthetic, green accents's rugged sole."}}
+{"type": "selection", "timestamp": "2026-02-27T17:15:38.719256", "data": {"selectedIds": [18, 19], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:15:45.220245", "data": {"imageIds": [20], "count": 1, "prompt": "A hiking shoe with a woven upper, minimalist lacing, and a recycled rubber sole in earthy tones."}}
+{"type": "selection", "timestamp": "2026-02-27T17:16:08.315557", "data": {"selectedIds": [18, 19, 11], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T17:16:16.352449", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:16:16.990501", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:17:40.964758", "data": {"selectedIds": [21, 22], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:17:40.967791", "data": {"imageIds": [21, 22], "count": 2, "prompt": "Modify the shoe's upper to a lightweight, breathable material. Update the color to pale sand."}}
+{"type": "selection", "timestamp": "2026-02-27T17:17:52.513111", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:00.214142", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:04.598375", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:17.201506", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:24.870197", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:32.416991", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:35.146909", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:41.158596", "data": {"selectedIds": [15], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:18:49.931610", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:18:56.323922", "data": {"imageIds": [23], "count": 1, "prompt": "A hiking shoe with rugged, dark charcoal leather and a low-profile, agile silhouette."}}
+{"type": "generation", "timestamp": "2026-02-27T17:19:12.358062", "data": {"imageIds": [24], "count": 1, "prompt": "A hiking shoe with a sleek, minimalist design, breathable knit upper, and a segmented, flexible sole."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T17:19:51.400222", "data": {"brief": "I'm envisioning a high-performance running sneaker built for any condition, utilizing durable, waterproof synthetic uppers to keep feet dry and comfortable. This design will be grounded by a rugged Vibram sole for superior traction and support, all rendered in a sophisticated neutral color palette that speaks to understated power and resilience."}}
+{"type": "selection", "timestamp": "2026-02-27T17:19:57.220333", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:19:58.816654", "data": {"selectedIds": [17, 23], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:19:59.994084", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:20:05.913887", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], "count": 25}}
+{"type": "selection", "timestamp": "2026-02-27T17:20:09.372946", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:20:18.049983", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:20:19.943115", "data": {"selectedIds": [17, 11], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:21:45.557715", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:21:47.876151", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:21:52.561017", "data": {"selectedIds": [17, 4], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:21:52.562679", "data": {"selectedIds": [17, 4, 0], "count": 3}}
+{"type": "generation", "timestamp": "2026-02-27T17:21:54.339953", "data": {"imageIds": [25, 26], "count": 2, "prompt": "A fast, lightweight running sneaker with high-top boot, waterproof upper, zipper closure, rugged sole, geometric pattern, bright green accents's waterproof upper, mid-top boot, mesh upper, zipper closure, textured heel, chunky sole, neon green laces's mesh upper, a low collar, mid-top boot, mesh upper, zipper closure, textured heel, chunky sole, neon green laces's neon green laces, high-top boot, waterproof upper, zipper closure, rugged sole, geometric pattern, bright green accents's bright green accents, and high-top boot, waterproof upper, zipper closure, rugged sole, geometric pattern, bright green accents's rugged sole."}}
+{"type": "selection", "timestamp": "2026-02-27T17:21:54.343244", "data": {"selectedIds": [25, 26], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:02.736897", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:04.529772", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:05.294203", "data": {"selectedIds": [17, 4], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:35.543197", "data": {"selectedIds": [25, 26], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:40.663611", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:51.783342", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:51.784950", "data": {"selectedIds": [25, 26], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:53.247330", "data": {"selectedIds": [27, 28], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:22:53.250143", "data": {"imageIds": [27, 28], "count": 2, "prompt": "A sneaker with organic texture, white relief, geometric pattern, 3d surface, sculptural form, monochromatic's white relief, organic texture, white relief, geometric pattern, 3d surface, sculptural form, monochromatic's sculptural form, and organic texture, white relief, geometric pattern, 3d surface, sculptural form, monochromatic's monochromatic palette, featuring hiking boot, mid-top, rugged sole, mesh upper, bright laces, dark grey's rugged sole, hiking boot, mid-top, rugged sole, mesh upper, bright laces, dark grey's mesh upper, and hiking boot, mid-top, rugged sole, mesh upper, bright laces, dark grey's bright laces."}}
+{"type": "selection", "timestamp": "2026-02-27T17:22:58.103390", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:23:00.041613", "data": {"selectedIds": [28], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:23:02.747790", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:23:03.988521", "data": {"selectedIds": [27], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:23:39.425924", "data": {"selectedIds": [27, 28], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:23:48.543729", "data": {"imageIds": [29], "count": 1, "prompt": "A running sneaker with engineered mesh, translucent overlays, and responsive foam sole."}}
+{"type": "selection", "timestamp": "2026-02-27T17:23:51.161743", "data": {"selectedIds": [27, 28, 29], "count": 3}}
+{"type": "generation", "timestamp": "2026-02-27T17:24:02.365791", "data": {"imageIds": [30, 31], "count": 2, "prompt": "make this a lower collar so that it matches the collar of a running sneaker"}}
+{"type": "selection", "timestamp": "2026-02-27T17:24:03.223056", "data": {"selectedIds": [30, 31], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:24:04.713691", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:24:08.507405", "data": {"selectedIds": [31], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:24:19.413274", "data": {"selectedIds": [31, 23], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:24:48.849193", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:24:56.072110", "data": {"imageIds": [32], "count": 1, "prompt": "A running sneaker with a breathable knit upper and minimal reflective accents, emphasizing speed."}}
+{"type": "selection", "timestamp": "2026-02-27T17:24:58.561175", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:01.868901", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:04.237628", "data": {"selectedIds": [28], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:06.885385", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:07.610188", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:12.728241", "data": {"selectedIds": [32, 28], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:12.729937", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:25:14.170552", "data": {"imageIds": [33, 34], "count": 2, "prompt": "high-top boot, waterproof synthetic, zipper closure, rugged sole, geometric accents, lime green laces's waterproof synthetic and lime green laces on running sneaker, mesh upper, neutral tones, chunky midsole, lime green accents, performance silhouette's running sneaker with a performance silhouette."}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:14.173369", "data": {"selectedIds": [33, 34], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:16.902609", "data": {"selectedIds": [34], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:17.843988", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:18.511313", "data": {"selectedIds": [33], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:22.873253", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:25.537546", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:28.059874", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:25:44.670219", "data": {"imageIds": [35], "count": 1, "prompt": "A running sneaker with a breathable mesh upper, minimalist design, and reflective accents."}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:45.859768", "data": {"selectedIds": [35], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:25:49.014013", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:26:38.287610", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:26:40.627039", "data": {"selectedIds": [11, 28], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:27:45.985077", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:28:01.673286", "data": {"imageIds": [36, 37], "count": 2, "prompt": "A high-performance running sneaker with high-top boot, zipper closure, geometric pattern, rugged sole, lacing system, accent green's weather-resistant look and running sneaker, mesh upper, webbed overlay, chunky sole, accent green, low-top's general form and color palette."}}
+{"type": "selection", "timestamp": "2026-02-27T17:28:01.674838", "data": {"selectedIds": [36, 37], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:28:06.864415", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:28:08.617502", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:28:10.095120", "data": {"selectedIds": [37], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:28:12.269374", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:28:18.844147", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:28:21.222477", "data": {"selectedIds": [], "count": 0}}
+{"type": "axis_change", "timestamp": "2026-02-27T17:30:12.829438", "data": {"axisLabels": {"x": ["ready to wear", "avant garde"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T17:30:34.536253", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-02-27T17:30:36.830129", "data": {"selectedIds": [28], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:30:41.885611", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:30:44.198289", "data": {"selectedIds": [37], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:30:44.972941", "data": {"selectedIds": [37, 28], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:31:49.978551", "data": {"imageIds": [38, 39], "count": 2, "prompt": "rugged sole, Combine open mesh upper, chunky sole, geometric details, lime green laces, athletic silhouette, white and grey's open mesh upper with high-top boot, zipper closure, technical fabric, rugged sole, lime green accents, dark grey's rugged sole and dark grey colorway for a resilient slide."}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:02.041125", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:07.501767", "data": {"selectedIds": [39], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:10.415994", "data": {"selectedIds": [39, 38], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:11.127768", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:17.573431", "data": {"selectedIds": [39], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:21.362228", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:32:22.816151", "data": {"imageIds": [40, 41], "count": 2, "prompt": "Blend the rugged sole of high-top boot, zipper closure, lacing system, rugged sole, geometric panels, water-resistant material with the layered cage design of mesh upper, layered cage, chunky sole, contrasting laces, athletic silhouette, lightweight feel's upper, using waterproof synthetic materials in a neutral palette for an avant garde slide that is fashion-forward and ready for the runway"}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:22.819273", "data": {"selectedIds": [40, 41], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:24.433462", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T17:32:24.844173", "data": {"imageIds": [42], "count": 1, "prompt": "A slide with a sculpted EVA foam sole, premium leather straps, and minimalist stitching, in monochrome black."}}
+{"type": "selection", "timestamp": "2026-02-27T17:32:40.121437", "data": {"selectedIds": [38], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T17:32:48.812035", "data": {"imageIds": [43], "count": 1, "prompt": "A slide with sculpted foam, single strap, minimalist branding, and adaptive fit for ultimate comfort."}}
+{"type": "selection", "timestamp": "2026-02-27T17:33:05.587867", "data": {"selectedIds": [38, 0], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:33:36.315836", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:33:39.125356", "data": {"selectedIds": [42], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:33:39.868339", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:33:40.461411", "data": {"selectedIds": [38], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:33:47.019662", "data": {"selectedIds": [38, 36], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:34:09.044497", "data": {"imageIds": [44, 45], "count": 2, "prompt": "An athletic slide with textured knit, waffle pattern, organic lines, light green accents, neutral base, soft material's light green accents on a neutral base, featuring athletic slide, open toe, Vibram sole, cage detailing, lime green accents, grey synthetic's open toe, Vibram sole, and cage detailing, made bigger and bolder."}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:14.832091", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:17.445438", "data": {"selectedIds": [44, 45], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:20.130177", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:22.735277", "data": {"selectedIds": [45], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:24.839380", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:28.565063", "data": {"selectedIds": [42], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:35.218999", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:37.063923", "data": {"selectedIds": [42], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:42.830706", "data": {"selectedIds": [42, 28], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:34:44.121199", "data": {"imageIds": [46, 47], "count": 2, "prompt": "hightop boot, zipper closure, mesh upper, chunky speckled sole, lime green accents, technical detailing's hightop boot with lime green accents, technical detailing, and mesh upper, combined with slide sandal, mesh upper, chunky speckled sole, lime green accents, athletic silhouette, open toe's slide sandal and open toe design."}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:44.122660", "data": {"selectedIds": [46, 47], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:50.860361", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:54.696083", "data": {"selectedIds": [42], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:34:59.616752", "data": {"selectedIds": [42, 28], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:35:17.208418", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:35:19.433937", "data": {"selectedIds": [46, 47], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:35:23.297590", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:35:31.983689", "data": {"selectedIds": [47], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:35:35.859376", "data": {"selectedIds": [47, 36], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:35:49.224097", "data": {"imageIds": [48, 49], "count": 2, "prompt": "Apply the color palette of grey mesh upper, white cage overlay, green laces, chunky sculpted sole, athletic silhouette, mesh paneling to black leather strap, black chunky sole, cross strap design, minimalist black, slide silhouette, sculpted sole pattern"}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:02.872840", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:04.626072", "data": {"selectedIds": [48, 49], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:30.479382", "data": {"selectedIds": [50, 51], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T17:36:30.481057", "data": {"imageIds": [50, 51], "count": 2, "prompt": "ensure that the high collar from high-top boot, zip closure, mesh upper, rugged sole, lime green accents, grey tones is applied to the sandal open-toe sandal, mesh upper, rugged sole, lime green accents, grey tones, speckled midsole"}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:31.374833", "data": {"selectedIds": [50, 51, 48], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:35.057203", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:36.855280", "data": {"selectedIds": [50, 51], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:44.388376", "data": {"selectedIds": [50], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:44.389980", "data": {"selectedIds": [50, 51], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:44.530608", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:45.009594", "data": {"selectedIds": [51], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:45.762623", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:55.743005", "data": {"selectedIds": [51], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T17:36:57.186398", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T18:07:55.000161", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "toCanvasId": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-02-27T18:07:55.002171", "canvas_id": "cdef4fab-cca7-42ee-857c-3ad0dea327c6"}

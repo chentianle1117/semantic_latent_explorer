@@ -1,0 +1,9 @@
+{"type": "session_start", "timestamp": "2026-03-02T16:04:54.584024", "canvas_id": "ad7be14f-608b-4170-bbb3-caf1798389a1", "canvas_name": "Canvas 3", "participant_id": "Evan", "study_session": null}
+{"type": "file_upload", "timestamp": "2026-03-02T16:05:09.198398", "data": {"shoeCount": 0, "referenceCount": 9, "totalCount": 9}}
+{"type": "generation", "timestamp": "2026-03-02T16:05:19.637866", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8], "count": 9, "prompt": "Reference images"}}
+{"type": "generation", "timestamp": "2026-03-02T16:07:08.082923", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8], "count": 9, "prompt": "Reference images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:07:08.084869", "data": {"brief": "This is a football boot designed for lightning-fast turf play, evoking the aggressive speed and dynamism of the Nike Mercurial line. The striking colorway of electric blue and vibrant pink will make a bold statement, pushing the boundaries of athletic aesthetics."}}
+{"type": "generation", "timestamp": "2026-03-02T16:09:05.856827", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8], "count": 9, "prompt": "Reference images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-02T16:09:05.859187", "data": {"brief": "This is a football boot designed for lightning-fast turf play, evoking the aggressive speed and dynamism of the Nike Mercurial line. The striking colorway of electric blue and vibrant pink will make a bold statement, pushing the boundaries of athletic aesthetics."}}
+{"type": "canvas_switch", "timestamp": "2026-03-02T16:09:12.579079", "data": {"fromCanvasId": "ad7be14f-608b-4170-bbb3-caf1798389a1", "toCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-03-02T16:09:12.581077", "canvas_id": "ad7be14f-608b-4170-bbb3-caf1798389a1"}

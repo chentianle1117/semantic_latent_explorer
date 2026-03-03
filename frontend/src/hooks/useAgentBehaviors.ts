@@ -12,13 +12,103 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../store/appStore';
 import { apiClient } from '../api/client';
-import { falClient } from '../api/falClient';
+import { falClient, extractBriefConstraint } from '../api/falClient';
 import type { GhostNode } from '../types';
 
 // Unique ID counter for ghost nodes (negative to avoid collisions with real image IDs)
 let ghostIdCounter = -1;
 function nextGhostId(): number {
   return ghostIdCounter--;
+}
+
+/**
+ * Generate a 300×300 semantic scatter-plot image (JPEG base64) from current canvas state.
+ * Shows where each visible shoe sits in 2D semantic space, with axis labels at the edges.
+ * Sent to Gemini so it can visually see the distribution and suggest unexplored directions.
+ * Returns null if no images or canvas API unavailable.
+ */
+function generateSemanticMapImage(): string | null {
+  try {
+    const appState = useAppStore.getState();
+    const images = appState.images.filter(img => img.visible && img.coordinates?.length >= 2);
+    const axisLabels = appState.axisLabels;
+    if (images.length === 0) return null;
+
+    const SIZE = 300;
+    const MARGIN = 36;
+    const INNER = SIZE - 2 * MARGIN;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Dark background
+    ctx.fillStyle = '#111827';
+    ctx.fillRect(0, 0, SIZE, SIZE);
+
+    // Get coordinate bounds, add small padding so edge dots aren't clipped
+    const xs = images.map(img => img.coordinates[0]);
+    const ys = images.map(img => img.coordinates[1]);
+    const xMin = Math.min(...xs), xMax = Math.max(...xs);
+    const yMin = Math.min(...ys), yMax = Math.max(...ys);
+    const xRange = Math.max(xMax - xMin, 1e-6);
+    const yRange = Math.max(yMax - yMin, 1e-6);
+
+    const toCanvasX = (x: number) => MARGIN + ((x - xMin) / xRange) * INNER;
+    const toCanvasY = (y: number) => SIZE - MARGIN - ((y - yMin) / yRange) * INNER;
+
+    // Axis crosshairs at semantic midpoint
+    const midX = toCanvasX((xMin + xMax) / 2);
+    const midY = toCanvasY((yMin + yMax) / 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    ctx.beginPath();
+    ctx.moveTo(midX, MARGIN); ctx.lineTo(midX, SIZE - MARGIN);
+    ctx.moveTo(MARGIN, midY); ctx.lineTo(SIZE - MARGIN, midY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dots — cyan for shoes, orange for mood boards
+    images.forEach(img => {
+      const cx = toCanvasX(img.coordinates[0]);
+      const cy = toCanvasY(img.coordinates[1]);
+      ctx.fillStyle = img.realm === 'mood-board'
+        ? 'rgba(255,107,43,0.9)'
+        : 'rgba(0,210,255,0.85)';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Axis labels at edges
+    ctx.font = '10px sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    const trim = (s: string) => (s || '').slice(0, 14);
+
+    // X-axis: left (neg) and right (pos)
+    ctx.textAlign = 'left';
+    ctx.fillText('← ' + trim(axisLabels.x[0]), 2, SIZE / 2 + 4);
+    ctx.textAlign = 'right';
+    ctx.fillText(trim(axisLabels.x[1]) + ' →', SIZE - 2, SIZE / 2 + 4);
+
+    // Y-axis: top (pos) and bottom (neg)
+    ctx.textAlign = 'center';
+    ctx.fillText('↑ ' + trim(axisLabels.y[1]), SIZE / 2, 14);
+    ctx.fillText('↓ ' + trim(axisLabels.y[0]), SIZE / 2, SIZE - 4);
+
+    // Image count label
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.font = '9px sans-serif';
+    ctx.fillText(`${images.length} designs`, MARGIN, MARGIN - 6);
+
+    return canvas.toDataURL('image/jpeg', 0.7);
+  } catch {
+    return null;
+  }
 }
 
 export function useAgentBehaviors() {
@@ -94,7 +184,8 @@ export function useAgentBehaviors() {
       let thisExplores = '';
       let keyShifts: string[] = [];
       try {
-        const result = await apiClient.getConcurrentPrompt(userPrompt, brief, refUrls);
+        const canvasMap = generateSemanticMapImage();
+        const result = await apiClient.getConcurrentPrompt(userPrompt, brief, refUrls, canvasMap ?? undefined);
         altPrompt = result.prompt;
         reasoning = result.reasoning;
         yourDesignWas = result.your_design_was || '';
@@ -109,6 +200,7 @@ export function useAgentBehaviors() {
 
       // Generate ghost image via fal.ai
       let falResult;
+      const agentBriefConstraint = extractBriefConstraint(useAppStore.getState().briefFields);
       if (refUrls.length > 0) {
         falResult = await falClient.generateImageEdit({
           prompt: altPrompt,
@@ -116,6 +208,7 @@ export function useAgentBehaviors() {
           num_images: 1,
           aspect_ratio: '1:1',
           output_format: 'jpeg',
+          briefConstraint: agentBriefConstraint,
         });
       } else {
         falResult = await falClient.generateTextToImage({
@@ -123,6 +216,7 @@ export function useAgentBehaviors() {
           num_images: 1,
           aspect_ratio: '1:1',
           output_format: 'jpeg',
+          briefConstraint: agentBriefConstraint,
         });
       }
 
@@ -194,7 +288,8 @@ export function useAgentBehaviors() {
       if (brief) setIsAgentUsingBrief(true);
       let suggestions: any[] = [];
       try {
-        const result = await apiClient.suggestGhosts(brief ?? '', 2);
+        const canvasMap = generateSemanticMapImage();
+        const result = await apiClient.suggestGhosts(brief ?? '', 2, canvasMap ?? undefined);
         suggestions = result.ghosts;
       } finally {
         setIsAgentUsingBrief(false);

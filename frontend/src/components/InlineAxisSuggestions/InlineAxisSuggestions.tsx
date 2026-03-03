@@ -6,6 +6,7 @@
 
 import React from "react";
 import { useAppStore } from "../../store/appStore";
+import { apiClient } from "../../api/client";
 import "./InlineAxisSuggestions.css";
 
 interface InlineAxisSuggestionsProps {
@@ -32,6 +33,7 @@ export const InlineAxisSuggestions: React.FC<InlineAxisSuggestionsProps> = ({ on
             key={i}
             className="ias-card"
             onClick={() => {
+              apiClient.logEvent('axis_suggestion_apply', { xAxis: s.x_axis, yAxis: s.y_axis, reasoning: s.reasoning });
               onApply(s.x_axis, s.y_axis);
               clearInlineAxisData();
             }}

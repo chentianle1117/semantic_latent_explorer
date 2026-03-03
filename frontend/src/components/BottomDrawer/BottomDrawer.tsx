@@ -5,43 +5,11 @@ import { getCategoryColor, CATEGORY_COLORS, CATEGORY_LABELS, getDisplayCategory 
 import type { DisplayCategory } from "../../utils/generationCategories";
 import "./BottomDrawer.css";
 
-// ─── Tapered Bézier helper ────────────────────────────────────────────────────
-function taperedBezierD(
-  px: number, py: number,
-  cx: number, cy: number,
-  wStart: number, wEnd: number,
-  steps = 16,
-): string {
-  const cpx = (cx - px) * 0.55;
-  const cx1 = px + cpx, cy1 = py;
-  const cx2 = cx - cpx, cy2 = cy;
-  const left: string[] = [];
-  const right: string[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const mt = 1 - t;
-    const bx = mt*mt*mt*px + 3*mt*mt*t*cx1 + 3*mt*t*t*cx2 + t*t*t*cx;
-    const by = mt*mt*mt*py + 3*mt*mt*t*cy1 + 3*mt*t*t*cy2 + t*t*t*cy;
-    const dx = 3*mt*mt*(cx1-px) + 6*mt*t*(cx2-cx1) + 3*t*t*(cx-cx2);
-    const dy = 3*mt*mt*(cy1-py) + 6*mt*t*(cy2-cy1) + 3*t*t*(cy-cy2);
-    const len = Math.sqrt(dx*dx + dy*dy) || 1;
-    const nx = -dy / len;
-    const ny = dx / len;
-    const hw = (wStart + (wEnd - wStart) * t) / 2;
-    left.push(`${(bx + nx * hw).toFixed(2)},${(by + ny * hw).toFixed(2)}`);
-    right.push(`${(bx - nx * hw).toFixed(2)},${(by - ny * hw).toFixed(2)}`);
-  }
-  return `M${left.join('L')}L${right.reverse().join('L')}Z`;
-}
-
-// ─── Realm-aware edge colors ──────────────────────────────────────────────────
-function getRealmEdgeColor(parentRealm: string, childRealm: string): string {
-  const pMood = parentRealm === 'mood-board';
-  const cMood = childRealm === 'mood-board';
-  if (pMood && cMood) return 'rgba(255, 107, 43, 0.8)';  // orange: board→board
-  if (!pMood && !cMood) return 'rgba(50, 70, 88, 1.0)';  // dark blue-gray: shoe→shoe
-  if (pMood && !cMood) return 'rgba(63, 185, 80, 0.8)';  // green: board→shoe (consolidation)
-  return 'rgba(168, 85, 247, 0.7)';                       // purple: shoe→board (abstraction)
+// ─── Simple cubic bezier path string ──────────────────────────────────────────
+function cubicBezierD(px: number, py: number, cx: number, cy: number): string {
+  const tension = 0.55;
+  const dx = (cx - px) * tension;
+  return `M${px},${py} C${px + dx},${py} ${cx - dx},${cy} ${cx},${cy}`;
 }
 
 // ─── Tree layout computation ──────────────────────────────────────────────────
@@ -50,13 +18,13 @@ function computeTreeLayout(
   availH: number,
 ): {
   nodes: { id: number; x: number; y: number; img: ImageData }[];
-  edges: { key: string; px: number; py: number; cx: number; cy: number; parentRealm: string; childRealm: string }[];
+  edges: { key: string; px: number; py: number; cx: number; cy: number; parentColor: string }[];
   totalW: number;
-  dotR: number;
+  thumbS: number;
 } {
   // Exclude ghost nodes and satellite views — only side views represent designs in the tree
   const images = allImages.filter(img => !img.is_ghost && (!img.shoe_view || img.shoe_view === 'side'));
-  if (images.length === 0) return { nodes: [], edges: [], totalW: 120, dotR: 6 };
+  if (images.length === 0) return { nodes: [], edges: [], totalW: 120, thumbS: 32 };
 
   const idSet = new Set(images.map(img => img.id));
 
@@ -109,11 +77,12 @@ function computeTreeLayout(
   const maxDepth = Math.max(...Array.from(depths.values()), 0);
   const maxColSize = Math.max(...Array.from(byDepth.values()).map(v => v.length), 1);
 
-  // Fit dots into available height
-  const dotR = Math.max(5, Math.min(14, (availH - 20) / ((maxColSize + 1) * 2.4)));
-  const colSpacing = Math.max(dotR * 10 + 20, 60);
-  const padX = dotR + 14;
-  const totalW = padX + (maxDepth + 1) * colSpacing + dotR + 12;
+  // Thumbnail side length: fill row spacing minus a small gap (no label — tooltip only)
+  const thumbS = Math.max(20, Math.min(40, Math.floor((availH - 8) / (maxColSize + 1) - 6)));
+  const hs = thumbS / 2;
+  const colSpacing = thumbS + 44;
+  const padX = hs + 14;
+  const totalW = padX + (maxDepth + 1) * colSpacing + hs + 16;
 
   const posMap = new Map<number, { x: number; y: number }>();
   byDepth.forEach((col, d) => {
@@ -130,9 +99,9 @@ function computeTreeLayout(
     img,
   }));
 
-  // Edges: draw from parent → child using the parents[] array (works even with stale children[])
+  // Edges: connect right-center of parent thumbnail → left-center of child thumbnail
   const imgMap = new Map(images.map(img => [img.id, img]));
-  const edges: { key: string; px: number; py: number; cx: number; cy: number; parentRealm: string; childRealm: string }[] = [];
+  const edges: { key: string; px: number; py: number; cx: number; cy: number; parentColor: string }[] = [];
   images.forEach(img => {
     const cp = posMap.get(img.id);
     if (!cp) return;
@@ -143,14 +112,14 @@ function computeTreeLayout(
       const parent = imgMap.get(pid);
       edges.push({
         key: `${pid}→${img.id}`,
-        px: pp.x, py: pp.y, cx: cp.x, cy: cp.y,
-        parentRealm: parent?.realm ?? 'shoe',
-        childRealm: img.realm ?? 'shoe',
+        px: pp.x + hs, py: pp.y,
+        cx: cp.x - hs, cy: cp.y,
+        parentColor: getCategoryColor(parent?.generation_method ?? 'batch', parent?.realm ?? 'shoe'),
       });
     });
   });
 
-  return { nodes, edges, totalW, dotR };
+  return { nodes, edges, totalW, thumbS };
 }
 
 
@@ -160,6 +129,7 @@ const GenealogyTree: React.FC = () => {
   const isolatedImageIds = useAppStore(s => s.isolatedImageIds);
   const selectedImageIds = useAppStore(s => s.selectedImageIds);
   const setSelectedImageIds = useAppStore(s => s.setSelectedImageIds);
+  const imageRatings = useAppStore(s => s.imageRatings);
   const containerRef = useRef<HTMLDivElement>(null);
   const [availH, setAvailH] = useState(220);
 
@@ -181,7 +151,7 @@ const GenealogyTree: React.FC = () => {
   }, [allImages, isolatedImageIds]);
 
   const selectedSet = useMemo(() => new Set(selectedImageIds), [selectedImageIds]);
-  const { nodes, edges, totalW, dotR } = useMemo(
+  const { nodes, edges, totalW, thumbS } = useMemo(
     () => computeTreeLayout(treeImages, availH),
     [treeImages, availH],
   );
@@ -201,66 +171,110 @@ const GenealogyTree: React.FC = () => {
         ) : (
           <svg height={availH} width={Math.max(totalW, 200)} style={{ display: 'block' }}>
             <defs>
-              <filter id="dt-sel-glow" x="-60%" y="-60%" width="220%" height="220%">
-                <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor="#00d2ff" floodOpacity="0.85" />
+              <filter id="dt-sel-glow" x="-80%" y="-80%" width="260%" height="260%">
+                <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#00d2ff" floodOpacity="0.9" />
               </filter>
+              {/* Shared rounded clip path — local coords work because each <image> is
+                  inside a translated <g>, so userSpaceOnUse resolves to local space */}
+              <clipPath id="clip-tree-thumb">
+                <rect x={-thumbS / 2} y={-thumbS / 2} width={thumbS} height={thumbS} rx={3} />
+              </clipPath>
             </defs>
 
-            {/* Edges — tapered ribbons, thick at parent, thin at child, realm-colored */}
+            {/* Edges — thin cubic bezier lines in parent color, low opacity */}
             {edges.map(e => (
               <path
                 key={e.key}
-                d={taperedBezierD(e.px, e.py, e.cx, e.cy, dotR * 0.72, dotR * 0.26)}
-                fill={getRealmEdgeColor(e.parentRealm, e.childRealm)}
-                stroke="none"
+                d={cubicBezierD(e.px, e.py, e.cx, e.cy)}
+                fill="none"
+                stroke={e.parentColor}
+                strokeWidth={1.2}
+                strokeOpacity={0.32}
               />
             ))}
 
-            {/* Nodes — solid filled circles, with realm indicator */}
+            {/* Thumbnail nodes */}
             {nodes.map(n => {
               const sel = selectedSet.has(n.id);
               const del = !n.img.visible;
+              const isAgent = n.img.generation_method === 'agent';
+              const rating = imageRatings[n.id] ?? 0;
               const isMoodBoard = n.img.realm === 'mood-board';
               const col = getCategoryColor(n.img.generation_method, n.img.realm);
               const selColor = isMoodBoard ? '#FF6B2B' : '#00d2ff';
+              const hs = thumbS / 2;
               const label = n.img.prompt
                 ? (n.img.prompt.length > 80 ? n.img.prompt.slice(0, 80) + '…' : n.img.prompt)
                 : `Image ${n.id}`;
               return (
                 <g
                   key={n.id}
-                  transform={`translate(${n.x}, ${n.y})`}
+                  transform={`translate(${n.x},${n.y})`}
                   onClick={() => setSelectedImageIds([n.id])}
                   style={{ cursor: 'pointer' }}
                 >
                   <title>{label}{isMoodBoard ? ' [mood board]' : ''}{del ? ' (deleted)' : ''}</title>
+
                   {/* Hit area */}
-                  <circle r={dotR + 6} fill="transparent" />
-                  {/* Mood board outer ring indicator */}
-                  {isMoodBoard && !del && (
-                    <circle
-                      r={dotR + 3}
-                      fill="none"
-                      stroke="rgba(255, 107, 43, 0.4)"
-                      strokeWidth={1.5}
-                      strokeDasharray="3 2"
+                  <rect x={-hs - 4} y={-hs - 4} width={thumbS + 8} height={thumbS + 8} fill="transparent" />
+
+                  {/* Faint category-colored background */}
+                  <rect
+                    x={-hs} y={-hs}
+                    width={thumbS} height={thumbS}
+                    rx={3}
+                    fill={col}
+                    fillOpacity={del ? 0.06 : 0.18}
+                  />
+
+                  {/* Shoe thumbnail */}
+                  {n.img.base64_image && (
+                    <image
+                      href={`data:image/png;base64,${n.img.base64_image}`}
+                      x={-hs} y={-hs}
+                      width={thumbS} height={thumbS}
+                      clipPath="url(#clip-tree-thumb)"
+                      preserveAspectRatio="xMidYMid slice"
+                      opacity={del ? 0.28 : 1}
                     />
                   )}
-                  {/* Solid filled circle */}
-                  <circle
-                    r={sel ? dotR + 2 : dotR}
-                    fill={del ? 'rgba(55,65,78,0.6)' : col}
-                    fillOpacity={del ? 0.5 : 0.88}
-                    stroke={sel ? selColor : 'rgba(0,0,0,0.25)'}
-                    strokeWidth={sel ? 2.5 : 1}
+
+                  {/* Thin border — category color normally, selection color when selected */}
+                  <rect
+                    x={-hs} y={-hs}
+                    width={thumbS} height={thumbS}
+                    rx={3}
+                    fill="none"
+                    stroke={sel ? selColor : col}
+                    strokeWidth={sel ? 1.8 : 1}
+                    strokeOpacity={sel ? 1 : 0.55}
                     filter={sel ? 'url(#dt-sel-glow)' : undefined}
                   />
+
+                  {/* Deleted X overlay */}
                   {del && (
                     <>
-                      <line x1={-dotR * 0.6} y1={-dotR * 0.6} x2={dotR * 0.6} y2={dotR * 0.6} stroke="#e05050" strokeWidth={1.5} />
-                      <line x1={dotR * 0.6} y1={-dotR * 0.6} x2={-dotR * 0.6} y2={dotR * 0.6} stroke="#e05050" strokeWidth={1.5} />
+                      <line x1={-hs + 4} y1={-hs + 4} x2={hs - 4} y2={hs - 4} stroke="#e05050" strokeWidth={1.5} strokeOpacity={0.9} />
+                      <line x1={hs - 4} y1={-hs + 4} x2={-hs + 4} y2={hs - 4} stroke="#e05050" strokeWidth={1.5} strokeOpacity={0.9} />
                     </>
                   )}
+
+                  {/* Agent "A" badge — top-right */}
+                  {isAgent && (
+                    <g transform={`translate(${hs - 5},${-hs + 5})`}>
+                      <circle r={4.5} fill="#6a5acd" opacity={0.92} />
+                      <text textAnchor="middle" dominantBaseline="central" fontSize={5.5} fill="white" fontWeight="bold">A</text>
+                    </g>
+                  )}
+
+                  {/* Star badge — top-left (only when rated) */}
+                  {rating > 0 && (
+                    <g transform={`translate(${-hs + 5},${-hs + 5})`}>
+                      <circle r={4.5} fill="#c8a000" opacity={0.92} />
+                      <text textAnchor="middle" dominantBaseline="central" fontSize={6} fill="white">★</text>
+                    </g>
+                  )}
+
                 </g>
               );
             })}
@@ -298,6 +312,12 @@ export const BottomDrawer: React.FC = () => {
   const allImages = useAppStore(s => s.images);
   const isolatedImageIds = useAppStore(s => s.isolatedImageIds);
   const images = allImages.filter(img => img.visible);
+  // Visible image ID set — used to decide if a batch still has live images
+  const visibleImageIds = useMemo(
+    () => new Set(allImages.filter(img => img.visible).map(img => img.id)),
+    [allImages],
+  );
+  // Deleted ID set — used for per-image dot indicators (separate from batch visibility)
   const deletedIds = useMemo(
     () => new Set(allImages.filter(img => !img.visible).map(img => img.id)),
     [allImages],
@@ -307,12 +327,18 @@ export const BottomDrawer: React.FC = () => {
 
   // When isolation is active, filter history groups to only those with isolated items
   const historyGroups = useMemo(() => {
-    if (isolatedImageIds === null) return allHistoryGroups;
-    const isoSet = new Set(isolatedImageIds);
-    const filtered = allHistoryGroups.filter(g => g.image_ids.some(id => isoSet.has(id)));
-    console.log(`[BottomDrawer] isolation active: ${isolatedImageIds.length} ids, ${filtered.length}/${allHistoryGroups.length} groups pass filter`);
-    return filtered;
-  }, [allHistoryGroups, isolatedImageIds]);
+    // Hide batches where NO images are currently visible.
+    // Using visibleImageIds (not deletedIds) catches both soft-deleted images AND
+    // images that were purged server-side and never added to the frontend state.
+    let groups = allHistoryGroups.filter(g =>
+      g.image_ids.some(id => visibleImageIds.has(id))
+    );
+    if (isolatedImageIds !== null) {
+      const isoSet = new Set(isolatedImageIds);
+      groups = groups.filter(g => g.image_ids.some(id => isoSet.has(id)));
+    }
+    return groups;
+  }, [allHistoryGroups, isolatedImageIds, visibleImageIds]);
 
   // Filtered image count for stats
   const displayedImageCount = isolatedImageIds !== null
@@ -340,8 +366,8 @@ export const BottomDrawer: React.FC = () => {
       <div
         className={`drawer-bar${isExpanded ? ' drawer-bar--expanded' : ''}`}
         data-tour="bottom-drawer-bar"
-        onClick={() => { isExpanded ? setActiveTab(null) : setActiveTab('history'); }}
-        style={{ cursor: 'pointer' }}
+        onClick={() => { if (!isExpanded) setActiveTab('history'); }}
+        style={{ cursor: isExpanded ? 'default' : 'pointer' }}
       >
         {/* Left: collapse toggle */}
         <button
@@ -394,12 +420,12 @@ export const BottomDrawer: React.FC = () => {
                   group.thumbnail_id !== null
                     ? allImages.find(img => img.id === group.thumbnail_id)
                     : null;
-                const thumbDeleted = thumbnailImage ? deletedIds.has(thumbnailImage.id) : false;
-                const deletedCount = group.image_ids.filter(id => deletedIds.has(id)).length;
+                const thumbDeleted = thumbnailImage ? !visibleImageIds.has(thumbnailImage.id) : false;
+                const deletedCount = group.image_ids.filter(id => !visibleImageIds.has(id)).length;
                 // When isolated, only select images that are in the isolation set
                 const isoSet = isolatedImageIds !== null ? new Set(isolatedImageIds) : null;
                 const selectableIds = group.image_ids.filter(id =>
-                  !deletedIds.has(id) && (isoSet === null || isoSet.has(id))
+                  visibleImageIds.has(id) && (isoSet === null || isoSet.has(id))
                 );
                 return (
                   <div
@@ -448,23 +474,24 @@ export const BottomDrawer: React.FC = () => {
                       group.thumbnail_id !== null
                         ? allImages.find(img => img.id === group.thumbnail_id)
                         : null;
-                    const allDeleted = group.image_ids.every(id => deletedIds.has(id));
-                    const someDeleted = !allDeleted && group.image_ids.some(id => deletedIds.has(id));
+                    // Batch is shown here only if it passed the "has visible images" filter above.
+                    // someDeleted = some (but not all) images are no longer visible.
+                    const someDeleted = group.image_ids.some(id => !visibleImageIds.has(id));
                     // When isolated, only select images that are in the isolation set
                     const isoSet = isolatedImageIds !== null ? new Set(isolatedImageIds) : null;
                     const selectableIds = group.image_ids.filter(id =>
-                      !deletedIds.has(id) && (isoSet === null || isoSet.has(id))
+                      visibleImageIds.has(id) && (isoSet === null || isoSet.has(id))
                     );
                     return (
                       <div
                         key={group.id}
-                        className={`drawer-group${allDeleted ? ' highlighting' : ''}`}
+                        className="drawer-group"
                         onClick={() => setSelectedImageIds(selectableIds)}
                         title={group.prompt || ''}
                       >
-                        {thumbnailImage ? (
+                        {thumbnailImage && visibleImageIds.has(thumbnailImage.id) ? (
                           <img
-                            className={`group-thumb-bg${allDeleted ? ' group-thumb-bg--deleted' : ''}`}
+                            className="group-thumb-bg"
                             src={`data:image/png;base64,${thumbnailImage.base64_image}`}
                             alt=""
                           />
@@ -477,9 +504,9 @@ export const BottomDrawer: React.FC = () => {
                               {group.type?.toUpperCase() ?? 'BATCH'}
                             </span>
                             <span className="group-count">
-                              {group.image_ids.length}
+                              {selectableIds.length}
                               {someDeleted
-                                ? ` (−${group.image_ids.filter(id => deletedIds.has(id)).length})`
+                                ? ` (−${group.image_ids.filter(id => !visibleImageIds.has(id)).length})`
                                 : ''}
                             </span>
                           </div>
@@ -495,10 +522,10 @@ export const BottomDrawer: React.FC = () => {
                             </span>
                           </div>
                         </div>
-                        {(allDeleted || someDeleted) && (
+                        {someDeleted && (
                           <span
-                            className={`group-deleted-dot${allDeleted ? ' group-deleted-dot--all' : ''}`}
-                            title={allDeleted ? 'All images deleted' : 'Some images deleted'}
+                            className="group-deleted-dot"
+                            title="Some images deleted"
                           />
                         )}
                       </div>

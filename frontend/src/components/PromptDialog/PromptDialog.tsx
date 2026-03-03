@@ -29,7 +29,7 @@ function hexToRgba(hex: string, alpha: number): string {
 interface PromptDialogProps {
   referenceImages: ImageData[];
   onClose: () => void;
-  onGenerate: (referenceIds: number[], prompt: string, numImages: number) => void;
+  onGenerate: (referenceIds: number[], prompt: string, numImages: number, shoeType?: string) => void;
 }
 
 export const PromptDialog: React.FC<PromptDialogProps> = ({
@@ -48,11 +48,22 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   // All available pills from SuggestionsPanel (kept for future use)
   const [_availablePills, setAvailablePills] = useState<PillDef[]>([]);
 
+  // Shoe type override — highest-priority hard constraint, pre-filled from AI context
+  const briefFields = useAppStore((s) => s.briefFields);
+  const [shoeType, setShoeType] = useState(
+    () => briefFields.find(f => f.key === 'shoe_type')?.value?.trim() ?? ''
+  );
+
   // Reference analysis — loaded from SuggestionsPanel, used to expand @A/@B at generation time
   const [refAnalysis, setRefAnalysis] = useState<ReferenceImageAnalysis[]>([]);
 
   // Refine state
   const [isRefining, setIsRefining] = useState(false);
+  // Snapshot before refine — allows undo
+  const [preRefineState, setPreRefineState] = useState<{
+    freeText: string;
+    chipMap: Map<string, string>;
+  } | null>(null);
   const designBrief = useAppStore((s) => s.designBrief);
 
   // Tutorial guide
@@ -97,7 +108,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
     resolved = resolved.replace(/@[A-D]'s\b/gi, 'the reference image\'s').replace(/@[A-D]\b/gi, 'the reference image');
 
     const referenceIds = referenceImages.map(img => img.id);
-    onGenerate(referenceIds, resolved, numImages);
+    onGenerate(referenceIds, resolved, numImages, shoeType.trim() || undefined);
   };
 
   const handleFreeTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -164,6 +175,8 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   // Refine prompt via AI — directly replaces freeText
   const handleRefine = async () => {
     if (!composedPrompt || isRefining) return;
+    // Snapshot current state for undo
+    setPreRefineState({ freeText, chipMap: new Map(chipMap) });
     setIsRefining(true);
     try {
       const tags = Array.from(chipMap.entries()).map(([text, imageLabel]) => {
@@ -182,11 +195,14 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         .join(', ');
 
       const refIds = referenceImages.map(img => img.id);
+      const genMode = referenceImages.length >= 2 ? 'multi-ref' : 'single-ref';
       const result = await apiClient.refinePrompt(
         preAttributedPrompt,
         tags,
         refIds,
-        designBrief || ''
+        designBrief || '',
+        'shoe',
+        genMode
       );
       // Directly update: clear chips, put refined text in freeText
       setChipMap(new Map());
@@ -196,6 +212,13 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
     } finally {
       setIsRefining(false);
     }
+  };
+
+  const handleUndoRefine = () => {
+    if (!preRefineState) return;
+    setFreeText(preRefineState.freeText);
+    setChipMap(preRefineState.chipMap);
+    setPreRefineState(null);
   };
 
   // Callback from SuggestionsPanel
@@ -212,6 +235,19 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
         {/* Left panel: generate form */}
         <div className="dialog prompt-dialog-main">
           <h2>Generate from Reference{referenceImages.length > 1 ? 's' : ''}</h2>
+
+          {/* ── Shoe Type override — highest-priority constraint ── */}
+          <div className="shoe-type-row" title="This overrides the AI context shoe type for this generation only">
+            <span className="shoe-type-icon">⚡</span>
+            <label className="shoe-type-label">Shoe Type</label>
+            <input
+              type="text"
+              className="shoe-type-input"
+              placeholder="slide, trail runner, sneaker…"
+              value={shoeType}
+              onChange={e => setShoeType(e.target.value)}
+            />
+          </div>
 
           {/* ── Tutorial guide banner ── */}
           {showTutorialGuide && (
@@ -374,7 +410,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                 </div>
 
                 {/* Refine button row */}
-                {composedPrompt && (
+                {(composedPrompt || preRefineState) && (
                   <div className="ttd-refine-row">
                     <button
                       className={`ttd-refine-btn${showTutorialGuide ? ' ttd-btn-pulse' : ''}`}
@@ -384,6 +420,15 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                     >
                       {isRefining ? 'Refining...' : 'Refine Prompt'}
                     </button>
+                    {preRefineState && (
+                      <button
+                        className="ttd-refine-btn ttd-undo-btn"
+                        onClick={handleUndoRefine}
+                        title="Revert to your original prompt before refinement"
+                      >
+                        Undo Refine
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

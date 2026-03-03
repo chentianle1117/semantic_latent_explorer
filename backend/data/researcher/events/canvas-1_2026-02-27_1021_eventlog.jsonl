@@ -1,0 +1,104 @@
+{"type": "session_start", "timestamp": "2026-02-27T10:21:47.140181", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0", "canvas_name": "Canvas 1", "participant_id": "researcher", "study_session": null}
+{"type": "file_upload", "timestamp": "2026-02-27T12:12:12.334509", "data": {"shoeCount": 19, "referenceCount": 0, "totalCount": 19}}
+{"type": "generation", "timestamp": "2026-02-27T12:12:53.377969", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "count": 19, "prompt": "Shoe images"}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:14.738160", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:15.203795", "data": {"selectedIds": [9, 6], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:15.517940", "data": {"selectedIds": [9, 6, 7], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:15.800271", "data": {"selectedIds": [9, 6], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:16.153079", "data": {"selectedIds": [9, 6, 3], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:17.263961", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:18.465573", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:18.894056", "data": {"selectedIds": [6, 5], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:19.992556", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:21.147567", "data": {"selectedIds": [0, 6, 8, 9, 10, 11, 15], "count": 7}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:21.599309", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:23.032237", "data": {"selectedIds": [0, 6, 8, 9, 10, 11], "count": 6}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:23.803600", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "count": 19}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:24.224351", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:25.222537", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "count": 19}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:26.482905", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:28.917827", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:29.687727", "data": {"selectedIds": [7, 6], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:35.217823", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:35.804448", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:14:36.527544", "data": {"selectedIds": [17, 5], "count": 2}}
+{"type": "generation", "timestamp": "2026-02-27T12:15:14.076969", "data": {"imageIds": [19, 20], "count": 2, "prompt": "Shoe design with black upper, purple accents, chunky sole, athletic silhouette, geometric pattern, mesh details's purple accents and off-white canvas, low-top, round toe, simple design, thick laces, rubber sole's thick laces."}}
+{"type": "selection", "timestamp": "2026-02-27T12:15:14.606597", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:15:15.839124", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:15:16.112837", "data": {"selectedIds": [6, 20], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:15:23.437669", "data": {"selectedIds": [], "count": 0}}
+{"type": "axis_change", "timestamp": "2026-02-27T12:16:20.582890", "data": {"axisLabels": {"x": ["low", "high"], "y": ["dark", "colorful"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-02-27T12:16:27.184980", "data": {"selectedIds": [20], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:16:27.497840", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:16:28.317264", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:17:07.157612", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:11.664151", "data": {"selectedIds": [8], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:17.509396", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:19.646511", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "count": 18}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:21.006398", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:21.678605", "data": {"selectedIds": [20], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:22.329457", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:22.811907", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:56.703247", "data": {"selectedIds": [19, 20], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:58.430578", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "count": 18}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:58.875983", "data": {"selectedIds": [19, 20], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:18:59.153177", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "count": 18}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:03.056282", "data": {"selectedIds": [19, 20], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:04.008573", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:12.930320", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:13.322024", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:24.282277", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:24.613268", "data": {"selectedIds": [11, 9], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:25.111320", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:25.437515", "data": {"selectedIds": [20], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:25.890141", "data": {"selectedIds": [20, 9], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:26.189390", "data": {"selectedIds": [20, 9, 11], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:34.012346", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T12:19:41.343878", "data": {"selectedIds": [19], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T12:21:22.547014", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T12:21:53.043807", "data": {"imageIds": [21], "count": 1, "prompt": "A high-top sneaker with a translucent, iridescent upper showcasing vibrant, abstract paint splatters in electric blues, neon pinks, and lime greens, contrasted with stark white architectural lacing systems and a chunky, translucent gum sole."}}
+{"type": "selection", "timestamp": "2026-02-27T12:21:59.707486", "data": {"selectedIds": [21], "count": 1}}
+{"type": "generation", "timestamp": "2026-02-27T12:21:59.723090", "data": {"imageIds": [22], "count": 1, "prompt": "A streamlined, laceless running shoe with a shimmering, metallic woven upper in gradients of sunset orange, amethyst purple, and rose gold, featuring subtle reflective accents and a minimalist, sculpted sole in a soft, cloud-white hue."}}
+{"type": "selection", "timestamp": "2026-02-27T12:22:08.572441", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T13:05:54.071809", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22], "count": 22}}
+{"type": "selection", "timestamp": "2026-02-27T13:06:04.478524", "data": {"selectedIds": [], "count": 0}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T13:11:31.294512", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T13:12:05.609391", "data": {"tag": "Woven canvas", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T13:12:10.396742", "data": {"tag": "Earth tones", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T13:12:11.297598", "data": {"tag": "Textural play", "category": "style", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-02-27T13:12:13.880346", "data": {"tag": "Exposed seams", "category": "details", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-02-27T13:12:22.039993", "data": {"prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form.", "imageCount": 3, "selectedTagCount": 0}}
+{"type": "generation", "timestamp": "2026-02-27T13:13:02.768489", "data": {"imageIds": [23, 24, 25], "count": 3, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:22.460571", "data": {"selectedIds": [25], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:24.446896", "data": {"selectedIds": [25, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:25.023566", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:25.405591", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:26.125654", "data": {"selectedIds": [24, 25], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:26.763662", "data": {"selectedIds": [25], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:27.394470", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:32.540503", "data": {"selectedIds": [23], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:33.248639", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:33.507121", "data": {"selectedIds": [25], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:34.090337", "data": {"selectedIds": [25, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:34.292682", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:36.442501", "data": {"selectedIds": [25], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:36.831007", "data": {"selectedIds": [25, 23], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:37.069413", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:41.332621", "data": {"selectedIds": [25], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:41.659699", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:42.294471", "data": {"selectedIds": [23], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:43.059516", "data": {"selectedIds": [23, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T13:14:43.704384", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T13:16:00.015417", "data": {"imageIds": [23, 24, 25], "count": 3, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T13:16:00.017414", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "selection", "timestamp": "2026-02-27T13:20:45.788165", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:20:48.191864", "data": {"selectedIds": [24, 23], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T13:21:26.657897", "data": {"selectedIds": [23, 24, 25], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T13:21:27.010940", "data": {"selectedIds": [22], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:21:27.441693", "data": {"selectedIds": [21], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:21:30.407523", "data": {"selectedIds": [22], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:21:30.845059", "data": {"selectedIds": [21], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T13:21:31.250504", "data": {"selectedIds": [19, 20], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T13:21:31.558494", "data": {"selectedIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "count": 19}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T13:21:37.981174", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "new", "newName": "Canvas 3"}}
+{"type": "session_end", "timestamp": "2026-02-27T13:21:37.984534", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0"}

@@ -1,0 +1,105 @@
+{"type": "session_start", "timestamp": "2026-02-27T14:48:50.360055", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0", "canvas_name": "Onboarding", "participant_id": "Evan", "study_session": null}
+{"type": "axis_change", "timestamp": "2026-02-27T14:48:53.831175", "data": {"axisLabels": {"x": ["fast", "slow"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-02-27T14:48:58.664041", "data": {"selectedIds": [40], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:48:59.942791", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:49:06.537823", "data": {"selectedIds": [24], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:49:08.625346", "data": {"selectedIds": [23], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:49:10.751939", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:51:41.150240", "data": {"selectedIds": [26, 27, 28], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:51:53.670811", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:51:54.575887", "data": {"selectedIds": [26], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:01.472592", "data": {"selectedIds": [26, 31], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:06.723927", "data": {"selectedIds": [33], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:07.519531", "data": {"selectedIds": [38], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:07.947126", "data": {"selectedIds": [39], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:10.615799", "data": {"selectedIds": [40], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:11.570470", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:21.080742", "data": {"selectedIds": [28], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:21.573698", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:21.983857", "data": {"selectedIds": [28], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:22.651690", "data": {"selectedIds": [28, 31], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:23.113959", "data": {"selectedIds": [28, 31, 40], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:24.508555", "data": {"selectedIds": [39], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:26.379834", "data": {"selectedIds": [39, 42], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:26.885399", "data": {"selectedIds": [39, 42, 25], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:27.337823", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:40.804021", "data": {"selectedIds": [23, 25, 26, 31], "count": 4}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:41.745141", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:42.164397", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:52:42.601454", "data": {"selectedIds": [32, 31], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:03.122115", "data": {"selectedIds": [34], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:13.209134", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:15.830237", "data": {"selectedIds": [26], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:31.293138", "data": {"selectedIds": [26, 25], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:32.373687", "data": {"selectedIds": [26, 25, 24], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:33.643088", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:35.492230", "data": {"selectedIds": [41], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:40.571949", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:42.188775", "data": {"selectedIds": [41], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:45.322971", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:51.801565", "data": {"selectedIds": [41], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:51.802706", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:51.805438", "data": {"selectedIds": [40], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:51.808444", "data": {"selectedIds": [35], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:51.809444", "data": {"selectedIds": [34], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:53:51.811451", "data": {"selectedIds": [31], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:11.369474", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:13.473196", "data": {"selectedIds": [25], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:14.842292", "data": {"selectedIds": [25, 24], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:16.069555", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:17.339317", "data": {"selectedIds": [41], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:21.039836", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:23.365698", "data": {"selectedIds": [36], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:23.798094", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:24.439386", "data": {"selectedIds": [36, 44, 45], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:24.916159", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:25.196616", "data": {"selectedIds": [36, 33, 34], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:25.809671", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:26.166432", "data": {"selectedIds": [35, 29, 30, 37, 38, 39], "count": 6}}
+{"type": "selection", "timestamp": "2026-02-27T14:54:26.527709", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:03.466670", "data": {"selectedIds": [38], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:05.326781", "data": {"selectedIds": [39], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:05.896743", "data": {"selectedIds": [40], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:07.125832", "data": {"selectedIds": [34], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:07.618802", "data": {"selectedIds": [35], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:08.495454", "data": {"selectedIds": [39], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:09.292107", "data": {"selectedIds": [31], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:11.924175", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:12.363843", "data": {"selectedIds": [28], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:12.797407", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:13.414733", "data": {"selectedIds": [42], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:13.892582", "data": {"selectedIds": [42, 28], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:14.423161", "data": {"selectedIds": [42, 28, 40], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:17.613975", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:18.893291", "data": {"selectedIds": [28], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:19.480373", "data": {"selectedIds": [28, 23], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:20.123515", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:20.454656", "data": {"selectedIds": [25], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:20.769703", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:21.294710", "data": {"selectedIds": [31], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:22.008330", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:22.677206", "data": {"selectedIds": [40], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:23.179024", "data": {"selectedIds": [40, 42], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:24.110992", "data": {"selectedIds": [40, 42, 39], "count": 3}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:24.527113", "data": {"selectedIds": [40, 42, 39, 37], "count": 4}}
+{"type": "selection", "timestamp": "2026-02-27T14:55:25.114313", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-02-27T15:00:05.340765", "data": {"imageIds": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 43, 44, 45], "count": 22, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T15:00:05.342220", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "generation", "timestamp": "2026-02-27T15:00:18.170475", "data": {"imageIds": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 43, 44, 45], "count": 22, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T15:00:18.173478", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "generation", "timestamp": "2026-02-27T15:00:28.930763", "data": {"imageIds": [23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 42, 43, 44, 45], "count": 22, "prompt": "Modify the shoe with woven canvas, earth tones, textural play, and exposed seams for a sculptural, updated form."}}
+{"type": "design_brief_change", "timestamp": "2026-02-27T15:00:28.933169", "data": {"brief": "football shoe that has traditional material with sculptural form"}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:30.335577", "data": {"selectedIds": [37], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:30.734803", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:31.302253", "data": {"selectedIds": [42], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:31.740177", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:33.599746", "data": {"selectedIds": [32], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:34.121682", "data": {"selectedIds": [33, 34], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:34.469411", "data": {"selectedIds": [36, 37], "count": 2}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:34.886751", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:35.270654", "data": {"selectedIds": [43], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:35.533450", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:36.357617", "data": {"selectedIds": [43], "count": 1}}
+{"type": "selection", "timestamp": "2026-02-27T15:00:37.230951", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-02-27T15:01:15.908744", "data": {"fromCanvasId": "35088ec9-1823-4177-967c-709cf91b0cd0", "action": "new", "newName": "0227 Evan User Test"}}
+{"type": "session_end", "timestamp": "2026-02-27T15:01:15.911851", "canvas_id": "35088ec9-1823-4177-967c-709cf91b0cd0"}

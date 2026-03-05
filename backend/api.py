@@ -1223,6 +1223,189 @@ async def update_semantic_axes(request: AxisUpdateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/axis-sentences")
+async def get_axis_sentences():
+    """Return the current Gemini-expanded sentences for all axis ends (from cache)."""
+    try:
+        result: Dict[str, List[str]] = {}
+        for axis in ("x", "y"):
+            neg, pos = state.axis_labels.get(axis, ("", ""))
+            for suffix, label in [("negative", neg), ("positive", pos)]:
+                key = f"{axis}_{suffix}"
+                cache_key = f"{label}:4"
+                if label and cache_key in state._gemini_expansion_cache:
+                    result[key] = state._gemini_expansion_cache[cache_key]
+                elif label:
+                    # Generate on the fly if not cached
+                    concepts = expand_concept_with_gemini(label, num_expansions=4)
+                    _set_cached_expansion(label, concepts)
+                    result[key] = concepts
+                else:
+                    result[key] = []
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class TunedAxesRequest(BaseModel):
+    custom_sentences: Dict[str, List[str]]  # e.g. { "x_negative": [...], "x_positive": [...], ... }
+    image_anchors: List[Dict]  # [{ "imageId": int, "axis": "x"|"y", "position": float (0-10) }]
+    text_weight: float = 1.0  # Weight for text-based direction (vs image anchors)
+
+
+@app.post("/api/update-axes-tuned")
+async def update_axes_tuned(request: TunedAxesRequest):
+    """
+    Compute blended axis vectors from custom sentences + image anchors, then reproject.
+    axis_vector = α * normalize(text_direction) + Σ(wᵢ * normalize(imageᵢ_embedding))
+    where wᵢ = (position_i - 5) / 5  (maps 0-10 to [-1, +1])
+    """
+    try:
+        if state.axis_builder is None or state.embedder is None:
+            raise HTTPException(status_code=400, detail="Models not initialized")
+
+        print(f"\n=== Tuned Axis Update ===")
+        print(f"  Text weight: {request.text_weight}")
+        print(f"  Image anchors: {len(request.image_anchors)}")
+
+        # Build image ID → embedding lookup
+        img_embed_map: Dict[int, np.ndarray] = {}
+        for img_meta in state.images_metadata:
+            img_embed_map[img_meta.id] = img_meta.embedding
+
+        directions = {}
+        for axis in ("x", "y"):
+            neg_key = f"{axis}_negative"
+            pos_key = f"{axis}_positive"
+            neg_sentences = request.custom_sentences.get(neg_key, [])
+            pos_sentences = request.custom_sentences.get(pos_key, [])
+
+            # Text direction (same as standard projection)
+            text_dir = np.zeros(len(next(iter(img_embed_map.values()))))
+            if neg_sentences and pos_sentences:
+                neg_axis = state.axis_builder.create_ensemble_axis(
+                    neg_sentences, name=f"tuned_{neg_key}", positive_concept="neg", negative_concept="neg"
+                )
+                pos_axis = state.axis_builder.create_ensemble_axis(
+                    pos_sentences, name=f"tuned_{pos_key}", positive_concept="pos", negative_concept="neg"
+                )
+                text_dir = pos_axis.direction - neg_axis.direction
+                norm = np.linalg.norm(text_dir)
+                if norm > 1e-12:
+                    text_dir = text_dir / norm
+
+            # Image anchor direction
+            anchor_dir = np.zeros_like(text_dir)
+            axis_anchors = [a for a in request.image_anchors if a.get("axis") == axis]
+            if axis_anchors:
+                for anchor in axis_anchors:
+                    img_id = anchor["imageId"]
+                    position = anchor["position"]  # 0-10
+                    weight = (position - 5) / 5  # maps to [-1, +1]
+                    emb = img_embed_map.get(img_id)
+                    if emb is not None:
+                        emb_norm = emb / (np.linalg.norm(emb) + 1e-12)
+                        anchor_dir += weight * emb_norm
+                norm = np.linalg.norm(anchor_dir)
+                if norm > 1e-12:
+                    anchor_dir = anchor_dir / norm
+
+            # Blend: α * text + (1-α) * anchors (when anchors exist)
+            alpha = request.text_weight
+            if len(axis_anchors) > 0:
+                combined = alpha * text_dir + (1 - alpha) * anchor_dir
+            else:
+                combined = text_dir
+            norm = np.linalg.norm(combined)
+            if norm > 1e-12:
+                combined = combined / norm
+
+            directions[axis] = combined
+            print(f"  {axis}: text_norm={np.linalg.norm(text_dir):.3f}, anchor_norm={np.linalg.norm(anchor_dir):.3f}")
+
+        # Project all images onto tuned axes
+        all_embeddings = np.array([img.embedding for img in state.images_metadata])
+        x_coords = all_embeddings @ directions["x"]
+        y_coords = all_embeddings @ directions["y"]
+
+        for i, img_meta in enumerate(state.images_metadata):
+            img_meta.coordinates = (float(x_coords[i]), float(y_coords[i]))
+
+        # Update the expansion cache with custom sentences
+        for key, sentences in request.custom_sentences.items():
+            parts = key.split("_")
+            axis = parts[0]
+            direction = parts[1]
+            label = state.axis_labels.get(axis, ("", ""))[0 if direction == "negative" else 1]
+            if label and sentences:
+                _set_cached_expansion(label, sentences)
+
+        # Invalidate direction cache (custom directions don't match standard projection)
+        state._axis_directions_cache = None
+
+        update_clusters()
+        await broadcast_state_update()
+
+        return {"status": "success", "message": "Tuned axes applied"}
+
+    except Exception as e:
+        print(f"ERROR in tuned axis update: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RefineSentencesRequest(BaseModel):
+    sentences: Dict[str, List[str]]  # Current sentences per axis end
+    instruction: str  # Natural language instruction for refinement
+
+
+@app.post("/api/refine-sentences")
+async def refine_sentences(request: RefineSentencesRequest):
+    """Use Gemini to refine axis sentences based on natural language instruction."""
+    try:
+        gemini_model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
+        prompt = f"""You are refining visual description sentences used for semantic axis projection in a shoe design tool.
+
+Current axis sentences:
+{json.dumps(request.sentences, indent=2)}
+
+User instruction: "{request.instruction}"
+
+Rewrite each group of sentences to reflect the user's instruction. Rules:
+- Keep exactly 4 sentences per axis end
+- Each sentence should be 3-8 words
+- Focus on VISUAL attributes (materials, colors, shapes, textures)
+- Be specific and concrete
+- Return ONLY a JSON object with the same keys, no other text.
+
+Example output:
+{{"x_negative": ["sentence1", "sentence2", "sentence3", "sentence4"], "x_positive": [...]}}"""
+
+        response = gemini_model.generate_content(prompt)
+        text = (getattr(response, "text", None) or "").strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*\n?", "", text)
+            text = re.sub(r"\n?```\s*$", "", text)
+            text = text.strip()
+        match = re.search(r"\{[\s\S]*\}", text)
+        if match:
+            text = match.group(0)
+        result = json.loads(text)
+
+        # Validate structure
+        for key in request.sentences:
+            if key not in result or not isinstance(result[key], list):
+                result[key] = request.sentences[key]
+
+        return result
+
+    except Exception as e:
+        print(f"ERROR refining sentences: {e}")
+        return request.sentences  # Fallback: return originals
+
+
 @app.post("/api/set-3d-mode")
 async def set_3d_mode(use_3d: bool):
     """Toggle between 2D and 3D visualization mode."""

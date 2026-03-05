@@ -47,6 +47,12 @@ export interface MultiViewHistoryEntry {
   viewBases: Record<string, string | null>;
 }
 
+export interface AxisTuningAnchor {
+  imageId: number;
+  axis: 'x' | 'y';
+  position: number; // 0-10 scale
+}
+
 export interface ImageData {
   id: number;
   group_id: string;
@@ -221,6 +227,13 @@ export interface AppState {
 
   // Multi-View Editor history (keyed by side image ID, persists across dialog open/close)
   multiViewHistory: Record<number, MultiViewHistoryEntry[]>;
+
+  // Axis Tuning Mode
+  axisTuningMode: boolean;
+  axisTuningAxis: 'x' | 'y' | null;
+  axisTuningSentences: Record<string, string[]>; // "x_negative" | "x_positive" | "y_negative" | "y_positive" → string[]
+  axisTuningAnchors: AxisTuningAnchor[];
+  axisTuningTextWeight: number; // 0-1, weight of text vs image anchors
 
   // Onboarding tutorial
   onboardingActive: boolean;

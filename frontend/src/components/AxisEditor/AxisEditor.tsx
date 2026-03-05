@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef } from "react";
+import { useAppStore } from "../../store/appStore";
 import "./AxisEditor.css";
 
 interface AxisEditorProps {
@@ -106,6 +107,20 @@ export const AxisEditor: React.FC<AxisEditorProps> = ({
           <span className={`axis-arrow ${colorClass}`}>
             {axis === "x" ? "◄──────────────────►" : "◄────────►"}
           </span>
+          {(axis === "x" || axis === "y") && (
+            <button
+              className="axis-tune-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                const store = useAppStore.getState();
+                store.setAxisTuningMode(true);
+                store.setAxisTuningAxis(axis);
+              }}
+              title="Open axis tuning mode"
+            >
+              Tune
+            </button>
+          )}
           <span className="axis-label-block">
             <span
               className={`axis-word ${colorClass}`}

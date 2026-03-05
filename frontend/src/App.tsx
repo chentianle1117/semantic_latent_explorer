@@ -24,6 +24,7 @@ import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/Inline
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { OnboardingTour } from "./components/OnboardingTour/OnboardingTour";
 import { MultiViewEditor } from "./components/MultiViewEditor/MultiViewEditor";
+import { AxisTuningRail } from "./components/AxisTuningRail/AxisTuningRail";
 import { useAppStore } from "./store/appStore";
 import type { ImageData, ShoeViewType } from "./types";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
@@ -969,6 +970,8 @@ export const App: React.FC = () => {
             <DesignBriefOverlay />
             {/* Canvas view toggle (Semantic | Lineage) */}
             <CanvasViewToggle />
+            {/* Axis Tuning Rail overlay */}
+            <AxisTuningRail />
             {/* Conditionally render canvas based on view mode */}
             {canvasViewMode === 'lineage' ? (
               <LineageCanvas

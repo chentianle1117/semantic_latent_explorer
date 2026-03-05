@@ -139,6 +139,17 @@ interface AppStore extends AppState {
   toggleSatelliteView: (viewType: string) => void;
   enableSatelliteViews: (views: string[]) => void;
 
+  // Axis tuning mode
+  setAxisTuningMode: (on: boolean) => void;
+  setAxisTuningAxis: (axis: 'x' | 'y' | null) => void;
+  setAxisTuningSentences: (sentences: Record<string, string[]>) => void;
+  updateAxisTuningSentence: (key: string, index: number, value: string) => void;
+  addAxisTuningAnchor: (anchor: { imageId: number; axis: 'x' | 'y'; position: number }) => void;
+  removeAxisTuningAnchor: (imageId: number, axis: 'x' | 'y') => void;
+  updateAxisTuningAnchorPosition: (imageId: number, axis: 'x' | 'y', position: number) => void;
+  setAxisTuningTextWeight: (weight: number) => void;
+  clearAxisTuning: () => void;
+
   // Star ratings
   setImageRating: (imageId: number, rating: number) => void;
   setStarFilter: (n: number | null) => void;
@@ -306,6 +317,13 @@ const initialState: AppState = {
 
   // Multi-View Editor history (keyed by side image ID)
   multiViewHistory: {} as Record<number, MultiViewHistoryEntry[]>,
+
+  // Axis tuning mode
+  axisTuningMode: false,
+  axisTuningAxis: null as 'x' | 'y' | null,
+  axisTuningSentences: {} as Record<string, string[]>,
+  axisTuningAnchors: [] as { imageId: number; axis: 'x' | 'y'; position: number }[],
+  axisTuningTextWeight: 1.0,
 
   // Onboarding tutorial
   onboardingActive: false,
@@ -680,6 +698,39 @@ export const useAppStore = create<AppStore>((set) => ({
     const updated = { ...s.visibleSatelliteViews };
     for (const v of views) updated[v] = true;
     return { visibleSatelliteViews: updated };
+  }),
+
+  // Axis tuning mode
+  setAxisTuningMode: (on) => set({ axisTuningMode: on }),
+  setAxisTuningAxis: (axis) => set({ axisTuningAxis: axis }),
+  setAxisTuningSentences: (sentences) => set({ axisTuningSentences: sentences }),
+  updateAxisTuningSentence: (key, index, value) => set((s) => {
+    const arr = [...(s.axisTuningSentences[key] || [])];
+    arr[index] = value;
+    return { axisTuningSentences: { ...s.axisTuningSentences, [key]: arr } };
+  }),
+  addAxisTuningAnchor: (anchor) => set((s) => ({
+    axisTuningAnchors: [...s.axisTuningAnchors.filter(
+      a => !(a.imageId === anchor.imageId && a.axis === anchor.axis)
+    ), anchor],
+  })),
+  removeAxisTuningAnchor: (imageId, axis) => set((s) => ({
+    axisTuningAnchors: s.axisTuningAnchors.filter(
+      a => !(a.imageId === imageId && a.axis === axis)
+    ),
+  })),
+  updateAxisTuningAnchorPosition: (imageId, axis, position) => set((s) => ({
+    axisTuningAnchors: s.axisTuningAnchors.map(a =>
+      a.imageId === imageId && a.axis === axis ? { ...a, position } : a
+    ),
+  })),
+  setAxisTuningTextWeight: (weight) => set({ axisTuningTextWeight: weight }),
+  clearAxisTuning: () => set({
+    axisTuningMode: false,
+    axisTuningAxis: null,
+    axisTuningSentences: {},
+    axisTuningAnchors: [],
+    axisTuningTextWeight: 1.0,
   }),
 
   // Multi-View Editor history

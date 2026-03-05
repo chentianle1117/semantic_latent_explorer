@@ -49,6 +49,31 @@ class APIClient {
     return response.data;
   }
 
+  // Axis tuning: get current expanded sentences
+  async getAxisSentences(): Promise<Record<string, string[]>> {
+    const response = await axios.get(`${API_BASE}/axis-sentences`);
+    return response.data;
+  }
+
+  // Axis tuning: reproject with custom sentences + image anchors
+  async updateAxesTuned(params: {
+    custom_sentences: Record<string, string[]>;
+    image_anchors: { imageId: number; axis: string; position: number }[];
+    text_weight: number;
+  }): Promise<{ status: string }> {
+    const response = await axios.post(`${API_BASE}/update-axes-tuned`, params);
+    return response.data;
+  }
+
+  // Axis tuning: refine sentences via Gemini
+  async refineSentences(params: {
+    sentences: Record<string, string[]>;
+    instruction: string;
+  }): Promise<Record<string, string[]>> {
+    const response = await axios.post(`${API_BASE}/refine-sentences`, params);
+    return response.data;
+  }
+
   // Delete image (soft-delete: sets visible=false on backend)
   async deleteImage(imageId: number): Promise<{ status: string }> {
     const response = await axios.delete(`${API_BASE}/images/${imageId}`);

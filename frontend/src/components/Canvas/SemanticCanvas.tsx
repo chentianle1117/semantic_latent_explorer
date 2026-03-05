@@ -804,6 +804,12 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               .style("cursor", "pointer")
               .on("click", function (event) {
                 event.stopPropagation();
+                // Axis tuning mode: add as anchor
+                const ts = useAppStore.getState();
+                if (ts.axisTuningMode && ts.axisTuningAxis) {
+                  ts.addAxisTuningAnchor({ imageId: d.id, axis: ts.axisTuningAxis, position: 5 });
+                  return;
+                }
                 // Satellite views redirect to their parent side view
                 const targetId = (d.shoe_view && d.shoe_view !== 'side' && d.parent_side_id && d.parent_side_id > 0)
                   ? d.parent_side_id : d.id;
@@ -1484,6 +1490,17 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         });
 
         event.stopPropagation();
+
+        // Axis tuning mode: clicking a node adds it as an anchor instead of selecting
+        const tuningState = useAppStore.getState();
+        if (tuningState.axisTuningMode && tuningState.axisTuningAxis) {
+          tuningState.addAxisTuningAnchor({
+            imageId: d.id,
+            axis: tuningState.axisTuningAxis,
+            position: 5, // Default to middle; user drags to reposition on rail
+          });
+          return;
+        }
 
         // Block selection of non-isolated images when in isolate mode
         const curIsolated = useAppStore.getState().isolatedImageIds;

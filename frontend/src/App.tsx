@@ -284,7 +284,7 @@ export const App: React.FC = () => {
     setGenerationProgress(10);
 
     try {
-      // Remove old satellites that are being replaced (hide them)
+      // Remove old satellites that are being replaced
       for (const [view] of satelliteEntries) {
         const origSat = multiViewTarget.satellites.find(s => s.shoe_view === view);
         if (origSat) {
@@ -292,34 +292,49 @@ export const App: React.FC = () => {
         }
       }
 
-      let done = 0;
-      for (const [view, imgData] of satelliteEntries) {
-        // Upload to fal.ai storage, then save via backend
-        const blob = await (await fetch(`data:image/png;base64,${imgData.base64_image}`)).blob();
-        const file = new File([blob], `${view}-${sideId}.png`, { type: 'image/png' });
-        const url = await falClient.uploadFile(file);
+      // Upload all files to fal.ai in parallel (major speedup vs sequential loop)
+      setGenerationProgress(20);
+      const uploadedEntries = await Promise.all(
+        satelliteEntries.map(async ([view, imgData]) => {
+          const blob = await (await fetch(`data:image/png;base64,${imgData.base64_image}`)).blob();
+          const file = new File([blob], `${view}-${sideId}.png`, { type: 'image/png' });
+          const url = await falClient.uploadFile(file);
+          return { view, url };
+        })
+      );
 
-        const result = await apiClient.addExternalImages({
-          images: [{ url }],
-          prompt,
-          generation_method: 'reference',
-          remove_background: false, // Already processed by MVE pipeline (rembg already applied)
-          realm: 'shoe',
-          shoe_view: view,
-          parent_side_id: sideId,
-          parent_ids: [sideId],
-        });
+      setGenerationProgress(60);
+
+      // Save all via backend in parallel
+      const results = await Promise.all(
+        uploadedEntries.map(({ view, url }) =>
+          apiClient.addExternalImages({
+            images: [{ url }],
+            prompt,
+            generation_method: 'reference',
+            remove_background: false, // Already processed by MVE pipeline (rembg already applied)
+            realm: 'shoe',
+            shoe_view: view,
+            parent_side_id: sideId,
+            parent_ids: [sideId],
+          })
+        )
+      );
+
+      for (const result of results) {
         mergeImages(result.images);
-
-        done++;
-        setGenerationProgress(10 + Math.round((done / satelliteEntries.length) * 80));
       }
+
+      setGenerationProgress(90);
 
       // Enable visibility for any new satellite views
       const viewsToEnable = satelliteEntries.map(([v]) => v);
       if (viewsToEnable.length > 0) {
         useAppStore.getState().enableSatelliteViews(viewsToEnable);
       }
+
+      // Clear MVE history so re-opening starts with a clean slate
+      useAppStore.getState().clearMultiViewHistory(sideId);
     } catch (err) {
       console.error('Multi-View Editor save failed:', err);
     } finally {

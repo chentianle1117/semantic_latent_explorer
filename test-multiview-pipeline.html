@@ -120,11 +120,70 @@
   .mve-cell--empty { border-style: dashed; border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); }
   .mve-cell--info { background: transparent; border-color: transparent; display: flex; flex-direction: column; justify-content: center; padding: 8px; }
   .mve-cell--info .info-line { font-size: 10px; color: rgba(150,165,180,0.6); margin: 2px 0; }
+
+  /* ─── Two-column layout ─── */
+  .page-layout { display: flex; gap: 16px; align-items: flex-start; }
+  .page-main { flex: 2; min-width: 0; }
+  .page-graph {
+    flex: 1; min-width: 360px; max-width: 480px; position: sticky; top: 12px;
+    background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 16px; max-height: calc(100vh - 24px); overflow-y: auto;
+  }
+  .page-graph::-webkit-scrollbar { width: 4px; }
+  .page-graph::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+  .pg-title { font-size: 11px; color: #8cb4ff; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; font-weight: 700; text-align: center; }
+
+  /* Flowchart container */
+  .pg-flow { position: relative; }
+  .pg-flow svg.pg-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+  .pg-flow .pg-lines path { stroke: rgba(255,255,255,0.15); stroke-width: 1.5; }
+  .pg-flow .pg-lines path.ready { stroke: rgba(63,185,80,0.5); stroke-width: 2; }
+  .pg-flow .pg-lines path.active { stroke: rgba(0,210,255,0.55); stroke-width: 2.5; stroke-dasharray: 6 3; animation: pg-dash 0.8s linear infinite; }
+  .pg-flow .pg-lines circle { fill: rgba(255,255,255,0.15); }
+  .pg-flow .pg-lines circle.ready { fill: rgba(63,185,80,0.5); }
+  .pg-flow .pg-lines circle.active { fill: rgba(0,210,255,0.55); }
+  .pg-flow .pg-lines line.collector { stroke: rgba(255,255,255,0.12); stroke-width: 1; }
+  .pg-flow .pg-lines line.collector.ready { stroke: rgba(63,185,80,0.35); }
+  @keyframes pg-dash { to { stroke-dashoffset: -9; } }
+
+  /* Row containers */
+  .pg-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 14px; position: relative; z-index: 1; }
+  .pg-row-label { font-size: 9px; color: rgba(150,165,180,0.35); text-transform: uppercase; letter-spacing: 0.08em; text-align: center; margin: 14px 0 4px; }
+
+  /* Nodes */
+  .pg-node {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px;
+    border-radius: 8px; border: 1.5px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02);
+    transition: border-color 0.3s, box-shadow 0.3s; width: 90px; flex-shrink: 0;
+  }
+  .pg-node.sm { width: 76px; }
+  .pg-node.ready { border-color: rgba(63,185,80,0.45); box-shadow: 0 0 8px rgba(63,185,80,0.1); }
+  .pg-node.active { border-color: rgba(0,210,255,0.5); box-shadow: 0 0 12px rgba(0,210,255,0.15); }
+
+  .pg-thumb {
+    width: 72px; height: 72px; border-radius: 6px; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08); overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pg-node.sm .pg-thumb { width: 60px; height: 60px; }
+  .pg-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; background: white; }
+  .pg-thumb .pg-empty { font-size: 18px; color: rgba(255,255,255,0.1); font-weight: 700; }
+  .pg-label { font-size: 9px; font-weight: 600; color: #c8d2dc; text-align: center; line-height: 1.2; }
+  .pg-sub { font-size: 8px; color: rgba(150,165,180,0.45); text-align: center; }
+
+  /* Wide node for sheets/grid */
+  .pg-node.wide { width: 130px; }
+  .pg-node.wide .pg-thumb { width: 114px; height: 64px; }
+  .pg-node.grid { width: 160px; }
+  .pg-node.grid .pg-thumb { width: 140px; height: 94px; }
 </style>
 </head>
 <body>
 
 <h1>MULTI-VIEW PIPELINE TEST HARNESS</h1>
+
+<div class="page-layout">
+<div class="page-main">
 
 <!-- Config -->
 <div class="config-row">
@@ -261,6 +320,108 @@
   <div id="normResult"></div>
 </div>
 
+</div><!-- /.page-main -->
+
+<!-- ─── Process Graph (right panel) ─── -->
+<div class="page-graph">
+  <div class="pg-title">Pipeline Dataflow</div>
+  <div class="pg-flow" id="pgFlow">
+    <svg class="pg-lines" id="pgLines"></svg>
+
+    <!-- Row 0: Input (side + 3/4 template) -->
+    <div class="pg-row-label">Input</div>
+    <div class="pg-row">
+      <div class="pg-node" id="pg-side">
+        <div class="pg-thumb" id="pg-side-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">Side View</div>
+      </div>
+      <div class="pg-node" id="pg-34tpl">
+        <div class="pg-thumb" id="pg-34tpl-thumb"><span class="pg-empty">T</span></div>
+        <div class="pg-label">3/4 Template</div>
+      </div>
+    </div>
+
+    <!-- Row 1: Generate (medial + 3/4 sheet) -->
+    <div class="pg-row-label">Generate</div>
+    <div class="pg-row">
+      <div class="pg-node" id="pg-medial">
+        <div class="pg-thumb" id="pg-medial-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">Medial</div>
+        <div class="pg-sub">fal.ai</div>
+      </div>
+      <div class="pg-node wide" id="pg-34sheet">
+        <div class="pg-thumb" id="pg-34sheet-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">3/4 Sheet</div>
+        <div class="pg-sub">fal.ai</div>
+      </div>
+    </div>
+
+    <!-- Row 2: Slice 3/4 -->
+    <div class="pg-row-label">Slice (blob detect)</div>
+    <div class="pg-row">
+      <div class="pg-node sm" id="pg-34front">
+        <div class="pg-thumb" id="pg-34front-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">3/4 Front</div>
+      </div>
+      <div class="pg-node sm" id="pg-34back">
+        <div class="pg-thumb" id="pg-34back-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">3/4 Back</div>
+      </div>
+    </div>
+
+    <!-- Row 3: MV Template (right above MV sheet) -->
+    <div class="pg-row-label">Template</div>
+    <div class="pg-row">
+      <div class="pg-node" id="pg-mvtpl">
+        <div class="pg-thumb" id="pg-mvtpl-thumb"><span class="pg-empty">T</span></div>
+        <div class="pg-label">MV Template</div>
+      </div>
+    </div>
+
+    <!-- Row 4: Generate multi-view -->
+    <div class="pg-row-label">Generate</div>
+    <div class="pg-row">
+      <div class="pg-node wide" id="pg-mvsheet">
+        <div class="pg-thumb" id="pg-mvsheet-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">Multi-View Sheet</div>
+        <div class="pg-sub">tpl + side + 3/4s → fal.ai</div>
+      </div>
+    </div>
+
+    <!-- Row 4: Slice multi-view -->
+    <div class="pg-row-label">Slice (gutter split)</div>
+    <div class="pg-row">
+      <div class="pg-node sm" id="pg-front">
+        <div class="pg-thumb" id="pg-front-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">Front</div>
+      </div>
+      <div class="pg-node sm" id="pg-top">
+        <div class="pg-thumb" id="pg-top-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">Top</div>
+      </div>
+      <div class="pg-node sm" id="pg-back">
+        <div class="pg-thumb" id="pg-back-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">Back</div>
+      </div>
+      <div class="pg-node sm" id="pg-outsole">
+        <div class="pg-thumb" id="pg-outsole-thumb"><span class="pg-empty">?</span></div>
+        <div class="pg-label">Outsole</div>
+      </div>
+    </div>
+
+    <!-- Row 5: Final grid -->
+    <div class="pg-row-label">Rembg + Normalize</div>
+    <div class="pg-row">
+      <div class="pg-node grid" id="pg-grid">
+        <div class="pg-thumb" id="pg-grid-thumb"><span class="pg-empty">3×3</span></div>
+        <div class="pg-label">Final 3×3 Grid</div>
+        <div class="pg-sub" id="pg-grid-sub">8 views normalized</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /.page-layout -->
 
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -277,7 +438,208 @@ let quarterBackUrl = null;
 let medialImageUrl = null;        // standalone medial generation result (raw fal.ai url)
 let normalizedViews = {};         // { view: { url, w, h } }
 
-// (fixed-grid cell constants removed — blob detection only)
+// ─── Process Graph updater ────────────────────────────────────────────────────
+function pgSet(thumbId, src, nodeId) {
+  const el = document.getElementById(thumbId);
+  if (el && src) {
+    el.innerHTML = '<img src="'+src+'" />';
+    if (nodeId) {
+      const node = document.getElementById(nodeId);
+      if (node) node.classList.add('ready');
+    }
+  }
+  drawPgLines();
+}
+function pgActive(nodeId) {
+  const node = document.getElementById(nodeId);
+  if (node) { node.classList.remove('ready'); node.classList.add('active'); }
+  drawPgLines();
+}
+function pgReady(nodeId) {
+  const node = document.getElementById(nodeId);
+  if (node) { node.classList.remove('active'); node.classList.add('ready'); }
+  drawPgLines();
+}
+function pgResetAll() {
+  document.querySelectorAll('.pg-node').forEach(n => { n.classList.remove('ready','active'); });
+  document.querySelectorAll('.pg-thumb').forEach(t => {
+    const empty = t.querySelector('.pg-empty');
+    if (!empty) t.innerHTML = '<span class="pg-empty">?</span>';
+  });
+  // Re-set template placeholders
+  document.getElementById('pg-34tpl-thumb').innerHTML='<span class="pg-empty">T</span>';
+  document.getElementById('pg-mvtpl-thumb').innerHTML='<span class="pg-empty">T</span>';
+  document.getElementById('pg-grid-thumb').innerHTML='<span class="pg-empty">3×3</span>';
+  drawPgLines();
+}
+
+// ─── Process Graph: SVG connection lines ──────────────────────────────────────
+
+// Adjacent-row edges: source → target in next/nearby row (simple curves)
+const PG_ADJ_EDGES = [
+  ['pg-side',    'pg-medial'],
+  ['pg-side',    'pg-34sheet'],
+  ['pg-34tpl',   'pg-34sheet'],
+  ['pg-34sheet', 'pg-34front'],
+  ['pg-34sheet', 'pg-34back'],
+  ['pg-34front', 'pg-mvsheet'],
+  ['pg-34back',  'pg-mvsheet'],
+  ['pg-mvtpl',   'pg-mvsheet'],
+  ['pg-mvsheet', 'pg-front'],
+  ['pg-mvsheet', 'pg-top'],
+  ['pg-mvsheet', 'pg-back'],
+  ['pg-mvsheet', 'pg-outsole'],
+];
+
+// Skip-row edges: must route along panel edges to avoid crossing nodes
+// [source, target, 'left'|'right'] — which side of the panel to route along
+const PG_SKIP_EDGES = [
+  ['pg-side', 'pg-mvsheet', 'left'],
+];
+
+// Grid collector: all 8 view nodes feed into the final grid
+// Instead of 8 individual lines, draw a horizontal bar + single stem
+const PG_GRID_SOURCES = [
+  'pg-side', 'pg-medial', 'pg-34front', 'pg-34back',
+  'pg-front', 'pg-top', 'pg-back', 'pg-outsole',
+];
+
+function drawPgLines() {
+  const svg = document.getElementById('pgLines');
+  const flow = document.getElementById('pgFlow');
+  if (!svg || !flow) return;
+  svg.innerHTML = '';
+
+  const flowRect = flow.getBoundingClientRect();
+  svg.setAttribute('width', flowRect.width);
+  svg.setAttribute('height', flowRect.height);
+
+  const GAP = 6; // gap between node edge and line start/end
+  const RAIL_PAD = 8; // padding from panel edges for skip-row routing
+
+  // Helper: get node anchor points relative to pgFlow
+  function np(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      cx: r.left + r.width/2 - flowRect.left,
+      top: r.top - flowRect.top,
+      bot: r.bottom - flowRect.top,
+      left: r.left - flowRect.left,
+      right: r.right - flowRect.left,
+    };
+  }
+
+  // Helper: edge CSS class based on source/target state
+  function eCls(srcId, tgtId) {
+    const s = document.getElementById(srcId);
+    const t = document.getElementById(tgtId);
+    if (!s || !t) return '';
+    const sa = s.classList.contains('active'), sr = s.classList.contains('ready');
+    const ta = t.classList.contains('active'), tr = t.classList.contains('ready');
+    if (sa || ta) return 'active';
+    if (sr && tr) return 'ready';
+    if (sr) return 'ready';
+    return '';
+  }
+
+  function makePath(d, cls) {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d); p.setAttribute('fill', 'none');
+    if (cls) p.setAttribute('class', cls);
+    svg.appendChild(p);
+  }
+
+  function makeDot(x, y, cls) {
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', x); c.setAttribute('cy', y); c.setAttribute('r', 2.5);
+    if (cls) c.setAttribute('class', cls);
+    svg.appendChild(c);
+  }
+
+  // 1. Draw adjacent-row edges as smooth beziers with margin
+  for (const [srcId, tgtId] of PG_ADJ_EDGES) {
+    const src = np(srcId), tgt = np(tgtId);
+    if (!src || !tgt) continue;
+    const x1 = src.cx, y1 = src.bot + GAP;
+    const x2 = tgt.cx, y2 = tgt.top - GAP;
+    const dy = y2 - y1;
+    // Control points: ease vertically first, then shift horizontally
+    const cpY1 = y1 + dy * 0.45, cpY2 = y2 - dy * 0.45;
+    const cls = eCls(srcId, tgtId);
+    makePath(`M${x1},${y1} C${x1},${cpY1} ${x2},${cpY2} ${x2},${y2}`, cls);
+    makeDot(x2, y2, cls); // arrowhead dot at target
+  }
+
+  // 2. Draw skip-row edges routed along panel edges
+  for (const [srcId, tgtId, side] of PG_SKIP_EDGES) {
+    const src = np(srcId), tgt = np(tgtId);
+    if (!src || !tgt) continue;
+    const cls = eCls(srcId, tgtId);
+    // Start from source node's outer edge (left or right side, not center)
+    const srcX = side === 'left' ? src.left : src.right;
+    const y1 = src.bot + GAP;
+    const railX = side === 'left' ? RAIL_PAD : flowRect.width - RAIL_PAD;
+    const tgtX = side === 'left' ? tgt.left : tgt.right;
+    const y2 = tgt.top - GAP;
+    // Path: curve from src edge → rail, vertical along rail, curve rail → target edge
+    const r = 10; // corner radius
+    const d = [
+      `M${srcX},${y1}`,
+      `C${srcX},${y1+r} ${railX},${y1+r} ${railX},${y1+r*2}`,
+      `L${railX},${y2-r*2}`,
+      `C${railX},${y2-r} ${tgtX},${y2-r} ${tgtX},${y2}`,
+    ].join(' ');
+    makePath(d, cls);
+    makeDot(tgtX, y2, cls);
+  }
+
+  // 3. Grid collector: horizontal bar + vertical drops from row-4 nodes + stem to grid
+  const gridNode = np('pg-grid');
+  if (gridNode) {
+    // Collect the row-4 nodes (front, top, back, outsole) — closest row above grid
+    const row4Ids = ['pg-front', 'pg-top', 'pg-back', 'pg-outsole'];
+    const row4Nodes = row4Ids.map(id => np(id)).filter(Boolean);
+    if (row4Nodes.length > 0) {
+      // Horizontal collector bar midway between row4 bottom and grid top
+      const row4Bot = Math.max(...row4Nodes.map(n => n.bot));
+      const barY = row4Bot + (gridNode.top - row4Bot) * 0.4;
+      const barLeft = Math.min(...row4Nodes.map(n => n.cx)) - 8;
+      const barRight = Math.max(...row4Nodes.map(n => n.cx)) + 8;
+
+      // Determine overall collector state
+      const anyActive = row4Ids.some(id => document.getElementById(id)?.classList.contains('active'));
+      const allReady = row4Ids.every(id => document.getElementById(id)?.classList.contains('ready'));
+      const gridActive = document.getElementById('pg-grid')?.classList.contains('active');
+      const gridReady = document.getElementById('pg-grid')?.classList.contains('ready');
+      let barCls = '';
+      if (anyActive || gridActive) barCls = 'active';
+      else if (allReady || gridReady) barCls = 'ready';
+
+      // Draw vertical drops from each row-4 node to the bar
+      for (let i = 0; i < row4Ids.length; i++) {
+        const n = row4Nodes[i];
+        if (!n) continue;
+        const cls = eCls(row4Ids[i], 'pg-grid');
+        makePath(`M${n.cx},${n.bot + GAP} L${n.cx},${barY}`, cls);
+      }
+
+      // Draw the horizontal bar
+      const hbar = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      hbar.setAttribute('x1', barLeft); hbar.setAttribute('y1', barY);
+      hbar.setAttribute('x2', barRight); hbar.setAttribute('y2', barY);
+      hbar.setAttribute('class', 'collector' + (barCls ? ' ' + barCls : ''));
+      svg.appendChild(hbar);
+
+      // Single stem from bar center down to grid top
+      const stemX = gridNode.cx;
+      const stemY2 = gridNode.top - GAP;
+      makePath(`M${stemX},${barY} L${stemX},${stemY2}`, barCls);
+      makeDot(stemX, stemY2, barCls);
+    }
+  }
+}
 
 // ─── Prompt builders ─────────────────────────────────────────────────────────
 function buildMedialPrompt(desc) {
@@ -305,6 +667,8 @@ function buildQuarterPrompt(desc) {
     'LEFT: 3/4 front view. Toe points LEFT, heel faces RIGHT. The OUTER/LATERAL side of the shoe faces the viewer — the side without the arch. Camera sees the toe box, the outer side, and the top opening.',
     '',
     'RIGHT: 3/4 back view. Toe points RIGHT, heel faces LEFT. The INNER/MEDIAL side of the shoe faces the viewer — the arch side is visible. Camera sees the heel counter, the inner arch area, and the top opening.',
+    '',
+    'CRITICAL SPACING: The two shoes must be clearly SEPARATED horizontally with a wide gap of pure white space between them — at least 15-20% of the image width. Do NOT let the shoes touch, overlap, or crowd together. Place the LEFT shoe in the left third of the frame and the RIGHT shoe in the right third, leaving the middle third empty white space. This gap is essential for automated detection to identify them as two separate objects.',
     '',
     'Render the actual shoe from the reference photo in these two orientations. Pure white (#ffffff) background. No borders, bounding boxes, gray lines, text, labels, or shadows.',
     desc ? 'Shoe: ' + desc : '',
@@ -426,6 +790,23 @@ async function callRembg(dataUrl) {
   if (!result.images || !result.images.length) throw new Error('No images returned from backend');
   // Backend returns base64_image as a data:image/png;base64,... string with transparency
   return result.images[0].base64_image;
+}
+
+/**
+ * Remove background from a dataUrl via backend rembg, composite on white.
+ * Returns white-bg jpeg dataUrl. Falls back to original if rembg fails.
+ */
+async function removeAndWhiten(dataUrl, logId) {
+  try {
+    const rembgResult = await callRembg(dataUrl);
+    const img = await loadImage(rembgResult);
+    return compositeOnWhite(img).toDataURL('image/jpeg', 0.95);
+  } catch (e) {
+    if (logId) log(logId, 'rembg failed ('+e.message+'), using original');
+    // Fallback: composite on white in case it has transparency
+    const img = await loadImage(dataUrl);
+    return compositeOnWhite(img).toDataURL('image/jpeg', 0.95);
+  }
 }
 
 /**
@@ -715,18 +1096,58 @@ async function cropTightAndScale(dataUrl, targetW, targetH, whiteTh) {
 
 async function normalizeAllViews() {
   const whiteTh = getTuningParams().whiteTh, logId='normLog';
+
+  // Step 1: Remove backgrounds from all generated views in parallel
+  log(logId,'Removing backgrounds from all generated views...');
+  const rembgJobs = [];
+  const cleanViews = {}; // key → white-bg dataUrl
+
+  // Side is already white-bg from preprocessing
+  cleanViews['side'] = sideImageDataUrl;
+
+  // Medial from standalone generation
+  if (medialImageUrl) {
+    rembgJobs.push((async () => {
+      const img = await loadImage(medialImageUrl);
+      const c = document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
+      c.getContext('2d').drawImage(img,0,0);
+      const dataUrl = c.toDataURL('image/jpeg',0.92);
+      log(logId,'  rembg medial...');
+      cleanViews['medial'] = await removeAndWhiten(dataUrl, logId);
+    })());
+  }
+  // Multi-view slices
+  for (const k of ['front','top','back','outsole']) {
+    if (!slicedMultiViews[k]) continue;
+    rembgJobs.push((async () => {
+      log(logId,'  rembg '+k+'...');
+      cleanViews[k] = await removeAndWhiten(slicedMultiViews[k], logId);
+    })());
+  }
+  // 3/4 views
+  for (const k of ['3/4-front','3/4-back']) {
+    if (!slicedQuarterViews[k]) continue;
+    rembgJobs.push((async () => {
+      log(logId,'  rembg '+k+'...');
+      cleanViews[k] = await removeAndWhiten(slicedQuarterViews[k], logId);
+    })());
+  }
+  await Promise.all(rembgJobs);
+  log(logId,'Background removal done ('+Object.keys(cleanViews).length+' views).\n');
+
+  // Step 2: Normalize dimensions
   log(logId,'Getting side view reference dimensions...');
-  const sideBbox = await getTightBbox(sideImageDataUrl, whiteTh);
+  const sideBbox = await getTightBbox(cleanViews['side'], whiteTh);
   const ref_W=sideBbox.w, ref_H=sideBbox.h;
   log(logId,'Side tight bbox: '+ref_W+'×'+ref_H+'px  (shoe_length × shoe_height)');
 
   let shoe_width = Math.round(ref_W * 0.38);
-  if (slicedMultiViews['top']) {
-    const tb=await getTightBbox(slicedMultiViews['top'],whiteTh);
+  if (cleanViews['top']) {
+    const tb=await getTightBbox(cleanViews['top'],whiteTh);
     shoe_width=Math.round(tb.h*(ref_W/tb.w));
     log(logId,'Top bbox: '+tb.w+'x'+tb.h+' → shoe_width='+shoe_width+'px at ref scale');
-  } else if (slicedMultiViews['outsole']) {
-    const ob=await getTightBbox(slicedMultiViews['outsole'],whiteTh);
+  } else if (cleanViews['outsole']) {
+    const ob=await getTightBbox(cleanViews['outsole'],whiteTh);
     shoe_width=Math.round(ob.h*(ref_W/ob.w));
     log(logId,'Outsole bbox used for shoe_width='+shoe_width+'px');
   }
@@ -740,40 +1161,31 @@ async function normalizeAllViews() {
     norm[key]={url:await cropTightAndScale(dataUrl,tW,tH,whiteTh),w:tW,h:tH,rule};
   }
 
-  await n('side',sideImageDataUrl,ref_W,ref_H,'reference');
-  // Medial from standalone generation (not from multi-view sheet)
-  if (medialImageUrl) {
-    const medialDataUrl = await (async () => {
-      const img = await loadImage(medialImageUrl);
-      const c = document.createElement('canvas'); c.width=img.naturalWidth; c.height=img.naturalHeight;
-      const ctx = c.getContext('2d'); ctx.drawImage(img,0,0);
-      return c.toDataURL('image/jpeg',0.92);
-    })();
-    const b=await getTightBbox(medialDataUrl,whiteTh);
-    await n('medial',medialDataUrl,ref_W,Math.round(b.h*ref_W/b.w),'width→ref_W='+ref_W);
+  await n('side',cleanViews['side'],ref_W,ref_H,'reference');
+  if (cleanViews['medial']) {
+    const b=await getTightBbox(cleanViews['medial'],whiteTh);
+    await n('medial',cleanViews['medial'],ref_W,Math.round(b.h*ref_W/b.w),'width→ref_W='+ref_W);
   }
   for (const k of ['top','outsole']) {
-    if (!slicedMultiViews[k]) continue;
-    const b=await getTightBbox(slicedMultiViews[k],whiteTh);
-    await n(k,slicedMultiViews[k],ref_W,Math.round(b.h*ref_W/b.w),'width→ref_W='+ref_W);
+    if (!cleanViews[k]) continue;
+    const b=await getTightBbox(cleanViews[k],whiteTh);
+    await n(k,cleanViews[k],ref_W,Math.round(b.h*ref_W/b.w),'width→ref_W='+ref_W);
   }
-  // Front: scale width = shoe_width, height floats proportionally
   let front_H = 0;
-  if (slicedMultiViews['front']) {
-    const b=await getTightBbox(slicedMultiViews['front'],whiteTh);
+  if (cleanViews['front']) {
+    const b=await getTightBbox(cleanViews['front'],whiteTh);
     front_H=Math.round(b.h*shoe_width/b.w);
-    await n('front',slicedMultiViews['front'],shoe_width,front_H,'width→shoe_width='+shoe_width);
+    await n('front',cleanViews['front'],shoe_width,front_H,'width→shoe_width='+shoe_width);
   }
-  // Back: scale height = front_H (so front & back are consistent), width floats proportionally
-  if (slicedMultiViews['back']) {
-    const b=await getTightBbox(slicedMultiViews['back'],whiteTh);
-    const bk_H = front_H || Math.round(b.h*shoe_width/b.w); // fallback if no front
-    await n('back',slicedMultiViews['back'],Math.round(b.w*bk_H/b.h),bk_H,'height→front_H='+bk_H);
+  if (cleanViews['back']) {
+    const b=await getTightBbox(cleanViews['back'],whiteTh);
+    const bk_H = front_H || Math.round(b.h*shoe_width/b.w);
+    await n('back',cleanViews['back'],Math.round(b.w*bk_H/b.h),bk_H,'height→front_H='+bk_H);
   }
   for (const k of ['3/4-front','3/4-back']) {
-    if (!slicedQuarterViews[k]) continue;
-    const b=await getTightBbox(slicedQuarterViews[k],whiteTh);
-    await n(k,slicedQuarterViews[k],Math.round(b.w*ref_H/b.h),ref_H,'height→ref_H='+ref_H);
+    if (!cleanViews[k]) continue;
+    const b=await getTightBbox(cleanViews[k],whiteTh);
+    await n(k,cleanViews[k],Math.round(b.w*ref_H/b.h),ref_H,'height→ref_H='+ref_H);
   }
   log(logId,'Normalization complete.');
   return norm;
@@ -864,6 +1276,7 @@ async function handleFile(file) {
     normalizedViews = {};
     quarterTemplateUrl = null;
     multiTemplateUrl = null;
+    pgResetAll();
 
     const {url, bgType, rembgApplied} = await ensureWhiteBackground(rawDataUrl);
     sideImageDataUrl = url;
@@ -879,7 +1292,40 @@ async function handleFile(file) {
     document.getElementById('previewAfter').style.display = 'block';
 
     dropZone.innerHTML = '<strong>Side View Loaded</strong> ('+file.name+')<br><img src="'+rawDataUrl+'" style="max-width:280px;max-height:220px;border-radius:6px;margin-top:10px;opacity:0.6" /><div style="font-size:10px;color:rgba(150,165,180,0.4);margin-top:4px">original</div>';
+
+    // Pre-upload side view + templates so parallel generation steps don't race
+    if (getApiKey()) {
+      dropZone.innerHTML += '<div style="font-size:10px;color:rgba(0,210,255,0.6);margin-top:6px">Uploading side view & templates to fal.ai...</div>';
+      const results = await Promise.allSettled([
+        falUpload(await dataUrlToBlob(sideImageDataUrl),'side-view.jpg').then(u => { sideImageUrl = u; }),
+        fetch('frontend/public/templates/34_view_template.png').then(r => {
+          if (!r.ok) throw new Error('3/4 template fetch failed');
+          return r.blob();
+        }).then(b => {
+          pgSet('pg-34tpl-thumb', URL.createObjectURL(b), 'pg-34tpl');
+          return falUpload(b,'34_view_template.png');
+        }).then(u => { quarterTemplateUrl = u; }),
+        fetch('frontend/public/templates/multi-view_template.png').then(r => {
+          if (!r.ok) throw new Error('Multi-view template fetch failed');
+          return r.blob();
+        }).then(b => {
+          pgSet('pg-mvtpl-thumb', URL.createObjectURL(b), 'pg-mvtpl');
+          return falUpload(b,'multi-view-template.png');
+        }).then(u => { multiTemplateUrl = u; }),
+      ]);
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length === 0) {
+        dropZone.innerHTML += '<div style="font-size:10px;color:rgba(63,185,80,0.8);margin-top:2px">Uploads ready — run steps in any order or in parallel.</div>';
+      } else {
+        dropZone.innerHTML += '<div style="font-size:10px;color:rgba(255,160,64,0.8);margin-top:2px">Side view uploaded. Templates will load on demand. ('+ failed.length +' pre-upload failed — are you serving via http-server?)</div>';
+      }
+    }
+
     setStep('step-input','done');
+    // Update process graph
+    pgSet('pg-side-thumb', sideImageDataUrl, 'pg-side');
+    if (quarterTemplateUrl) pgReady('pg-34tpl');
+    if (multiTemplateUrl) pgReady('pg-mvtpl');
 
     const desc=document.getElementById('shoePrompt').value.trim();
     document.getElementById('medialPrompt').value=buildMedialPrompt(desc);
@@ -903,22 +1349,22 @@ document.getElementById('shoePrompt').addEventListener('input',()=>{
 document.getElementById('btnMedial').addEventListener('click', async function() {
   if (!sideImageDataUrl){alert('Load a side view first');return;}
   if (!getApiKey()){alert('Enter API key');return;}
-  setStep('step-medial','active'); this.disabled=true;
+  setStep('step-medial','active'); this.disabled=true; pgActive('pg-medial');
   document.getElementById('medialResult').innerHTML='';
   document.getElementById('medialLog').textContent='';
   try {
-    // Upload side view if not already uploaded
     if (!sideImageUrl) {
-      log('medialLog','Uploading preprocessed side view...');
+      log('medialLog','Uploading side view (not pre-uploaded)...');
       sideImageUrl=await falUpload(await dataUrlToBlob(sideImageDataUrl),'side-view.jpg');
-      log('medialLog','Side URL: '+sideImageUrl);
     }
+    log('medialLog','Side URL: '+sideImageUrl);
     const prompt=document.getElementById('medialPrompt').value;
     const ar=document.getElementById('medialAR').value.trim()||'4:3';
     const imageUrls=[sideImageUrl];
     log('medialLog','image_urls: [sideView]\naspect_ratio: '+ar+'\nPrompt:\n'+prompt+'\n');
     const resultUrl=await falGenerate(prompt,imageUrls,ar,'medialLog');
     medialImageUrl=resultUrl;
+    pgSet('pg-medial-thumb', resultUrl, 'pg-medial');
     const img=await loadImage(resultUrl);
     // Show side-by-side comparison
     let h='<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">';
@@ -941,22 +1387,27 @@ document.getElementById('btnMedial').addEventListener('click', async function() 
 document.getElementById('btnQuarter').addEventListener('click', async function() {
   if (!sideImageDataUrl){alert('Load a side view first');return;}
   if (!getApiKey()){alert('Enter API key');return;}
-  setStep('step-quarter','active'); this.disabled=true;
+  setStep('step-quarter','active'); this.disabled=true; pgActive('pg-34sheet');
   document.getElementById('quarterResult').innerHTML='';
   document.getElementById('quarterLog').textContent='';
   try {
-    log('quarterLog','Uploading preprocessed side view...');
-    sideImageUrl=await falUpload(await dataUrlToBlob(sideImageDataUrl),'side-view.jpg');
+    if (!sideImageUrl) {
+      log('quarterLog','Uploading side view (not pre-uploaded)...');
+      sideImageUrl=await falUpload(await dataUrlToBlob(sideImageDataUrl),'side-view.jpg');
+    }
     log('quarterLog','Side URL: '+sideImageUrl);
-    log('quarterLog','Loading 3/4 template...');
-    const tR=await fetch('frontend/public/templates/34_view_template.png');
-    if(!tR.ok) throw new Error('Template not found. Serve from project root: npx http-server -p 8080');
-    quarterTemplateUrl=await falUpload(await tR.blob(),'34_view_template.png');
+    if (!quarterTemplateUrl) {
+      log('quarterLog','Loading 3/4 template...');
+      const tR=await fetch('frontend/public/templates/34_view_template.png');
+      if(!tR.ok) throw new Error('Template not found. Run: cd tests/multiview && python serve.py');
+      quarterTemplateUrl=await falUpload(await tR.blob(),'34_view_template.png');
+    }
     log('quarterLog','Template URL: '+quarterTemplateUrl);
     const prompt=document.getElementById('quarterPrompt').value,ar=document.getElementById('quarterAR').value.trim()||'16:9';
     const imageUrls=[sideImageUrl,quarterTemplateUrl];
     log('quarterLog','\nimage_urls: '+JSON.stringify(imageUrls)+'\naspect_ratio: '+ar+'\nPrompt:\n'+prompt+'\n');
     quarterSheetUrl=await falGenerate(prompt,imageUrls,ar,'quarterLog');
+    pgSet('pg-34sheet-thumb', quarterSheetUrl, 'pg-34sheet');
     log('quarterLog','Sheet URL: '+quarterSheetUrl);
     const si=await loadImage(quarterSheetUrl);
     document.getElementById('quarterResult').innerHTML='<h3>3/4 Sheet ('+si.naturalWidth+'×'+si.naturalHeight+')</h3>'+
@@ -982,6 +1433,8 @@ async function doSliceQuarter() {
     showBlobOverlay('quarterSliceResult',quarterSheetUrl,blobMeta,W,H,fgMask);
     showSliced('quarterSliceResult',results,'Blob Detection Results');
     slicedQuarterViews=results;
+    if (results['3/4-front']) { pgSet('pg-34front-thumb', results['3/4-front'], 'pg-34front'); }
+    if (results['3/4-back'])  { pgSet('pg-34back-thumb',  results['3/4-back'],  'pg-34back');  }
     // Upload whatever was detected (partial is OK — multi-view will use what's available)
     if (results['3/4-front']) quarterFrontUrl=await falUpload(await dataUrlToBlob(results['3/4-front']),'34-front.jpg');
     if (results['3/4-back'])  quarterBackUrl =await falUpload(await dataUrlToBlob(results['3/4-back']), '34-back.jpg');
@@ -1001,14 +1454,16 @@ document.getElementById('btnResliceQuarter').addEventListener('click',async()=>{
 // ─── Step 3: Generate Multi-View Sheet ────────────────────────────────────────
 document.getElementById('btnMulti').addEventListener('click', async function() {
   if (!sideImageUrl){alert('Load and process a side view first');return;}
-  setStep('step-multi','active'); this.disabled=true;
+  setStep('step-multi','active'); this.disabled=true; pgActive('pg-mvsheet');
   document.getElementById('multiResult').innerHTML='';
   document.getElementById('multiLog').textContent='';
   try {
-    log('multiLog','Loading multi-view template...');
-    const tR=await fetch('frontend/public/templates/multi-view_template.png');
-    if(!tR.ok) throw new Error('Template not found.');
-    multiTemplateUrl=await falUpload(await tR.blob(),'multi-view-template.png');
+    if (!multiTemplateUrl) {
+      log('multiLog','Loading multi-view template...');
+      const tR=await fetch('frontend/public/templates/multi-view_template.png');
+      if(!tR.ok) throw new Error('Template not found. Serve from project root: npx http-server -p 8081 --cors');
+      multiTemplateUrl=await falUpload(await tR.blob(),'multi-view-template.png');
+    }
     log('multiLog','Template URL: '+multiTemplateUrl);
     const prompt=document.getElementById('multiPrompt').value, ar=document.getElementById('multiAR').value.trim()||'3:2';
     // Template FIRST; include 3/4 views only if they were successfully sliced
@@ -1017,6 +1472,7 @@ document.getElementById('btnMulti').addEventListener('click', async function() {
     log('multiLog','\nimage_urls (template 1st): '+JSON.stringify(imageUrls));
     log('multiLog','aspect_ratio: '+ar+'\nPrompt:\n'+prompt+'\n');
     multiSheetUrl=await falGenerate(prompt,imageUrls,ar,'multiLog');
+    pgSet('pg-mvsheet-thumb', multiSheetUrl, 'pg-mvsheet');
     log('multiLog','Sheet URL: '+multiSheetUrl);
     const si=await loadImage(multiSheetUrl);
     document.getElementById('multiResult').innerHTML='<h3>Multi-View Sheet ('+si.naturalWidth+'×'+si.naturalHeight+')</h3>'+
@@ -1061,6 +1517,10 @@ async function doSliceMulti() {
     showBlobOverlay('multiSliceResult',multiSheetUrl,blobMeta,W,H,fgMask);
     showSliced('multiSliceResult',results,'Gutter Split ('+detectedCount+'/4 detected)');
     slicedMultiViews=results;
+    if (results['front'])   pgSet('pg-front-thumb',   results['front'],   'pg-front');
+    if (results['top'])     pgSet('pg-top-thumb',     results['top'],     'pg-top');
+    if (results['back'])    pgSet('pg-back-thumb',    results['back'],    'pg-back');
+    if (results['outsole']) pgSet('pg-outsole-thumb', results['outsole'], 'pg-outsole');
     setStep('step-multi-slice',detectedCount>=4?'done':'error');
     document.getElementById('btnResliceMulti').disabled=false;
     if (detectedCount>=4) await runNormalize();
@@ -1076,9 +1536,40 @@ document.getElementById('btnResliceMulti').addEventListener('click',async()=>{
   if(c>0) await runNormalize();
 });
 
+// ─── Build a mini 3×3 composite thumbnail ────────────────────────────────────
+async function buildGridThumbnail(norm) {
+  // Mini canvas matching the 3×3 layout: 3 cols × 3 rows
+  const TW = 140, TH = 94; // match .pg-node.grid .pg-thumb dimensions
+  const cW = Math.floor(TW / 3), cH = Math.floor(TH / 3);
+  const canvas = document.createElement('canvas');
+  canvas.width = TW; canvas.height = TH;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'white'; ctx.fillRect(0, 0, TW, TH);
+
+  // Grid: [row][col] = view key (matching mve-grid layout)
+  const layout = [
+    ['medial',    'top',     'front'],
+    ['3/4-front', 'side',    'back'],
+    ['3/4-back',  'outsole', null],
+  ];
+  const promises = [];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const key = layout[r][c];
+      if (!key || !norm[key]) continue;
+      promises.push((async () => {
+        const img = await loadImage(norm[key].url);
+        ctx.drawImage(img, c * cW, r * cH, cW, cH);
+      })());
+    }
+  }
+  await Promise.all(promises);
+  return canvas.toDataURL('image/jpeg', 0.85);
+}
+
 // ─── Step 5: Normalize + 3x3 Grid ───────────────────────────────────────────
 async function runNormalize() {
-  setStep('step-normalize','active');
+  setStep('step-normalize','active'); pgActive('pg-grid');
   document.getElementById('normLog').textContent='';
   document.getElementById('normResult').innerHTML='';
   try {
@@ -1124,11 +1615,24 @@ async function runNormalize() {
 
     document.getElementById('normResult').innerHTML=h;
     setStep('step-normalize','done');
+    // Build a mini 3×3 composite for the graph thumbnail
+    try {
+      const gridThumbSrc = await buildGridThumbnail(normalizedViews);
+      pgSet('pg-grid-thumb', gridThumbSrc, 'pg-grid');
+    } catch(_) {
+      const gridSrc = normalizedViews['side'] ? normalizedViews['side'].url : sideImageDataUrl;
+      pgSet('pg-grid-thumb', gridSrc, 'pg-grid');
+    }
+    document.getElementById('pg-grid-sub').textContent = Object.keys(normalizedViews).length+'/8 views normalized';
   } catch(e) {
     document.getElementById('normResult').innerHTML='<p style="color:#f85149">Normalize error: '+e.message+'</p>';
     setStep('step-normalize','error');
   }
 }
+
+// ─── Draw initial lines + redraw on resize ────────────────────────────────────
+window.addEventListener('load', () => { requestAnimationFrame(drawPgLines); });
+window.addEventListener('resize', drawPgLines);
 </script>
 </body>
 </html>

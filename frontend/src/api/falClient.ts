@@ -16,7 +16,7 @@ export const SHOE_VIEW_PROMPTS: Record<ShoeViewType, string> = {
   'top':
     'top-down bird\'s eye view looking straight down at a shoe, showing the full outline of the upper, lacing system, tongue, and toe box shape from above, white background, without logo',
   'medial':
-    'medial inner-side view, a realistic rendering of a shoe from the inner arch side, showing the medial upper panel, arch support area, and inner heel counter, toe towards left, white background, without logo',
+    'Generate the MEDIAL (inner side) view of this shoe. The reference image shows the LATERAL (outer) side view. The medial side is the OPPOSITE side of the shoe — the side that faces the other foot when worn. The arch area is visible — the sole curves UP in the middle (the medial arch). The inner ankle collar is often higher or shaped differently than the outer side. Stitching, panels, overlays, and logos are asymmetric — the inner side may have fewer overlays or different panel shapes. The toe points to the LEFT (the shoe is flipped horizontally compared to the lateral side view). Show the complete shoe from toe to heel. Pure white (#ffffff) background. No text, labels, borders, or shadows.',
   'front':
     'front view looking directly at the toe of a shoe, showing the toe box shape, front upper, and the front profile of the sole unit, centered composition, white background, without logo',
   'back':
@@ -362,41 +362,37 @@ class FalClient {
     templateUrl: string,
     options?: { outputFormat?: string; additionalRefUrls?: string[] }
   ): Promise<{ url: string }> {
-    const positions = [
-      `The 5 positions are:`,
-      `- TOP-LEFT: medial (inner side) view, toe pointing left`,
-      `- TOP-RIGHT: top-down bird's eye view looking straight down at the shoe`,
-      `- BOTTOM-LEFT: front toe view, looking directly at the toe box`,
-      `- BOTTOM-CENTER: rear heel view, looking at the back of the shoe`,
-      `- BOTTOM-RIGHT: outsole (bottom sole) view, looking up at the tread pattern`,
-    ];
-
     const sheetPrompt = [
-      `Generate a multi-view shoe sheet based on this template layout.`,
-      `The template shows labeled bounding boxes — these are POSITION GUIDES ONLY.`,
-      `Do NOT reproduce the bounding boxes, borders, rounded rectangles, or text labels in the output.`,
-      `Instead, place the exact shoe from the reference photo at each position on a clean white background.`,
-      ...positions,
-      `Keep the EXACT same shoe design in every position — only the camera angle changes.`,
-      `White background everywhere. No borders, no text, no grid lines.`,
+      'Generate a 2×2 multi-view shoe reference sheet matching the template layout EXACTLY. The template shows a shoe last only to indicate placement and orientation — do NOT copy the last shape.',
+      '',
+      'Top-left — FRONT view (portrait, smaller): camera faces the toe box straight on from the front.',
+      'Top-right — TOP-DOWN view (landscape, larger): camera looks straight down at the shoe from above, showing the top of the shoe with the laces and tongue visible. Toe points RIGHT.',
+      '',
+      'Bottom-left — BACK view (portrait, smaller): camera faces the heel counter straight on from behind.',
+      'Bottom-right — OUTSOLE view (landscape, larger): the shoe is FLIPPED UPSIDE DOWN so the RUBBER TREAD PATTERN on the bottom of the sole faces the camera. You should see the grip texture, rubber lugs, and tread grooves — NOT the top of the shoe, NOT the laces, NOT the insole. Imagine holding the shoe sole-up and photographing the bottom. Toe points RIGHT.',
+      '',
+      'The left column is narrower (portrait front + back), the right column is wider (landscape top + bottom). Match this layout from the template.',
+      'Use the reference images to understand the shoe design. Render the same shoe from each angle.',
+      'Do NOT add any text, labels, numbers, captions, or annotations. No borders, bounding boxes, dividing lines, grid lines, or shadows. The four views should float on a continuous pure white (#ffffff) background with NO lines or rules separating them.',
       prompt ? `Shoe: ${prompt}` : '',
-    ].filter(Boolean).join(' ');
+    ].filter(Boolean).join('\n');
 
-    // Build image_urls: primary reference + optional additional refs + template (max 4 total)
-    const imageUrls = [sideViewUrl, ...(options?.additionalRefUrls || []), templateUrl].slice(0, 4);
+    // Template FIRST so the model treats it as the layout guide; then side view + any 3/4 refs
+    const imageUrls = [templateUrl, sideViewUrl, ...(options?.additionalRefUrls || [])].slice(0, 4);
 
-    console.log(`[multi-view-sheet] Generating 5-view template sheet...`);
+    console.log(`[multi-view-sheet] Generating 2×2 multi-view sheet...`);
     console.log('[multi-view-sheet] PROMPT:', sheetPrompt);
     console.log('[multi-view-sheet] image_urls:', imageUrls);
     console.log('[multi-view-sheet] aspect_ratio: 3:2');
 
-    const result = await fal.subscribe("fal-ai/nano-banana/edit", {
+    const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
       input: {
         prompt: sheetPrompt,
         image_urls: imageUrls,
         num_images: 1,
-        output_format: options?.outputFormat || "jpeg",
+        output_format: options?.outputFormat || "png",
         aspect_ratio: "3:2",
+        resolution: "1K",
       },
       logs: true,
       onQueueUpdate: (update) => {
@@ -408,7 +404,7 @@ class FalClient {
 
     const data = result.data as FalImageEditResponse;
     if (!data.images.length) throw new Error('Multi-view sheet generation returned no images');
-    console.log(`[multi-view-sheet] ✓ 5-view sheet generated, URL:`, data.images[0].url);
+    console.log(`[multi-view-sheet] ✓ 2×2 sheet generated, URL:`, data.images[0].url);
     return { url: data.images[0].url };
   }
 
@@ -424,29 +420,33 @@ class FalClient {
     options?: { outputFormat?: string }
   ): Promise<{ url: string }> {
     const sheetPrompt = [
-      `Generate two three-quarter angle views of the shoe from the reference photo, using the template for positioning.`,
-      `The template bounding boxes and text are POSITION GUIDES ONLY — do NOT reproduce them.`,
-      `The reference photo shows a right-foot shoe from the standard side view with toe pointing right.`,
-      `Place shoes on a clean white background at these positions:`,
-      `- LEFT (3/4-front): Rotate the camera ~45 degrees counterclockwise from the side view, facing the front-lateral corner. The toe still points to the RIGHT and slightly toward the camera. You see the lateral side, toe box, and a glimpse of the top — three faces of the shoe.`,
-      `- RIGHT (3/4-back): The diagonally opposite camera angle. Rotate ~45 degrees clockwise from the side view, facing the heel-medial corner. The toe points to the LEFT and away from the camera. You see the medial side, heel counter, and a glimpse of the top — the opposite three faces.`,
-      `Together these two views plus the side view reveal all six sides of the shoe.`,
-      `Same shoe design in both views. White background. No borders, no text.`,
+      'Generate two three-quarter angle isometric views of the shoe from the reference photo. Place them side by side matching the EXACT positions and orientations shown in the template image. The template shows generic shoe lasts just to indicate placement and angle — do NOT copy the last shape, only match the orientation.',
+      '',
+      'IMPORTANT: Both shoes must sit FLAT on the ground with the sole resting on a surface — like a product photo on a table. The camera looks down at roughly 20-30 degrees from eye level. Do NOT show the shoes floating, tilted, or airborne.',
+      '',
+      'LEFT: 3/4 front view. Toe points LEFT, heel faces RIGHT. The OUTER/LATERAL side of the shoe faces the viewer — the side without the arch. Camera sees the toe box, the outer side, and the top opening.',
+      '',
+      'RIGHT: 3/4 back view. Toe points RIGHT, heel faces LEFT. The INNER/MEDIAL side of the shoe faces the viewer — the arch side is visible. Camera sees the heel counter, the inner arch area, and the top opening.',
+      '',
+      'CRITICAL SPACING: The two shoes must be clearly SEPARATED horizontally with a wide gap of pure white space between them — at least 15-20% of the image width. Do NOT let the shoes touch, overlap, or crowd together. Place the LEFT shoe in the left third of the frame and the RIGHT shoe in the right third, leaving the middle third empty white space. This gap is essential for automated detection to identify them as two separate objects.',
+      '',
+      'Render the actual shoe from the reference photo in these two orientations. Pure white (#ffffff) background. No borders, bounding boxes, gray lines, text, labels, or shadows.',
       prompt ? `Shoe: ${prompt}` : '',
-    ].filter(Boolean).join(' ');
+    ].filter(Boolean).join('\n');
 
     console.log('[quarter-view-sheet] Generating 3/4-view sheet...');
     console.log('[quarter-view-sheet] PROMPT:', sheetPrompt);
     console.log('[quarter-view-sheet] image_urls:', [sideViewUrl, templateUrl]);
     console.log('[quarter-view-sheet] aspect_ratio: 16:9');
 
-    const result = await fal.subscribe("fal-ai/nano-banana/edit", {
+    const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
       input: {
         prompt: sheetPrompt,
         image_urls: [sideViewUrl, templateUrl],
         num_images: 1,
-        output_format: options?.outputFormat || "jpeg",
+        output_format: options?.outputFormat || "png",
         aspect_ratio: "16:9",
+        resolution: "1K",
       },
       logs: true,
       onQueueUpdate: (update) => {

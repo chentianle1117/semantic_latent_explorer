@@ -172,6 +172,145 @@ function detectBlobs(
   return sorted;
 }
 
+/* ── Gutter-based 2×2 sheet slicer ── */
+
+/**
+ * Find the widest horizontal and vertical white gutters to split a 2×2 sheet.
+ * More robust than blob detection when shoes are dark (tread bridges create merges).
+ */
+function findGutterSplit(
+  imageData: ImageData,
+  W: number,
+  H: number,
+  whiteTh = 240,
+): { splitX: number; splitY: number } {
+  const data = imageData.data;
+
+  // Row white fractions
+  const rowWhite = new Float64Array(H);
+  for (let y = 0; y < H; y++) {
+    let wc = 0;
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (data[i] >= whiteTh && data[i + 1] >= whiteTh && data[i + 2] >= whiteTh) wc++;
+    }
+    rowWhite[y] = wc / W;
+  }
+
+  // Column white fractions
+  const colWhite = new Float64Array(W);
+  for (let x = 0; x < W; x++) {
+    let wc = 0;
+    for (let y = 0; y < H; y++) {
+      const i = (y * W + x) * 4;
+      if (data[i] >= whiteTh && data[i + 1] >= whiteTh && data[i + 2] >= whiteTh) wc++;
+    }
+    colWhite[x] = wc / H;
+  }
+
+  const gutterTh = 0.85;
+  const marginH = Math.round(H * 0.15);
+  const marginW = Math.round(W * 0.15);
+
+  // Find widest horizontal gutter in the middle 70% of the image
+  let bestHMid = Math.round(H / 2), bestHLen = 0;
+  for (let y = marginH; y < H - marginH; ) {
+    if (rowWhite[y] < gutterTh) { y++; continue; }
+    let yEnd = y;
+    while (yEnd < H - marginH && rowWhite[yEnd] >= gutterTh) yEnd++;
+    const len = yEnd - y;
+    if (len > bestHLen) { bestHLen = len; bestHMid = Math.round((y + yEnd) / 2); }
+    y = yEnd;
+  }
+
+  // Find widest vertical gutter in the middle 70% of the image
+  let bestVMid = Math.round(W / 2), bestVLen = 0;
+  for (let x = marginW; x < W - marginW; ) {
+    if (colWhite[x] < gutterTh) { x++; continue; }
+    let xEnd = x;
+    while (xEnd < W - marginW && colWhite[xEnd] >= gutterTh) xEnd++;
+    const len = xEnd - x;
+    if (len > bestVLen) { bestVLen = len; bestVMid = Math.round((x + xEnd) / 2); }
+    x = xEnd;
+  }
+
+  console.log(`[findGutterSplit] H-gutter mid=${bestHMid} (${bestHLen}px), V-gutter mid=${bestVMid} (${bestVLen}px)`);
+  return { splitX: bestVMid, splitY: bestHMid };
+}
+
+/**
+ * Slice a 2×2 sheet into 4 quadrants using gutter detection.
+ * Returns tight-cropped base64 for each view label (row-major: TL, TR, BL, BR).
+ */
+async function sliceByGutter(
+  imageUrl: string,
+  viewLabels: string[],
+): Promise<Record<string, string>> {
+  const img = await loadImage(imageUrl);
+  const W = img.naturalWidth;
+  const H = img.naturalHeight;
+  console.log(`[sliceByGutter] ${W}×${H}, expecting ${viewLabels.length} views`);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0);
+
+  const { splitX, splitY } = findGutterSplit(ctx.getImageData(0, 0, W, H), W, H);
+
+  // 4 quadrants: TL, TR, BL, BR
+  const quads = [
+    { x0: 0,      y0: 0,      x1: splitX, y1: splitY },
+    { x0: splitX, y0: 0,      x1: W,      y1: splitY },
+    { x0: 0,      y0: splitY, x1: splitX, y1: H      },
+    { x0: splitX, y0: splitY, x1: W,      y1: H      },
+  ];
+
+  const results: Record<string, string> = {};
+  const whiteTh = 240;
+
+  for (let i = 0; i < Math.min(quads.length, viewLabels.length); i++) {
+    const { x0, y0, x1, y1 } = quads[i];
+    // Find tight foreground bbox within this quadrant
+    let bx0 = x1, by0 = y1, bx1 = x0, by1 = y0, count = 0;
+    const qData = ctx.getImageData(x0, y0, x1 - x0, y1 - y0).data;
+    const qW = x1 - x0;
+    for (let qy = 0; qy < y1 - y0; qy++) {
+      for (let qx = 0; qx < qW; qx++) {
+        const ii = (qy * qW + qx) * 4;
+        if (qData[ii] < whiteTh || qData[ii + 1] < whiteTh || qData[ii + 2] < whiteTh) {
+          bx0 = Math.min(bx0, x0 + qx); by0 = Math.min(by0, y0 + qy);
+          bx1 = Math.max(bx1, x0 + qx); by1 = Math.max(by1, y0 + qy);
+          count++;
+        }
+      }
+    }
+
+    // Fall back to full quadrant if empty
+    if (count === 0) { bx0 = x0; by0 = y0; bx1 = x1 - 1; by1 = y1 - 1; }
+
+    const sx = Math.max(0, bx0 - 2);
+    const sy = Math.max(0, by0 - 2);
+    const ex = Math.min(W, bx1 + 2);
+    const ey = Math.min(H, by1 + 2);
+    const cw = ex - sx;
+    const ch = ey - sy;
+
+    canvas.width = cw;
+    canvas.height = ch;
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.drawImage(img, sx, sy, cw, ch, 0, 0, cw, ch);
+
+    results[viewLabels[i]] = canvas.toDataURL('image/jpeg', 0.92)
+      .replace(/^data:image\/\w+;base64,/, '');
+
+    console.log(`[sliceByGutter]   ${viewLabels[i]}: (${sx},${sy}) ${cw}×${ch}`);
+  }
+
+  return results;
+}
+
 /* ── Sheet slicer using blob detection ── */
 
 /**
@@ -229,21 +368,14 @@ async function sliceByBlobs(
 /* ── Public API ── */
 
 /**
- * Slice a 5-view multi-view sheet via blob detection.
- * Expected blob order (row-major): medial, top, front, back, outsole
+ * Slice a 2×2 multi-view sheet via gutter detection.
+ * Layout (row-major): TL=front, TR=top, BL=back, BR=outsole.
+ * Uses gutter-based splitting instead of blob detection — more robust
+ * for dark shoes where tread texture bridges create merged blobs.
  */
 export async function sliceMultiViewSheet(imageUrl: string): Promise<Record<string, string>> {
   console.log('[sliceMultiViewSheet]', imageUrl);
-  return sliceByBlobs(imageUrl, ['medial', 'top', 'front', 'back', 'outsole']);
-}
-
-/**
- * Slice a 6-view multi-view sheet (with side) via blob detection.
- * Expected blob order (row-major): side, medial, top, front, back, outsole
- */
-export async function sliceMultiViewSheetWithSide(imageUrl: string): Promise<Record<string, string>> {
-  console.log('[sliceMultiViewSheetWithSide]', imageUrl);
-  return sliceByBlobs(imageUrl, ['side', 'medial', 'top', 'front', 'back', 'outsole']);
+  return sliceByGutter(imageUrl, ['front', 'top', 'back', 'outsole']);
 }
 
 /**

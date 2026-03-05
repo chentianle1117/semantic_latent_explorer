@@ -262,7 +262,9 @@ export function useMultiViewState(
       let generatedViews: Record<string, { base64: string; w: number; h: number }>;
 
       if (threeFourFrontImg?.base64_image) {
-        // 3/4-first pipeline: anchor from 3/4-front (captures most 3D info)
+        // 3/4-first pipeline: anchor from 3/4-front (captures most 3D info).
+        // Always use the true original side (white background, unmodified) as the geometry
+        // base — passing rembg'd transparent views degrades quality over iterative updates.
         generatedViews = await updateAllViews({
           editPrompt: editPrompt.trim(),
           current34FrontBase64: threeFourFrontImg.base64_image,

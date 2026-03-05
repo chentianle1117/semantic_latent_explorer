@@ -454,6 +454,15 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
           </div>
 
           <div className="dialog-actions">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(150,165,180,0.7)', cursor: 'pointer', marginRight: 'auto' }}>
+              <input
+                type="checkbox"
+                checked={useAppStore.getState().concurrentGhostsEnabled}
+                onChange={(e) => useAppStore.getState().setConcurrentGhostsEnabled(e.target.checked)}
+                style={{ accentColor: '#58a6ff' }}
+              />
+              AI alternative
+            </label>
             <button onClick={onClose}>Cancel</button>
             <button
               className={`primary${showTutorialGuide && freeText.trim() ? ' ttd-btn-pulse' : ''}`}

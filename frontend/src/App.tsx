@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { SemanticCanvas } from "./components/Canvas/SemanticCanvas";
 import { SemanticCanvas3D } from "./components/Canvas/SemanticCanvas3D";
+import { LineageCanvas } from "./components/Canvas/LineageCanvas";
+import { CanvasViewToggle } from "./components/Canvas/CanvasViewToggle";
 import { PromptDialog } from "./components/PromptDialog/PromptDialog";
 // FloatingActionPanel removed — actions moved to RightInspector
 import { ProgressModal } from "./components/ProgressModal/ProgressModal";
@@ -117,6 +119,7 @@ export const App: React.FC = () => {
   }, [selectedImageIds, images]);
   const removeBackground = useAppStore((state) => state.removeBackground);
   const is3DMode = useAppStore((state) => state.is3DMode);
+  const canvasViewMode = useAppStore((state) => state.canvasViewMode);
 
   const setImages = useAppStore((state) => state.setImages);
   const mergeImages = useAppStore((state) => state.mergeImages);
@@ -964,8 +967,20 @@ export const App: React.FC = () => {
             <DynamicIsland />
             {/* Design Brief floating overlay */}
             <DesignBriefOverlay />
-            {/* Conditionally render 2D or 3D canvas */}
-            {is3DMode ? (
+            {/* Canvas view toggle (Semantic | Lineage) */}
+            <CanvasViewToggle />
+            {/* Conditionally render canvas based on view mode */}
+            {canvasViewMode === 'lineage' ? (
+              <LineageCanvas
+                onSelectionChange={React.useCallback((_x: number, _y: number, _count: number) => {
+                  // Selection tracking handled by store (selectedImageIds)
+                }, [])}
+                onMiddleClick={React.useCallback((x: number, y: number) => {
+                  setRadialDialPos({ x, y });
+                  setShowRadialDial(true);
+                }, [])}
+              />
+            ) : is3DMode ? (
               <SemanticCanvas3D
                 onSelectionChange={React.useCallback((_x: number, _y: number, _count: number) => {
                   // Selection tracking handled by store (selectedImageIds)

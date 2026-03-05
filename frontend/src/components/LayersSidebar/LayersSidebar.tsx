@@ -12,8 +12,11 @@ import "./LayersSidebar.css";
 export const LayersSidebar: React.FC = () => {
   const isExpanded = useAppStore((s) => s.isLayersExpanded);
   const setIsExpanded = useAppStore((s) => s.setIsLayersExpanded);
-  const layers = useAppStore((s) => s.layers);
+  const allLayers = useAppStore((s) => s.layers);
+  const studyMode = useAppStore((s) => s.studyMode);
   const toggleLayerVisibility = useAppStore((s) => s.toggleLayerVisibility);
+  // Hide mood board layer when studyMode (no multi-view) is active
+  const layers = studyMode ? allLayers.filter((l) => l.id !== "mood-boards") : allLayers;
 
   return (
     <div className={`layers-sidebar ${isExpanded ? "expanded" : ""}`} data-tour="layers">

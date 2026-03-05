@@ -218,6 +218,16 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     const img = imageMap.get(id);
     const resolvedId = (img && isSatellite(img) && img.parent_side_id && img.parent_side_id > 0)
       ? img.parent_side_id : id;
+
+    // If clicking the already-inspected image, deselect it
+    if (resolvedId === inspectedImageId) {
+      toggleImageSelection(resolvedId, false);
+      // Move inspection to another selected shoe, or clear
+      const remaining = selectedImageIds.filter(sid => sid !== resolvedId);
+      setInspectedImageId(remaining.length > 0 ? remaining[0] : null as any);
+      return;
+    }
+
     setInspectedImageId(resolvedId);
     setFlyToImageId(resolvedId);
   };

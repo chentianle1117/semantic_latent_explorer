@@ -177,11 +177,17 @@ export interface AppState {
   layers: CanvasLayer[];
   imageLayerMap: Record<number, string>; // imageId → layerId
 
+  // Canvas view mode: which view is active in the main canvas area
+  canvasViewMode: 'semantic' | 'lineage';
+
   // Isolate mode: when set, only these image IDs are shown at full opacity
   isolatedImageIds: number[] | null;
 
   // Hidden images: temporarily hidden (blacklist), separate from deletion
   hiddenImageIds: number[];
+
+  // Hidden batches: set of HistoryGroup IDs whose images should be hidden from canvas
+  hiddenBatchIds: Set<string>;
 
   // Star ratings: imageId → 1-5 (0 or absent = unrated)
   imageRatings: Record<number, number>;

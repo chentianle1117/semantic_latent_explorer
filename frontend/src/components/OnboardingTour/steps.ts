@@ -350,6 +350,18 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   {
+    id: 'c-controls',
+    section: 'c',
+    atomicUnit: 'isolate-manage',
+    title: 'Visual Controls',
+    description: '',
+    instruction: 'Try the **Size/Opacity sliders** on the right edge to adjust how shoes appear on the canvas.',
+    targetSelector: '[data-tour="canvas-sliders"]',
+    cardPosition: 'left',
+    isInformational: true,
+  },
+
+  {
     id: 'c-visual-reset',
     section: 'c',
     atomicUnit: 'isolate-manage',
@@ -424,18 +436,6 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     instruction: 'The **axis scale sliders** (below X-axis and left of Y-axis) let you **stretch or compress** the canvas along each dimension to spread out clusters or tighten gaps.',
     targetSelector: '[data-tour="axis-scale-x"]',
     cardPosition: 'above',
-    isInformational: true,
-  },
-
-  {
-    id: 'c-controls',
-    section: 'c',
-    atomicUnit: 'isolate-manage',
-    title: 'Visual Controls',
-    description: '',
-    instruction: 'Try the **Size/Opacity sliders** on the right edge. Use **Visual Reset** and **Recenter** buttons (bottom-right) to restore defaults.',
-    targetSelector: '[data-tour="canvas-sliders"]',
-    cardPosition: 'left',
     isInformational: true,
   },
 

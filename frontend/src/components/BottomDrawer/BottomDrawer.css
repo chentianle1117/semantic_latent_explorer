@@ -202,6 +202,17 @@
   box-shadow: 0 0 10px rgba(88, 166, 255, 0.2);
 }
 
+/* Hidden batch visual feedback — dimmed with strikethrough */
+.drawer-batch-chip.batch-hidden {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+.drawer-group.batch-hidden {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+  border-style: dashed;
+}
+
 /* Full-card background image */
 .group-thumb-bg {
   position: absolute;

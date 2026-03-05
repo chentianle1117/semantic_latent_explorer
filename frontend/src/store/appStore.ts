@@ -124,6 +124,9 @@ interface AppStore extends AppState {
 
   clearAll: () => void;
 
+  // Canvas view mode
+  setCanvasViewMode: (mode: 'semantic' | 'lineage') => void;
+
   // Isolate mode
   setIsolatedImageIds: (ids: number[] | null) => void;
 
@@ -174,8 +177,8 @@ interface AppStore extends AppState {
   clearMultiViewHistory: (sideId: number) => void;
 
   // Bottom drawer tab — in store so handleClearCanvas can collapse it
-  drawerActiveTab: 'history' | 'lineage' | null;
-  setDrawerActiveTab: (tab: 'history' | 'lineage' | null) => void;
+  drawerActiveTab: 'history' | null;
+  setDrawerActiveTab: (tab: 'history' | null) => void;
 
   /** Reset all transient UI state (panels, ghosts, agent) — called on Clear Canvas */
   resetTransientUIState: () => void;
@@ -269,8 +272,10 @@ const initialState: AppState = {
     { id: 'references', name: 'References', visible: true, color: '#ff7b72' },
   ] as CanvasLayer[],
   imageLayerMap: {} as Record<number, string>,
+  canvasViewMode: 'semantic' as 'semantic' | 'lineage',
   isolatedImageIds: null,
   hiddenImageIds: [] as number[],
+  hiddenBatchIds: new Set<string>(),
 
   // Star ratings
   imageRatings: {} as Record<number, number>,
@@ -310,7 +315,7 @@ const initialState: AppState = {
   onboardingSectionTransition: null as string | null,
 
   // Bottom drawer tab
-  drawerActiveTab: null as 'history' | 'lineage' | null,
+  drawerActiveTab: null as 'history' | null,
 };
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -507,6 +512,13 @@ export const useAppStore = create<AppStore>((set) => ({
   setIsAgentWorking: (v) => set({ isAgentWorking: v }),
   setAgentWorkingLabel: (label) => set({ agentWorkingLabel: label }),
 
+  // Agent — concurrent ghost (Behavior B) toggle + throttle
+  concurrentGhostsEnabled: true,
+  generationsSinceConcurrentGhost: 0,
+  setConcurrentGhostsEnabled: (v: boolean) => set({ concurrentGhostsEnabled: v, generationsSinceConcurrentGhost: 0 }),
+  incrementConcurrentGhostCounter: () => set((state) => ({ generationsSinceConcurrentGhost: state.generationsSinceConcurrentGhost + 1 })),
+  resetConcurrentGhostCounter: () => set({ generationsSinceConcurrentGhost: 0 }),
+
   // Agent — exploration accumulator
   imagesSinceLastExploration: 0,
   addToExplorationCounter: (count) => set((state) => ({ imagesSinceLastExploration: state.imagesSinceLastExploration + count })),
@@ -632,6 +644,9 @@ export const useAppStore = create<AppStore>((set) => ({
       isolatedImageIds: null,
     }),
 
+  // Canvas view mode
+  setCanvasViewMode: (mode) => set({ canvasViewMode: mode }),
+
   // Isolate mode
   setIsolatedImageIds: (ids) => set({ isolatedImageIds: ids }),
 
@@ -644,6 +659,14 @@ export const useAppStore = create<AppStore>((set) => ({
     hiddenImageIds: state.hiddenImageIds.filter(id => !ids.includes(id)),
   })),
   unhideAll: () => set({ hiddenImageIds: [] }),
+
+  // Batch visibility toggle
+  toggleBatchVisibility: (batchId: string) => set((state) => {
+    const next = new Set(state.hiddenBatchIds);
+    if (next.has(batchId)) next.delete(batchId);
+    else next.add(batchId);
+    return { hiddenBatchIds: next };
+  }),
 
   // Satellite view filter toggles
   toggleSatelliteView: (viewType) => set((s) => {

@@ -376,6 +376,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const stretchPivotXRef = useRef(0);  // viewport-center pivot used for last stretch (data space)
   const stretchPivotYRef = useRef(0);
 
+  // Tab-cycling state for overlapping shoes
+  const cursorPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const overlapCycleRef = useRef<{ ids: number[]; index: number }>({ ids: [], index: -1 });
+
   // Subscribe only to the specific state we need
   const allImages = useAppStore((state) => state.images);
   const visualSettings = useAppStore((state) => state.visualSettings);
@@ -393,6 +397,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const isolatedImageIds = useAppStore((state) => state.isolatedImageIds);
   const starFilter = useAppStore((state) => state.starFilter);
   const imageRatings = useAppStore((state) => state.imageRatings);
+  const studyMode = useAppStore((state) => state.studyMode);
+  const hiddenBatchIds = useAppStore((state) => state.hiddenBatchIds);
+  const historyGroups = useAppStore((state) => state.historyGroups);
   const imageSizeOverrides = useAppStore((state) => state.imageSizeOverrides);
   const imageOpacityOverrides = useAppStore((state) => state.imageOpacityOverrides);
   // Always-current refs so render closures never see stale overrides
@@ -407,6 +414,18 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   // Sorted so lower layers (higher index in layers array) render first = below in SVG stack
   // layers[0] = Shoes = topmost → rendered last (on top)
   // layers[1] = References = bottom → rendered first (behind shoes)
+  // Build reverse map: imageId → batchId (for batch visibility filtering)
+  const batchHiddenImageIds = useMemo(() => {
+    if (hiddenBatchIds.size === 0) return new Set<number>();
+    const hidden = new Set<number>();
+    for (const group of historyGroups) {
+      if (hiddenBatchIds.has(group.id)) {
+        for (const id of group.image_ids) hidden.add(id);
+      }
+    }
+    return hidden;
+  }, [hiddenBatchIds, historyGroups]);
+
   const images = useMemo(() => {
     const layerVisMap: Record<string, boolean> = {};
     const layerOrder: Record<string, number> = {};
@@ -415,8 +434,12 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     const filtered = allImages.filter((img) => {
       if (!img.visible) return false;
       if (hiddenSet.has(img.id)) return false;
+      // Hide images belonging to hidden batches
+      if (batchHiddenImageIds.has(img.id)) return false;
       const lid = imageLayerMap[img.id] ?? "default";
       if (!(layerVisMap[lid] ?? true)) return false;
+      // Hide mood boards when studyMode (no multi-view) is active
+      if (studyMode && img.realm === 'mood-board') return false;
       // Only show side views on the semantic canvas — satellites are shown in the inspector
       const view = img.shoe_view ?? 'side';
       if (view !== 'side') return false;
@@ -429,7 +452,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       if (bIdx !== aIdx) return bIdx - aIdx; // descending layer index: references first, shoes last
       return a.id - b.id; // ascending ID within layer: older images render first (behind newer)
     });
-  }, [allImages, layers, imageLayerMap, hiddenImageIds]);
+  }, [allImages, layers, imageLayerMap, hiddenImageIds, batchHiddenImageIds, studyMode]);
 
   // Rubber-band selection state
   // mode: 'window'   (drag →, solid blue)   = must fully contain the shoe
@@ -1800,9 +1823,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         // Satellite tether lines removed — satellites only shown in inspector
       });
     }
-  // Note: visualSettings intentionally excluded — opacity is handled by the render/fast-path on <image>,
+  // Note: full visualSettings intentionally excluded — opacity is handled by the render/fast-path on <image>,
   // not by this selection effect on <g>. Including it caused opacity compounding and slider blink.
-  }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, isolatedImageIds, starFilter, imageRatings]);
+  // However, axisScaleX/Y ARE included so genealogy lines recalculate when the user stretches axes.
+  }, [selectedImageIds, hoveredGroupId, hoveredImageId, images, isolatedImageIds, starFilter, imageRatings,
+      visualSettings.axisScaleX, visualSettings.axisScaleY]);
 
   // FlyTo effect: smoothly pan/zoom to a specific image
   const flyToImageId = useAppStore((state) => state.flyToImageId);
@@ -1875,6 +1900,73 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .call(zoomRef.current.transform as any, targetTransform);
   }, [minimapPanRequest]);
 
+  // Tab cycling: track cursor position + cycle overlapping shoes on Tab press
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = svgEl.getBoundingClientRect();
+      cursorPosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      // Reset cycle when cursor moves significantly
+      overlapCycleRef.current = { ids: [], index: -1 };
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const svgRect = svgEl.getBoundingClientRect();
+      const cx = cursorPosRef.current.x;
+      const cy = cursorPosRef.current.y;
+      // Skip if cursor is outside the SVG
+      if (cx < 0 || cy < 0 || cx > svgRect.width || cy > svgRect.height) return;
+
+      // Find all image nodes whose bounding box contains the cursor
+      const nearby: number[] = [];
+      svgEl.querySelectorAll('[data-image-id]').forEach((el: Element) => {
+        const r = el.getBoundingClientRect();
+        const ex = r.left - svgRect.left + r.width / 2;
+        const ey = r.top - svgRect.top + r.height / 2;
+        const dist = Math.sqrt((ex - cx) ** 2 + (ey - cy) ** 2);
+        if (dist < Math.max(r.width, r.height) * 0.75) {
+          const id = parseInt(el.getAttribute('data-image-id') || '-1');
+          if (id >= 0) nearby.push(id);
+        }
+      });
+
+      if (nearby.length < 2) return; // No overlap, let Tab do its thing
+
+      e.preventDefault();
+
+      // Build or continue the cycle
+      const cycle = overlapCycleRef.current;
+      const sameSet = cycle.ids.length === nearby.length && cycle.ids.every((id, i) => id === nearby[i]);
+      if (!sameSet) {
+        overlapCycleRef.current = { ids: nearby, index: 0 };
+      } else {
+        overlapCycleRef.current.index = (cycle.index + 1) % nearby.length;
+      }
+
+      const targetId = overlapCycleRef.current.ids[overlapCycleRef.current.index];
+      // Bring the target node to front and apply hover glow
+      const targetEl = svgEl.querySelector(`#image-${targetId}`);
+      if (targetEl) {
+        (targetEl as SVGGElement).parentNode?.appendChild(targetEl);
+        // Update hover state
+        useAppStore.getState().setHoveredImageId(targetId);
+      }
+    };
+
+    svgEl.addEventListener('mousemove', handleMouseMove);
+    svgEl.addEventListener('keydown', handleKeyDown);
+    // Make SVG focusable for keydown to work
+    if (!svgEl.hasAttribute('tabindex')) svgEl.setAttribute('tabindex', '0');
+
+    return () => {
+      svgEl.removeEventListener('mousemove', handleMouseMove);
+      svgEl.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   return (
     <div style={{
       position: "relative", width: "100%", height: "100%",
@@ -1882,6 +1974,10 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         outline: "2px solid rgba(239,68,68,0.75)",
         outlineOffset: "-2px",
         boxShadow: "inset 0 0 0 2px rgba(239,68,68,0.4), 0 0 24px rgba(239,68,68,0.15)",
+      } : starFilter !== null ? {
+        outline: "2px solid rgba(240,192,64,0.65)",
+        outlineOffset: "-2px",
+        boxShadow: "inset 0 0 0 2px rgba(240,192,64,0.3), 0 0 20px rgba(240,192,64,0.1)",
       } : {}),
     }}>
       <svg
@@ -1924,7 +2020,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
         <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "rgba(150,165,180,0.55)", textTransform: "uppercase", flexShrink: 0 }}>
           Filter
         </span>
-        {[1, 2, 3, 4, 5].map((n) => (
+        {[1, 2, 3, 4, 5].map((n) => {
+          const isActive = starFilter !== null && n <= starFilter;
+          return (
           <button
             key={n}
             onClick={() => {
@@ -1932,27 +2030,29 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               apiClient.logEvent('star_filter_toggle', { filterLevel: newFilter, previousLevel: starFilter });
               useAppStore.getState().setStarFilter(newFilter);
             }}
-            title={starFilter === n ? "Clear filter" : `Show only ${n}-star shoes`}
+            title={starFilter === n ? "Clear filter" : `Show ${n}+ star shoes`}
             style={{
               background: "none",
               border: "none",
-              padding: "0 1px",
+              padding: 0,
+              width: 22,
+              textAlign: "center" as const,
               cursor: "pointer",
               fontSize: 18,
               lineHeight: 1,
-              color: starFilter === n ? "#f0c040" : "rgba(150,165,180,0.3)",
-              textShadow: starFilter === n ? "0 0 8px rgba(240,192,64,0.6)" : "none",
-              transition: "color 0.15s, transform 0.1s",
+              color: isActive ? "#f0c040" : "rgba(150,165,180,0.3)",
+              textShadow: isActive ? "0 0 8px rgba(240,192,64,0.6)" : "none",
+              transition: "color 0.15s",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.color = "#f0c040"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = "#f0c040"; }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "scale(1)";
-              e.currentTarget.style.color = starFilter === n ? "#f0c040" : "rgba(150,165,180,0.3)";
+              e.currentTarget.style.color = isActive ? "#f0c040" : "rgba(150,165,180,0.3)";
             }}
           >
-            {starFilter === n ? "★" : "☆"}
+            {isActive ? "★" : "☆"}
           </button>
-        ))}
+          );
+        })}
         {starFilter !== null && (
           <button
             onClick={() => {

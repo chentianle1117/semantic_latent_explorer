@@ -296,9 +296,10 @@ class FalClient {
         basePrompt = [
           request.briefConstraint ? `STRICT REQUIREMENT — ${request.briefConstraint}` : null,
           systemPrompt,
-          `Use the reference image(s) as DESIGN INSPIRATION — extract their color palette, textures, patterns, mood, and design language.`,
-          `Do NOT literally copy or paste elements from the references onto the shoe.`,
-          `Instead, create a new shoe design that is INSPIRED BY the aesthetic qualities of the references.`,
+          `DESIGN LANGUAGE EXTRACTION: Analyze the reference image(s) and extract their DESIGN PRINCIPLES — color relationships, material language, proportions, silhouette rhythm, surface treatment philosophy, and aesthetic direction.`,
+          `Then REINTERPRET these principles as a professional shoe designer would: translate patterns into shoe-appropriate textures, translate color stories into colorway decisions, translate form language into sole/upper/heel shapes.`,
+          `NEVER literally paste, stamp, or directly transfer any texture, pattern, or imagery from the reference onto the shoe surface. Instead, design a shoe that a viewer would say "feels like" the reference.`,
+          `When merging multiple references, extract the strongest design element from each and synthesize them into a cohesive new design — do not collage or overlay them.`,
           request.prompt,
         ].filter(Boolean).join('. ');
       }

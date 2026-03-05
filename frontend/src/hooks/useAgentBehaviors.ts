@@ -170,6 +170,13 @@ export function useAgentBehaviors() {
     // Skip if not enough context
     if (currentImages.filter(img => img.visible).length < 1) return;
 
+    // Throttle: only fire every 2nd generation, and respect opt-in toggle
+    const store = useAppStore.getState();
+    if (!store.concurrentGhostsEnabled) return;
+    store.incrementConcurrentGhostCounter();
+    if (store.generationsSinceConcurrentGhost < 2) return;
+    store.resetConcurrentGhostCounter();
+
     console.log('[Agent B] Concurrent ghost triggered for prompt:', userPrompt.substring(0, 50));
 
     try {

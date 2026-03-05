@@ -1,0 +1,67 @@
+.lineage-canvas-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, rgba(20, 24, 32, 0.95) 0%, rgba(12, 14, 20, 1) 100%);
+}
+
+.lineage-canvas-svg {
+  display: block;
+  cursor: grab;
+}
+
+.lineage-canvas-svg:active {
+  cursor: grabbing;
+}
+
+/* Edges */
+.lc-edge {
+  pointer-events: none;
+  transition: stroke-opacity 0.15s ease;
+}
+
+/* Node label text */
+.lc-node-label {
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Legend */
+.lc-legend {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(30, 35, 44, 0.8);
+  border: 1px solid rgba(88, 166, 255, 0.12);
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  z-index: 10;
+}
+
+.lc-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: rgba(150, 165, 180, 0.7);
+  white-space: nowrap;
+}
+
+/* Empty state */
+.lc-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.lc-empty span {
+  font-size: 13px;
+  color: rgba(150, 165, 180, 0.4);
+}

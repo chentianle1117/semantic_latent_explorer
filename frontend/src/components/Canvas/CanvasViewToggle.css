@@ -1,0 +1,37 @@
+.canvas-view-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  background: rgba(30, 35, 44, 0.85);
+  border: 1px solid rgba(88, 166, 255, 0.2);
+  border-radius: 8px;
+  padding: 2px;
+  backdrop-filter: blur(8px);
+  gap: 2px;
+}
+
+.cvt-btn {
+  background: transparent;
+  border: none;
+  color: rgba(150, 165, 180, 0.7);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.cvt-btn:hover {
+  color: rgba(200, 210, 220, 0.9);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.cvt-btn.cvt-active {
+  background: rgba(88, 166, 255, 0.18);
+  color: #58a6ff;
+  box-shadow: 0 0 6px rgba(88, 166, 255, 0.15);
+}

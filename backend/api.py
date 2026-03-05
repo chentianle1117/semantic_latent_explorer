@@ -2145,7 +2145,8 @@ CRITICAL RULES:
 2. When a tag has a source attribution (e.g. "bold" (from A), "angular" (from B)), write "@A's bold energy" and "@B's angular tension" — use the @letter possessive form with evocative, conceptual language.
 3. If the user already typed @A, @B, @C, @D references, keep them EXACTLY as-is.
 4. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase them.
-5. The prompt should feel artistic, expressive, and conceptual — like briefing a footwear designer on a shoe concept board.
+5. PRESERVE the user's original freetext wording as much as possible. Do NOT simplify, shorten, or rewrite their words. Only fix grammar if needed. Never remove details the user wrote — only add context from tags. The designer's voice and intent must come through.
+6. The prompt should feel artistic, expressive, and conceptual — like briefing a footwear designer on a shoe concept board.
 
 EXAMPLES:
 - "A bold gestural shoe exploration with @A's raw energy and @B's structured sole tension, earth-tone palette"
@@ -2166,7 +2167,8 @@ CRITICAL RULES:
 1. Use generative language — "a shoe with...", "design featuring...", "create a...". Never use words like "modify", "update", "adjust", "change", or "restyle".
 2. Do NOT use @A or @B labels — there are no reference images.
 3. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase them.
-4. Be specific about the shoe's aesthetic, materials, silhouette, and mood.
+4. PRESERVE the user's original freetext wording as much as possible. Do NOT simplify, shorten, or rewrite their words. Only fix grammar if needed. Never remove or condense details the user wrote — their specific descriptions matter.
+5. Be specific about the shoe's aesthetic, materials, silhouette, and mood.
 
 EXAMPLES:
 - Input: "chunky sole, bright colors" → "A bold sneaker with an exaggerated chunky sole and vivid, high-contrast colorway"
@@ -2186,7 +2188,8 @@ CRITICAL RULES:
 1. Use light, exploratory language — "using this as a reference", "building on", "drawing from", "taking cues from", "informed by". Avoid harsh words like "overhaul" or "drastically change".
 2. Do NOT use @A or @B labels — there is only one reference shoe.
 3. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase them.
-4. Make it feel like a natural next step, not a complete redesign.
+4. PRESERVE the user's original freetext wording as much as possible. Do NOT simplify, shorten, or rewrite their words. Only fix grammar if needed. Never remove or condense details the user wrote — their specific descriptions and vocabulary matter.
+5. Make it feel like a natural next step, not a complete redesign.
 
 EXAMPLES:
 - Input: "chunkier sole, brighter colors" → "Using this as a reference, update the sole to be chunkier and push the colorway toward something brighter"
@@ -2206,7 +2209,8 @@ CRITICAL RULES:
 1. When a tag has a source attribution in parentheses (e.g. "formal wear" (from A), "platform sole" (from B)), you MUST write "@A's formal wear" and "@B's platform sole" — use the @letter possessive form to attribute the tag to its source image. This is the most important rule.
 2. If the user already typed @A, @B, @C, @D references, keep them EXACTLY as-is — do NOT rephrase or remove them.
 3. Keep the EXACT tag phrases intact word-for-word — do NOT rephrase or paraphrase them.
-4. Use combining language — "fusing", "blending", "merging", "@A's X with @B's Y" — to make clear this draws from multiple sources.
+4. PRESERVE the user's original freetext wording as much as possible. Do NOT simplify, shorten, or rewrite their words. Only fix grammar if needed. Never remove or condense details the user wrote — their specific descriptions and vocabulary matter.
+5. Use combining language — "fusing", "blending", "merging", "@A's X with @B's Y" — to make clear this draws from multiple sources.
 
 EXAMPLE:
 Input prompt: "formal wear, platform sole"

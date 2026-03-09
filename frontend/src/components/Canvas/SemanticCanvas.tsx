@@ -2004,7 +2004,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     }}>
       <svg
         ref={svgRef}
-        style={{ width: "100%", height: "100%", background: "#0d1117" }}
+        style={{ width: "100%", height: "100%", background: "#0d1117", cursor: axisTuningMode ? "crosshair" : undefined }}
       />
       {brush && (
         <svg

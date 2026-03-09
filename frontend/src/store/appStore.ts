@@ -709,11 +709,18 @@ export const useAppStore = create<AppStore>((set) => ({
     arr[index] = value;
     return { axisTuningSentences: { ...s.axisTuningSentences, [key]: arr } };
   }),
-  addAxisTuningAnchor: (anchor) => set((s) => ({
-    axisTuningAnchors: [...s.axisTuningAnchors.filter(
+  addAxisTuningAnchor: (anchor) => set((s) => {
+    // Remove duplicate if exists
+    const withoutDup = s.axisTuningAnchors.filter(
       a => !(a.imageId === anchor.imageId && a.axis === anchor.axis)
-    ), anchor],
-  })),
+    );
+    // Auto-position: spread anchors so they don't overlap
+    // Slot order gives good visual spacing for 1-9 anchors
+    const slots = [7, 3, 9, 1, 5, 8, 2, 6, 4];
+    const axisCount = withoutDup.filter(a => a.axis === anchor.axis).length;
+    const autoPos = slots[axisCount % slots.length];
+    return { axisTuningAnchors: [...withoutDup, { ...anchor, position: autoPos }] };
+  }),
   removeAxisTuningAnchor: (imageId, axis) => set((s) => ({
     axisTuningAnchors: s.axisTuningAnchors.filter(
       a => !(a.imageId === imageId && a.axis === axis)

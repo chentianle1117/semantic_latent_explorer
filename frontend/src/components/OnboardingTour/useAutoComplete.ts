@@ -102,6 +102,26 @@ export function useAutoComplete(): void {
     }
   }, [canvasViewMode, onboardingDismissed, completeStep]);
 
+  // ── c-axis-tune-intro: tuning mode opened ─────────────────────────────
+  const axisTuningMode = useAppStore((s) => s.axisTuningMode);
+  useEffect(() => {
+    if (onboardingDismissed) return;
+    if (axisTuningMode) {
+      completeStep('c-axis-tune-intro');
+    }
+  }, [axisTuningMode, onboardingDismissed, completeStep]);
+
+  // ── c-axis-tune-reproject: tuning mode closed (user clicked ✕) ───────
+  const prevTuningMode = useRef(axisTuningMode);
+  useEffect(() => {
+    if (onboardingDismissed) return;
+    // Detect transition true→false (user exited tuning mode)
+    if (prevTuningMode.current && !axisTuningMode) {
+      completeStep('c-axis-tune-reproject');
+    }
+    prevTuningMode.current = axisTuningMode;
+  }, [axisTuningMode, onboardingDismissed, completeStep]);
+
   // ── a-layers-expand: layers panel expanded ────────────────────────────
   // Complete on transition (false→true) OR when spotlight lands on step with panel already expanded
   const prevLayersExpanded = useRef(isLayersExpanded);

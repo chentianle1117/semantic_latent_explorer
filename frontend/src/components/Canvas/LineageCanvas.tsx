@@ -297,17 +297,15 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
     );
   }, [nodes.length, width, height, containerSize]);
 
-  // Click handlers
+  // Click handlers — same as SemanticCanvas: plain click toggles, ctrl deselects
   const handleNodeClick = useCallback((e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    if (e.shiftKey || e.metaKey || e.ctrlKey) {
-      toggleImageSelection(id, true);
-    } else {
-      setSelectedImageIds([id]);
-    }
+    toggleImageSelection(id, e.ctrlKey);
     if (setInspectedImageId) setInspectedImageId(id);
-    onSelectionChange(-1, -1, useAppStore.getState().selectedImageIds.length);
-  }, [toggleImageSelection, setSelectedImageIds, setInspectedImageId, onSelectionChange]);
+    setTimeout(() => {
+      onSelectionChange(-1, -1, useAppStore.getState().selectedImageIds.length);
+    }, 0);
+  }, [toggleImageSelection, setInspectedImageId, onSelectionChange]);
 
   const handleNodeDoubleClick = useCallback((e: React.MouseEvent, id: number) => {
     e.stopPropagation();
@@ -386,16 +384,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
                   fill="transparent"
                 />
 
-                {/* Background fill */}
-                <rect
-                  x={-hs} y={-hs}
-                  width={NODE_SIZE} height={NODE_SIZE}
-                  rx={NODE_RADIUS}
-                  fill={col}
-                  fillOpacity={0.12}
-                />
-
-                {/* Thumbnail */}
+                {/* Thumbnail — no background rect, just the image like SemanticCanvas */}
                 {n.img.base64_image && (
                   <>
                     <clipPath id={`lc-clip-${n.id}`}>
@@ -410,17 +399,6 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
                     />
                   </>
                 )}
-
-                {/* Border */}
-                <rect
-                  x={-hs} y={-hs}
-                  width={NODE_SIZE} height={NODE_SIZE}
-                  rx={NODE_RADIUS}
-                  fill="none"
-                  stroke={sel ? selColor : col}
-                  strokeWidth={sel ? 2.5 : hov ? 1.8 : 1}
-                  strokeOpacity={sel ? 1 : hov ? 0.85 : 0.5}
-                />
 
                 {/* Agent badge */}
                 {isAgent && (

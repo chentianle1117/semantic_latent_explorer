@@ -1,0 +1,10 @@
+{"type": "session_start", "timestamp": "2026-03-09T14:45:13.907388", "canvas_id": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "canvas_name": "Canvas 1", "participant_id": "Ty", "study_session": null}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:45:14.095989", "data": {"brief": null}}
+{"type": "canvas_switch", "timestamp": "2026-03-09T14:45:18.920944", "data": {"fromCanvasId": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "toCanvasId": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-03-09T14:45:18.922943", "canvas_id": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5"}
+{"type": "session_start", "timestamp": "2026-03-09T14:45:36.645039", "canvas_id": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "canvas_name": "Canvas 1", "participant_id": "Ty", "study_session": null}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:45:36.813326", "data": {"brief": null}}
+{"type": "file_upload", "timestamp": "2026-03-09T14:46:06.581394", "data": {"shoeCount": 0, "referenceCount": 6, "totalCount": 6}}
+{"type": "generation", "timestamp": "2026-03-09T14:46:12.628603", "data": {"imageIds": [0, 1, 2, 3, 4, 5], "count": 6, "prompt": "Reference images"}}
+{"type": "axis_change", "timestamp": "2026-03-09T14:47:10.420926", "data": {"axisLabels": {"x": ["formal", "sporty"], "y": ["Monotone", "colorful"], "z": ["casual", "elegant"]}}}
+{"type": "axis_change", "timestamp": "2026-03-09T14:47:21.118065", "data": {"axisLabels": {"x": ["lightweight", "rugged"], "y": ["Monotone", "colorful"], "z": ["casual", "elegant"]}}}

@@ -1,0 +1,5 @@
+{"type": "session_start", "timestamp": "2026-03-09T14:45:22.958154", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "canvas_name": "Onboarding", "participant_id": "Ty", "study_session": null}
+{"type": "generation", "timestamp": "2026-03-09T14:45:24.687793", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "count": 13, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:45:24.689801", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "canvas_switch", "timestamp": "2026-03-09T14:45:35.084223", "data": {"fromCanvasId": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "toCanvasId": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-03-09T14:45:35.086731", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc"}

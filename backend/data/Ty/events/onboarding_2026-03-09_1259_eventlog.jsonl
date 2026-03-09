@@ -1,0 +1,54 @@
+{"type": "session_start", "timestamp": "2026-03-09T12:59:22.230757", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "canvas_name": "Onboarding", "participant_id": "Ty", "study_session": null}
+{"type": "canvas_switch", "timestamp": "2026-03-09T12:59:22.233752", "data": {"fromCanvasId": "cdef4fab-cca7-42ee-857c-3ad0dea327c6", "action": "new", "newName": "Onboarding"}}
+{"type": "session_end", "timestamp": "2026-03-09T12:59:22.236211", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc"}
+{"type": "session_start", "timestamp": "2026-03-09T12:59:22.239653", "canvas_id": "45c24d76-2aa0-47a2-81ae-0046f2fc2c7e", "canvas_name": "Onboarding", "participant_id": "Ty", "study_session": null}
+{"type": "suggestion_click", "timestamp": "2026-03-09T12:59:55.051332", "data": {"tag": "Durable upper", "category": "material", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T12:59:55.596673", "data": {"tag": "Muted beige", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T12:59:56.310715", "data": {"tag": "Effortless slip-on", "category": "silhouette", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-03-09T13:00:00.678775", "data": {"prompt": "Create a shoe with a durable upper in muted beige, designed as an effortless slip-on with a rugged Vibram sole for ultimate comfort and resilience.", "imageCount": 3, "selectedTagCount": 0}}
+{"type": "file_upload", "timestamp": "2026-03-09T13:00:26.101632", "data": {"shoeCount": 7, "referenceCount": 0, "totalCount": 7}}
+{"type": "generation", "timestamp": "2026-03-09T13:00:43.712736", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6], "count": 7, "prompt": "Shoe images"}}
+{"type": "generation", "timestamp": "2026-03-09T13:00:50.347280", "data": {"imageIds": [7, 8, 9], "count": 3, "prompt": "Create a shoe with a durable upper in muted beige, designed as an effortless slip-on with a rugged Vibram sole for ultimate comfort and resilience."}}
+{"type": "selection", "timestamp": "2026-03-09T13:00:50.350618", "data": {"selectedIds": [7, 8, 9], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:00:51.321591", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:00:53.850520", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:00:54.479438", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:01:00.575762", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:01:01.090181", "data": {"selectedIds": [], "count": 0}}
+{"type": "axis_change", "timestamp": "2026-03-09T13:01:39.040703", "data": {"axisLabels": {"x": ["colorful", "monotone"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "axis_change", "timestamp": "2026-03-09T13:01:58.961187", "data": {"axisLabels": {"x": ["slow", "fast"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:55.869634", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:56.344923", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:57.160908", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:57.632613", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:57.953913", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:58.280950", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:58.814115", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:59.128856", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:05:59.719173", "data": {"selectedIds": [5, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:01.360678", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:02.054786", "data": {"selectedIds": [6, 4], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:02.518631", "data": {"selectedIds": [6, 4, 3], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:04.077775", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:11.244208", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:11.739199", "data": {"selectedIds": [9, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:12.158750", "data": {"selectedIds": [9, 7, 8], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:12.464097", "data": {"selectedIds": [9, 7, 8, 0], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:14.755170", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:15.156672", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:15.488907", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:15.848329", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:16.302386", "data": {"selectedIds": [1], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:17.473216", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:19.967705", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:21.194287", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:21.470582", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:21.839060", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:22.268866", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:23.707049", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:24.016155", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:24.251322", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:27.644204", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:28.053523", "data": {"selectedIds": [4], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:28.564231", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:06:29.092332", "data": {"selectedIds": [], "count": 0}}

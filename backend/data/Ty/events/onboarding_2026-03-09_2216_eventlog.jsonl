@@ -1,0 +1,68 @@
+{"type": "session_start", "timestamp": "2026-03-09T22:16:50.296436", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "canvas_name": "Onboarding", "participant_id": "Ty", "study_session": null}
+{"type": "canvas_switch", "timestamp": "2026-03-09T22:16:51.917098", "data": {"fromCanvasId": "8dffb8a7-464e-4a17-bd92-90b28236aa3a", "toCanvasId": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "action": "load"}}
+{"type": "generation", "timestamp": "2026-03-09T22:16:57.174605", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "count": 13, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T22:16:57.176172", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T22:19:18.438497", "data": {"brief": "I want to explore a minimal offroad trail shoe that has a minimal lacing system with an aggresive traction pattern that wraps up from the sole onto the heel and also from the sole onto the toe. neutral tones"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T22:20:08.018467", "data": {"brief": "I'm envisioning a futuristic trail shoe built for rugged, off-road adventures. Its minimalist aesthetic is grounded in neutral tones, with a sole designed for aggressive traction that wraps boldly up the shoe, promising grip and a forward-thinking silhouette. This is a shoe that feels both grounded and ahead of its time."}}
+{"type": "selection", "timestamp": "2026-03-09T22:20:46.880528", "data": {"selectedIds": [8], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:21:01.232818", "data": {"selectedIds": [8, 12], "count": 2}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-09T22:24:07.132190", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": false}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-09T22:24:07.703919", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-09T22:24:09.279481", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": false}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "layer_visibility_change", "timestamp": "2026-03-09T22:24:09.879577", "data": {"layers": [{"id": "default", "name": "Shoes", "visible": true}, {"id": "mood-boards", "name": "Mood Boards", "visible": true}, {"id": "references", "name": "References", "visible": true}]}}
+{"type": "file_upload", "timestamp": "2026-03-09T22:27:51.244884", "data": {"shoeCount": 1, "referenceCount": 1, "totalCount": 2}}
+{"type": "generation", "timestamp": "2026-03-09T22:28:03.493687", "data": {"imageIds": [13], "count": 1, "prompt": "Shoe images"}}
+{"type": "generation", "timestamp": "2026-03-09T22:28:04.475788", "data": {"imageIds": [14], "count": 1, "prompt": "Reference images"}}
+{"type": "selection", "timestamp": "2026-03-09T22:28:35.410729", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:28:45.263786", "data": {"selectedIds": [8], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:28:45.978485", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:29:01.918261", "data": {"selectedIds": [13], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:29:10.752206", "data": {"selectedIds": [], "count": 0}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T22:29:40.590099", "data": {"tag": "Off-white", "category": "color", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T22:29:48.695623", "data": {"tag": "Seamless construction", "category": "details", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T22:29:51.485196", "data": {"tag": "Tapered toe", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T22:29:51.992505", "data": {"tag": "Low-cut profile", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T22:29:53.759090", "data": {"tag": "Streamlined profile", "category": "silhouette", "action": "select"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T22:29:56.013473", "data": {"tag": "Seamless construction", "category": "details", "action": "deselect"}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T22:30:13.704071", "data": {"tag": "Integrated lacing", "category": "silhouette", "action": "select"}}
+{"type": "prompt_submit", "timestamp": "2026-03-09T22:30:48.240050", "data": {"prompt": "Create a futuristic, minimalist trail shoe in neutral tones, featuring integrated lacing, a sole with aggressive traction that wraps boldly up the shoe, promising grip and a forward-thinking silhouette. This is a shoe that feels both grounded and ahead of its time.", "imageCount": 2, "selectedTagCount": 0}}
+{"type": "generation", "timestamp": "2026-03-09T22:31:10.968894", "data": {"imageIds": [15, 16], "count": 2, "prompt": "Create a futuristic, minimalist trail shoe in neutral tones, featuring integrated lacing, a sole with aggressive traction that wraps boldly up the shoe, promising grip and a forward-thinking silhouette. This is a shoe that feels both grounded and ahead of its time."}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:11.097802", "data": {"selectedIds": [15, 16], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:13.671135", "data": {"selectedIds": [15], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:15.012400", "data": {"selectedIds": [15, 16], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:16.407305", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:16.987597", "data": {"selectedIds": [16], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:31.496247", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:33.696390", "data": {"selectedIds": [16], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:42.702932", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:44.333818", "data": {"selectedIds": [15], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:45.887324", "data": {"selectedIds": [15, 16], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T22:31:55.188435", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:32:03.018237", "data": {"selectedIds": [13], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:32:04.264632", "data": {"selectedIds": [13, 16], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-09T22:33:43.483057", "data": {"imageIds": [17, 18], "count": 2, "prompt": "I want to use off-white leather, low-profile sole, minimalist upper, perforated detail, clean silhouette, smooth texture profile and the sole from neutral tones, aggressive sole, technical mesh, lacing system, rugged silhouette, chunky accents to wrap up over the golf midsole from off-white leather, low-profile sole, minimalist upper, perforated detail, clean silhouette, smooth texture"}}
+{"type": "selection", "timestamp": "2026-03-09T22:33:43.616930", "data": {"selectedIds": [17, 18], "count": 2}}
+{"type": "axis_change", "timestamp": "2026-03-09T22:34:57.355420", "data": {"axisLabels": {"x": ["formal", "sporty"], "y": ["normal", "technical"], "z": ["casual", "elegant"]}}}
+{"type": "selection", "timestamp": "2026-03-09T22:35:22.594791", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:38:25.499284", "data": {"selectedIds": [17], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:38:37.671869", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:38:54.184100", "data": {"selectedIds": [0, 2, 3, 9, 10, 11, 12, 15, 16], "count": 9}}
+{"type": "selection", "timestamp": "2026-03-09T22:38:56.920703", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:04.326220", "data": {"selectedIds": [0, 2, 3, 9, 10, 11, 15, 16], "count": 8}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:18.869813", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:20.772587", "data": {"selectedIds": [5, 7, 8, 13, 17, 18], "count": 6}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:23.742994", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:48.177097", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:50.417575", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:52.873198", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:39:54.970895", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:40:01.996425", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:40:05.886152", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T22:40:06.383261", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T22:40:13.921632", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-03-09T22:42:37.462103", "data": {"imageIds": [19], "count": 1, "prompt": "A futuristic trail shoe crafted from matte, recycled performance knit in charcoal grey, featuring a translucent, bio-mimicking sole with sharp, angular lugs that aggressively wrap up the heel and toe. The lacing system is integrated with a subtle, almost invisible cable mechanism. The overall aesthetic is stark and utilitarian, with minimal branding."}}
+{"type": "generation", "timestamp": "2026-03-09T22:42:38.532454", "data": {"imageIds": [20], "count": 1, "prompt": "A futuristic trail shoe with a seamless, single-piece upper made from a graphene-infused textile in a light sand color, featuring strategically placed micro-perforations for breathability. The sole is a sculpted, multi-density rubber in a deep olive green, with a distinctive topographic pattern that climbs the sidewalls for enhanced grip. A minimalist, pull-tab lacing system is subtly integrated."}}
+{"type": "axis_suggestion_apply", "timestamp": "2026-03-09T22:43:03.429494", "data": {"xAxis": "utilitarian - sculpted", "yAxis": "earthy - celestial", "reasoning": "This highlights the shoe's practical purpose and form (functional design vs. artful shaping) and its overall feel and inspiration (connected to nature vs. looking towards the future and space), resonating with the minimalist, futuristic, and off-road brief."}}
+{"type": "axis_change", "timestamp": "2026-03-09T22:43:14.499873", "data": {"axisLabels": {"x": ["utilitarian", "sculpted"], "y": ["earthy", "celestial"], "z": ["casual", "elegant"]}}}
+{"type": "canvas_switch", "timestamp": "2026-03-09T22:43:43.217894", "data": {"fromCanvasId": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "toCanvasId": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-03-09T22:43:43.346649", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc"}

@@ -1,0 +1,8 @@
+{"type": "session_start", "timestamp": "2026-03-09T13:07:57.486759", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "canvas_name": "Onboarding", "participant_id": "Ty", "study_session": null}
+{"type": "axis_change", "timestamp": "2026-03-09T13:07:57.666012", "data": {"axisLabels": {"x": ["ready to wear", "avant garde"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T13:07:57.668413", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "file_upload", "timestamp": "2026-03-09T13:08:20.137788", "data": {"shoeCount": 9, "referenceCount": 0, "totalCount": 9}}
+{"type": "generation", "timestamp": "2026-03-09T13:08:43.007311", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8], "count": 9, "prompt": "Shoe images"}}
+{"type": "selection", "timestamp": "2026-03-09T13:10:10.382646", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:10:11.014929", "data": {"selectedIds": [2, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:10:11.292213", "data": {"selectedIds": [], "count": 0}}

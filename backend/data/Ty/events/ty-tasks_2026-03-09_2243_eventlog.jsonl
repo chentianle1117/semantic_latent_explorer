@@ -1,0 +1,4 @@
+{"type": "session_start", "timestamp": "2026-03-09T22:43:49.360775", "canvas_id": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "canvas_name": "Ty Tasks", "participant_id": "Ty", "study_session": null}
+{"type": "design_brief_change", "timestamp": "2026-03-09T22:43:55.761618", "data": {"brief": null}}
+{"type": "axis_change", "timestamp": "2026-03-09T22:43:55.763135", "data": {"axisLabels": {"x": ["lightweight", "rugged"], "y": ["Monotone", "colorful"], "z": ["casual", "elegant"]}}}
+{"type": "session_end", "timestamp": "2026-03-09T22:46:27.801695", "canvas_id": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5"}

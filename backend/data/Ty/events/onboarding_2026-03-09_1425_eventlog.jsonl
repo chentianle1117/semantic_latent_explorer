@@ -1,0 +1,46 @@
+{"type": "session_start", "timestamp": "2026-03-09T14:25:41.126654", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "canvas_name": "Onboarding", "participant_id": "Ty", "study_session": null}
+{"type": "generation", "timestamp": "2026-03-09T14:26:08.440958", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:26:08.444560", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-03-09T14:26:09.610054", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:26:10.234951", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:28:31.199520", "data": {"selectedIds": [5], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:28:33.874313", "data": {"selectedIds": [5, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T14:28:34.323849", "data": {"selectedIds": [5, 7, 0], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T14:28:35.109997", "data": {"selectedIds": [7, 0], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T14:28:35.506020", "data": {"selectedIds": [7], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:28:36.039025", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:28:43.469561", "data": {"selectedIds": [0], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:29:21.254208", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:29:46.246685", "data": {"selectedIds": [], "count": 0}}
+{"type": "suggestion_click", "timestamp": "2026-03-09T14:30:01.952402", "data": {"tag": "Durable vegan leather", "category": "material", "action": "select"}}
+{"type": "selection", "timestamp": "2026-03-09T14:30:09.095758", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:30:09.657151", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-09T14:35:18.790512", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:35:18.794032", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-03-09T14:35:18.796125", "data": {"selectedIds": [0], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:35:19.085734", "data": {"selectedIds": [0, 2], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-09T14:42:57.928078", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:42:57.930449", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:05.531191", "data": {"selectedIds": [8], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:18.216101", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:20.192935", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:20.552535", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:25.003864", "data": {"selectedIds": [8], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:25.384759", "data": {"selectedIds": [8, 7], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:25.813839", "data": {"selectedIds": [8, 7, 3], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:26.424586", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:27.203712", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:43:28.833351", "data": {"selectedIds": [9, 0], "count": 2}}
+{"type": "generation", "timestamp": "2026-03-09T14:44:09.362750", "data": {"imageIds": [11, 12], "count": 2, "prompt": "Merge high-top silhouette, chunky sole, mesh upper, blue accents, athletic design, black and white's high-top silhouette and chunky sole with slide silhouette, running shoe, yellow accent, blue upper, mesh material, contoured sole's slide silhouette and mesh material, featuring high-top silhouette, chunky sole, mesh upper, blue accents, athletic design, black and white's blue accents."}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:09.367004", "data": {"selectedIds": [11, 12], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:13.532730", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:14.205537", "data": {"selectedIds": [12], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:14.527099", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:16.968504", "data": {"selectedIds": [12], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:17.340746", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:19.485612", "data": {"selectedIds": [11], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:20.039744", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:20.481504", "data": {"selectedIds": [12], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:44:23.033858", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-03-09T14:45:12.336423", "data": {"fromCanvasId": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "toCanvasId": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-03-09T14:45:12.338427", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc"}

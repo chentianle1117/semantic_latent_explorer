@@ -1,0 +1,81 @@
+{"type": "session_start", "timestamp": "2026-03-09T13:29:59.153543", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "canvas_name": "Onboarding", "participant_id": "Ty", "study_session": null}
+{"type": "generation", "timestamp": "2026-03-09T13:30:00.511660", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8], "count": 9, "prompt": "Shoe images"}}
+{"type": "axis_change", "timestamp": "2026-03-09T13:30:00.514790", "data": {"axisLabels": {"x": ["ready to wear", "avant garde"], "y": ["low-top", "high-top"], "z": ["casual", "elegant"]}}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T13:30:00.516786", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:43.785220", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:44.652427", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:52.662158", "data": {"selectedIds": [2, 3, 5], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:53.646588", "data": {"selectedIds": [2, 3], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:54.420191", "data": {"selectedIds": [2, 3, 5], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:55.011240", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:55.527238", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:56.271371", "data": {"selectedIds": [6, 4], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:43:58.840203", "data": {"selectedIds": [6, 4, 3], "count": 3}}
+{"type": "generation", "timestamp": "2026-03-09T13:44:48.147391", "data": {"imageIds": [9, 10], "count": 2, "prompt": "An everyday slide blending blue mesh, yellow accents, thick white sole, athletic silhouette, breathable upper, contrasting midsole's yellow accents with a rugged Vibram stitched sole, built for comfort and resilience in waterproof synthetic materials."}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:48.149392", "data": {"selectedIds": [9, 10], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:50.348751", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:53.647087", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:54.916472", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:55.805096", "data": {"selectedIds": [6], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:56.178558", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:57.725099", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:44:59.455473", "data": {"selectedIds": [10, 5], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:46:24.341787", "data": {"selectedIds": [10, 5, 7], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:47:48.160090", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:47:48.532563", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:47:49.165619", "data": {"selectedIds": [10, 5], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:47:50.031531", "data": {"selectedIds": [10, 5, 7], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:47:50.584855", "data": {"selectedIds": [10, 5, 7, 6], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-09T13:47:51.153367", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:47:51.710023", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:30.243738", "data": {"selectedIds": [10, 2], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:31.879670", "data": {"selectedIds": [10, 2, 1], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:37.313423", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:37.315423", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:37.658317", "data": {"selectedIds": [10, 2], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:38.011567", "data": {"selectedIds": [10, 2, 1], "count": 3}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:41.208617", "data": {"selectedIds": [10, 2, 1, 9], "count": 4}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:48.331589", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:48.991409", "data": {"selectedIds": [2], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:49:49.607219", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-03-09T13:50:21.951297", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T13:50:21.954300", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-03-09T13:51:15.168773", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:51:15.569761", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T13:51:16.137155", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T13:51:16.663550", "data": {"selectedIds": [9, 10], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T14:00:11.978277", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-03-09T14:09:59.996702", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:09:59.998502", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:10:00.002667", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:10:00.005758", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:10:13.978442", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:10:13.980818", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:10:13.985480", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:10:13.987673", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-03-09T14:15:17.210727", "data": {"selectedIds": [9], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:15:49.081906", "data": {"selectedIds": [9, 3], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T14:15:49.380245", "data": {"selectedIds": [], "count": 0}}
+{"type": "selection", "timestamp": "2026-03-09T14:15:49.879129", "data": {"selectedIds": [10], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:15:50.256474", "data": {"selectedIds": [10, 2], "count": 2}}
+{"type": "selection", "timestamp": "2026-03-09T14:15:50.670101", "data": {"selectedIds": [], "count": 0}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:06.889519", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:06.891517", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:06.895516", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:06.897963", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:14.842549", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:14.845630", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:14.849651", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:14.851653", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:21.864389", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:21.866387", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:21.870033", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:21.871031", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:33.949052", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:33.952056", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "generation", "timestamp": "2026-03-09T14:16:33.956053", "data": {"imageIds": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "count": 11, "prompt": "Shoe images"}}
+{"type": "design_brief_change", "timestamp": "2026-03-09T14:16:33.957559", "data": {"brief": "I'm envisioning a go-to everyday slide, built for comfort and resilience with waterproof synthetic materials. It'll feature a rugged Vibram sole for superior traction, all wrapped in a sophisticated neutral color palette. This is the ultimate effortless shoe for whatever your day brings."}}
+{"type": "selection", "timestamp": "2026-03-09T14:22:33.459519", "data": {"selectedIds": [3], "count": 1}}
+{"type": "selection", "timestamp": "2026-03-09T14:22:37.616559", "data": {"selectedIds": [], "count": 0}}
+{"type": "canvas_switch", "timestamp": "2026-03-09T14:25:22.326381", "data": {"fromCanvasId": "52aadacd-f8ab-43ff-b44a-98ae16284fdc", "toCanvasId": "dfbb6e15-e225-4daf-bee5-acbfd59f6db5", "action": "load"}}
+{"type": "session_end", "timestamp": "2026-03-09T14:25:22.328902", "canvas_id": "52aadacd-f8ab-43ff-b44a-98ae16284fdc"}

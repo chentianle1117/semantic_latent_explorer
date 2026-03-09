@@ -8,11 +8,7 @@
 
 .lineage-canvas-svg {
   display: block;
-  cursor: grab;
-}
-
-.lineage-canvas-svg:active {
-  cursor: grabbing;
+  cursor: default;
 }
 
 /* Edges */

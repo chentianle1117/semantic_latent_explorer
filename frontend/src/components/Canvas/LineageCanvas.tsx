@@ -262,12 +262,23 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 4])
+      .filter((event: any) => {
+        // Wheel = zoom, right-click drag = pan (same as SemanticCanvas)
+        if (event.type === "wheel") return true;
+        if (event.type === "mousedown" || event.type === "pointerdown") return event.button === 2;
+        return false;
+      })
       .on("zoom", (event) => {
         d3.select(g).attr("transform", event.transform.toString());
       });
 
-    svg.call(zoom);
+    svg.call(zoom as any).on("dblclick.zoom", null);
     zoomRef.current = zoom;
+
+    // Suppress browser context menu so right-drag works for pan
+    const svgEl = svgRef.current!;
+    const suppressCtx = (e: Event) => e.preventDefault();
+    svgEl.addEventListener("contextmenu", suppressCtx);
 
     // Middle-click handler
     svg.on("auxclick", (event: MouseEvent) => {
@@ -280,6 +291,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
     return () => {
       svg.on(".zoom", null);
       svg.on("auxclick", null);
+      svgEl.removeEventListener("contextmenu", suppressCtx);
     };
   }, []);
 
@@ -328,11 +340,12 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
         onClick={handleBackgroundClick}
       >
         <defs>
-          <filter id="lc-sel-glow" x="-80%" y="-80%" width="260%" height="260%">
-            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#00d2ff" floodOpacity="0.85" />
+          <filter id="lc-sel-glow" x="-100%" y="-100%" width="300%" height="300%">
+            <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#00d2ff" floodOpacity="0.9" />
+            <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#00d2ff" floodOpacity="0.7" />
           </filter>
-          <filter id="lc-hover-glow" x="-60%" y="-60%" width="220%" height="220%">
-            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#c0d0e0" floodOpacity="0.6" />
+          <filter id="lc-hover-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#c0d0e0" floodOpacity="0.7" />
           </filter>
         </defs>
 
@@ -416,18 +429,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
                   </g>
                 )}
 
-                {/* Prompt snippet below node */}
-                {(sel || hov) && n.img.prompt && (
-                  <text
-                    y={hs + 12}
-                    textAnchor="middle"
-                    fontSize={9}
-                    fill="rgba(200,210,220,0.8)"
-                    className="lc-node-label"
-                  >
-                    {n.img.prompt.length > 30 ? n.img.prompt.slice(0, 30) + '…' : n.img.prompt}
-                  </text>
-                )}
+                {/* Prompt shown in tooltip via <title> — no text below node */}
               </g>
             );
           })}

@@ -63,8 +63,8 @@ export const BottomDrawer: React.FC = () => {
       <div
         className={`drawer-bar${isExpanded ? ' drawer-bar--expanded' : ''}`}
         data-tour="bottom-drawer-bar"
-        onClick={() => { if (!isExpanded) setActiveTab('history'); }}
-        style={{ cursor: isExpanded ? 'default' : 'pointer' }}
+        onClick={() => { setActiveTab(isExpanded ? null : 'history'); }}
+        style={{ cursor: 'pointer' }}
       >
         {/* Left: collapse toggle */}
         <button

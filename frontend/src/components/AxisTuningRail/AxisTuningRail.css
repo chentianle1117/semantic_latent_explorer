@@ -418,3 +418,58 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ─── Drag-to-rail: drop-ready glow on rail ───────────────────────────────── */
+.atr-rail-drop-ready {
+  background: rgba(88, 166, 255, 0.08);
+  border: 1.5px dashed rgba(88, 166, 255, 0.45);
+  border-radius: 6px;
+  animation: atr-pulse-border 1.2s ease-in-out infinite;
+}
+
+@keyframes atr-pulse-border {
+  0%, 100% { border-color: rgba(88, 166, 255, 0.45); }
+  50% { border-color: rgba(88, 166, 255, 0.8); }
+}
+
+/* Shadow magnet: ghost preview on the rail during drag */
+.atr-shadow-magnet {
+  position: absolute;
+  width: 68px;
+  height: 68px;
+  border-radius: 7px;
+  border: 2px dashed rgba(88, 166, 255, 0.65);
+  overflow: visible;
+  z-index: 4;
+  background: rgba(18, 22, 30, 0.5);
+  opacity: 0.55;
+  pointer-events: none;
+  box-shadow: 0 0 20px rgba(88, 166, 255, 0.3);
+  animation: atr-magnet-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes atr-magnet-pulse {
+  0%, 100% { opacity: 0.45; box-shadow: 0 0 16px rgba(88, 166, 255, 0.25); }
+  50% { opacity: 0.7; box-shadow: 0 0 28px rgba(88, 166, 255, 0.45); }
+}
+
+.atr-shadow-magnet .atr-anchor-img {
+  opacity: 0.6;
+}
+
+.atr-shadow-label {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(88, 166, 255, 0.8);
+  white-space: nowrap;
+}
+
+/* ─── Floating drag ghost ─────────────────────────────────────────────────── */
+.atr-drag-ghost {
+  pointer-events: none;
+  z-index: 9999;
+}

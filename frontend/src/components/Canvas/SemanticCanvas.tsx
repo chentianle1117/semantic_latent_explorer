@@ -803,12 +803,22 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
               .attr("fill", "transparent")
               .attr("pointer-events", "all")
               .style("cursor", "pointer")
+              .on("pointerdown", function (event) {
+                // Axis tuning mode: start drag-to-rail
+                const ts = useAppStore.getState();
+                if (ts.axisTuningMode && ts.axisTuningAxis && event.button === 0) {
+                  event.stopPropagation();
+                  event.preventDefault();
+                  ts.setAxisTuningDragImageId(d.id);
+                  return;
+                }
+              })
               .on("click", function (event) {
                 event.stopPropagation();
-                // Axis tuning mode: add as anchor
+                // Axis tuning mode: click fallback (if drag wasn't completed on rail)
                 const ts = useAppStore.getState();
                 if (ts.axisTuningMode && ts.axisTuningAxis) {
-                  ts.addAxisTuningAnchor({ imageId: d.id, axis: ts.axisTuningAxis, position: 8 });
+                  // Drag handler deals with this; click is a no-op in tuning mode
                   return;
                 }
                 // Satellite views redirect to their parent side view
@@ -1480,6 +1490,16 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       .attr("fill", "transparent")
       .attr("pointer-events", "all")
       .style("cursor", "pointer")
+      .on("pointerdown", function (event, d) {
+        // Axis tuning mode: start drag-to-rail
+        const ts = useAppStore.getState();
+        if (ts.axisTuningMode && ts.axisTuningAxis && event.button === 0) {
+          event.stopPropagation();
+          event.preventDefault();
+          ts.setAxisTuningDragImageId(d.id);
+          return;
+        }
+      })
       .on("click", function (event, d) {
         console.log("🖱️ Canvas click detected:", {
           imageId: d.id,
@@ -1492,14 +1512,9 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
 
         event.stopPropagation();
 
-        // Axis tuning mode: clicking a node adds it as an anchor instead of selecting
+        // Axis tuning mode: click is no-op (drag handler manages anchors)
         const tuningState = useAppStore.getState();
         if (tuningState.axisTuningMode && tuningState.axisTuningAxis) {
-          tuningState.addAxisTuningAnchor({
-            imageId: d.id,
-            axis: tuningState.axisTuningAxis,
-            position: 5, // Default to middle; user drags to reposition on rail
-          });
           return;
         }
 

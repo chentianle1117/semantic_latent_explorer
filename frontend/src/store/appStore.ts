@@ -148,6 +148,7 @@ interface AppStore extends AppState {
   removeAxisTuningAnchor: (imageId: number, axis: 'x' | 'y') => void;
   updateAxisTuningAnchorPosition: (imageId: number, axis: 'x' | 'y', position: number) => void;
   setAxisTuningTextWeight: (weight: number) => void;
+  setAxisTuningDragImageId: (id: number | null) => void;
   clearAxisTuning: () => void;
 
   // Star ratings
@@ -324,6 +325,7 @@ const initialState: AppState = {
   axisTuningSentences: {} as Record<string, string[]>,
   axisTuningAnchors: [] as { imageId: number; axis: 'x' | 'y'; position: number }[],
   axisTuningTextWeight: 1.0,
+  axisTuningDragImageId: null as number | null,
 
   // Onboarding tutorial
   onboardingActive: false,
@@ -714,12 +716,15 @@ export const useAppStore = create<AppStore>((set) => ({
     const withoutDup = s.axisTuningAnchors.filter(
       a => !(a.imageId === anchor.imageId && a.axis === anchor.axis)
     );
-    // Auto-position: spread anchors so they don't overlap
-    // Slot order gives good visual spacing for 1-9 anchors
-    const slots = [7, 3, 9, 1, 5, 8, 2, 6, 4];
-    const axisCount = withoutDup.filter(a => a.axis === anchor.axis).length;
-    const autoPos = slots[axisCount % slots.length];
-    return { axisTuningAnchors: [...withoutDup, { ...anchor, position: autoPos }] };
+    // If position > 0 was explicitly provided (e.g. from drag-drop), use it directly.
+    // Otherwise auto-distribute across the rail using a slot pattern.
+    let pos = anchor.position;
+    if (pos <= 0) {
+      const slots = [7, 3, 9, 1, 5, 8, 2, 6, 4];
+      const axisCount = withoutDup.filter(a => a.axis === anchor.axis).length;
+      pos = slots[axisCount % slots.length];
+    }
+    return { axisTuningAnchors: [...withoutDup, { ...anchor, position: pos }] };
   }),
   removeAxisTuningAnchor: (imageId, axis) => set((s) => ({
     axisTuningAnchors: s.axisTuningAnchors.filter(
@@ -732,12 +737,14 @@ export const useAppStore = create<AppStore>((set) => ({
     ),
   })),
   setAxisTuningTextWeight: (weight) => set({ axisTuningTextWeight: weight }),
+  setAxisTuningDragImageId: (id) => set({ axisTuningDragImageId: id }),
   clearAxisTuning: () => set({
     axisTuningMode: false,
     axisTuningAxis: null,
     axisTuningSentences: {},
     axisTuningAnchors: [],
     axisTuningTextWeight: 1.0,
+    axisTuningDragImageId: null,
   }),
 
   // Multi-View Editor history

@@ -234,6 +234,7 @@ export interface AppState {
   axisTuningSentences: Record<string, string[]>; // "x_negative" | "x_positive" | "y_negative" | "y_positive" → string[]
   axisTuningAnchors: AxisTuningAnchor[];
   axisTuningTextWeight: number; // 0-1, weight of text vs image anchors
+  axisTuningDragImageId: number | null; // image being dragged from canvas to rail
 
   // Onboarding tutorial
   onboardingActive: boolean;

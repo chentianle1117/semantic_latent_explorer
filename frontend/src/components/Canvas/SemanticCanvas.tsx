@@ -807,7 +807,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
                 // Axis tuning mode: add as anchor
                 const ts = useAppStore.getState();
                 if (ts.axisTuningMode && ts.axisTuningAxis) {
-                  ts.addAxisTuningAnchor({ imageId: d.id, axis: ts.axisTuningAxis, position: 5 });
+                  ts.addAxisTuningAnchor({ imageId: d.id, axis: ts.axisTuningAxis, position: 8 });
                   return;
                 }
                 // Satellite views redirect to their parent side view

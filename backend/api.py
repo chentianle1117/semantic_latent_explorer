@@ -1310,18 +1310,16 @@ async def update_axes_tuned(request: TunedAxesRequest):
                 if norm > 1e-12:
                     anchor_dir = anchor_dir / norm
 
-            # Blend: α * text + (1-α) * anchors (when anchors exist)
+            # Additive blend: α * text_dir + anchor_dir (anchors always contribute)
+            # This matches: axis_vector = α * normalize(text) + Σ(wᵢ * normalize(imgᵢ))
             alpha = request.text_weight
-            if len(axis_anchors) > 0:
-                combined = alpha * text_dir + (1 - alpha) * anchor_dir
-            else:
-                combined = text_dir
+            combined = alpha * text_dir + anchor_dir
             norm = np.linalg.norm(combined)
             if norm > 1e-12:
                 combined = combined / norm
 
             directions[axis] = combined
-            print(f"  {axis}: text_norm={np.linalg.norm(text_dir):.3f}, anchor_norm={np.linalg.norm(anchor_dir):.3f}")
+            print(f"  {axis}: text_norm={np.linalg.norm(text_dir):.3f}, anchor_contrib={np.linalg.norm(anchor_dir):.3f}, n_anchors={len(axis_anchors)}")
 
         # Project all images onto tuned axes
         all_embeddings = np.array([img.embedding for img in state.images_metadata])

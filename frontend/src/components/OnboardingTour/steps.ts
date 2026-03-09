@@ -149,7 +149,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     atomicUnit: 'ui-orientation',
     title: 'Browse Batches',
     description: '',
-    instruction: '**Browse the generation batches** in the History panel. Each batch is one generation run.',
+    instruction: '**Browse the generation batches** in the History panel. Each batch is one generation run. **Click a batch** to toggle its visibility on the canvas — hidden batches appear dimmed. This is the quickest way to declutter.',
     targetSelector: '[data-tour="bottom-drawer-content"]',
     cardPosition: 'above',
     prerequisiteKey: 'a-history-browse',

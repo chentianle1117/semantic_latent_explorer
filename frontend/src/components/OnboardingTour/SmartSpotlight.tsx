@@ -61,7 +61,7 @@ function checkPrerequisite(key: string, ctx: PrereqContext): boolean {
     // Section A
     case 'a-select-visual':   return selCount > 0;
     case 'a-history-browse':  return isHistoryExpanded;
-    case 'a-lineage-tab':     return isHistoryExpanded;
+    case 'a-lineage-toggle':  return true; // always available
     case 'a-layers-assign':   return selCount > 0;
     case 'a-inspector':       return selCount > 0 && selHasLineage;
     case 'a-inspector-actions': return selCount > 0;
@@ -98,7 +98,6 @@ function findShoeWithLineage(): number | null {
 function getAutoResolve(key: string): (() => void) | null {
   switch (key) {
     case 'a-history-browse':
-    case 'a-lineage-tab':
       return () => useAppStore.getState().setIsHistoryExpanded(true);
     case 'a-inspector': {
       const shoeId = findShoeWithLineage();

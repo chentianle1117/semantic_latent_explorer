@@ -8,6 +8,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppStore } from "../../store/appStore";
+import { useProgressStore } from "../../store/progressStore";
 import { apiClient } from "../../api/client";
 import "./AxisTuningRail.css";
 
@@ -160,14 +161,27 @@ export const AxisTuningRail: React.FC = () => {
 
   const handleReproject = useCallback(async () => {
     setLoading(true);
+    useProgressStore.getState().showProgress("reprojecting", "Reprojecting with tuned axes...", false);
     try {
       await apiClient.updateAxesTuned({
         custom_sentences: sentences,
         image_anchors: anchors.map(a => ({ imageId: a.imageId, axis: a.axis, position: a.position })),
         text_weight: textWeight,
       });
+
+      useProgressStore.getState().updateProgress(50, "Fetching updated coordinates...");
+      // WebSocket broadcast doesn't reach us — fetch state explicitly
+      const freshState = await apiClient.getState();
+      const store = useAppStore.getState();
+      store.setImages(freshState.images);
+      if (freshState.history_groups) store.setHistoryGroups(freshState.history_groups);
+      store.resetCanvasBounds();
+
+      useProgressStore.getState().updateProgress(100);
+      useProgressStore.getState().hideProgress();
     } catch (err) {
       console.error('Reproject failed:', err);
+      useProgressStore.getState().hideProgress();
     } finally {
       setLoading(false);
     }

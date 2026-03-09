@@ -23,12 +23,6 @@ interface LineageCanvasProps {
 }
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
-interface TreeNode {
-  id: number;
-  img: ImageData;
-  children: TreeNode[];
-}
-
 interface LayoutNode {
   id: number;
   img: ImageData;
@@ -56,115 +50,90 @@ function edgePath(x1: number, y1: number, x2: number, y2: number): string {
   return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`;
 }
 
-/* ─── Build hierarchy from flat images ────────────────────────────────────── */
-function buildHierarchy(images: ImageData[]): { roots: TreeNode[]; allNodes: Map<number, TreeNode> } {
-  const idSet = new Set(images.map(i => i.id));
-  const nodeMap = new Map<number, TreeNode>();
-  images.forEach(img => nodeMap.set(img.id, { id: img.id, img, children: [] }));
+/* ─── DAG-aware layered layout (Sugiyama-style) ─────────────────────────── */
+function computeLayout(
+  images: ImageData[],
+): { nodes: LayoutNode[]; edges: LayoutEdge[]; width: number; height: number } {
+  if (images.length === 0) return { nodes: [], edges: [], width: 0, height: 0 };
 
-  // Parent→child: for each image, add it as a child of each of its parents
-  const hasParent = new Set<number>();
+  const idSet = new Set(images.map(i => i.id));
+
+  // Build adjacency: parentIds and childIds per node (only in-set)
+  const parentIds = new Map<number, number[]>();
+  const childIds = new Map<number, number[]>();
   images.forEach(img => {
-    img.parents.forEach(pid => {
-      if (!idSet.has(pid)) return;
-      const parent = nodeMap.get(pid)!;
-      const child = nodeMap.get(img.id)!;
-      if (!parent.children.includes(child)) {
-        parent.children.push(child);
-        hasParent.add(img.id);
-      }
+    parentIds.set(img.id, img.parents.filter(p => idSet.has(p)));
+    childIds.set(img.id, []);
+  });
+  images.forEach(img => {
+    for (const pid of parentIds.get(img.id)!) {
+      childIds.get(pid)!.push(img.id);
+    }
+  });
+
+  // 1. Assign depth = longest path from any root (handles multi-parent correctly)
+  const depth = new Map<number, number>();
+  const roots = images.filter(img => parentIds.get(img.id)!.length === 0);
+
+  // Topological BFS (Kahn's algorithm)
+  const inDegree = new Map<number, number>();
+  images.forEach(img => inDegree.set(img.id, parentIds.get(img.id)!.length));
+  const queue: number[] = roots.map(r => r.id);
+  roots.forEach(r => depth.set(r.id, 0));
+
+  while (queue.length > 0) {
+    const id = queue.shift()!;
+    const d = depth.get(id)!;
+    for (const cid of childIds.get(id)!) {
+      // Child depth = max of all parent depths + 1
+      depth.set(cid, Math.max(depth.get(cid) ?? 0, d + 1));
+      inDegree.set(cid, inDegree.get(cid)! - 1);
+      if (inDegree.get(cid) === 0) queue.push(cid);
+    }
+  }
+  // Handle any nodes not reached (cycles, etc.) — assign depth 0
+  images.forEach(img => { if (!depth.has(img.id)) depth.set(img.id, 0); });
+
+  // 2. Group nodes by depth column, sort by timestamp within each column
+  const maxDepth = Math.max(...Array.from(depth.values()), 0);
+  const columns: ImageData[][] = Array.from({ length: maxDepth + 1 }, () => []);
+  images.forEach(img => columns[depth.get(img.id)!].push(img));
+  columns.forEach(col => col.sort((a, b) =>
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  ));
+
+  // 3. Position nodes: x by depth, y evenly spaced per column
+  const positions = new Map<number, { x: number; y: number }>();
+  const layoutNodes: LayoutNode[] = [];
+
+  columns.forEach((col, d) => {
+    col.forEach((img, row) => {
+      const x = PADDING + d * COL_SPACING;
+      const y = PADDING + row * ROW_SPACING;
+      positions.set(img.id, { x, y });
+      layoutNodes.push({ id: img.id, img, x, y });
     });
   });
 
-  // Roots: nodes with no in-set parent
-  const roots = images
-    .filter(img => !hasParent.has(img.id))
-    .map(img => nodeMap.get(img.id)!)
-    .sort((a, b) => new Date(a.img.timestamp).getTime() - new Date(b.img.timestamp).getTime());
-
-  // Sort children by timestamp at every level
-  const sortChildren = (node: TreeNode) => {
-    node.children.sort((a, b) => new Date(a.img.timestamp).getTime() - new Date(b.img.timestamp).getTime());
-    node.children.forEach(sortChildren);
-  };
-  roots.forEach(sortChildren);
-
-  return { roots, allNodes: nodeMap };
-}
-
-/* ─── Layout: depth-first position assignment ─────────────────────────────── */
-function computeLayout(
-  roots: TreeNode[],
-): { nodes: LayoutNode[]; edges: LayoutEdge[]; width: number; height: number } {
-  const layoutNodes: LayoutNode[] = [];
-  const positions = new Map<number, { x: number; y: number }>();
-  let nextY = 0;
-
-  // DFS: each node gets (depth * COL_SPACING, nextY * ROW_SPACING)
-  const visited = new Set<number>();
-  const dfs = (node: TreeNode, depth: number) => {
-    if (visited.has(node.id)) return;
-    visited.add(node.id);
-
-    const childPositions: number[] = [];
-    node.children.forEach(child => {
-      dfs(child, depth + 1);
-      const cp = positions.get(child.id);
-      if (cp) childPositions.push(cp.y);
-    });
-
-    let y: number;
-    if (childPositions.length > 0) {
-      // Center parent among its children
-      y = (Math.min(...childPositions) + Math.max(...childPositions)) / 2;
-    } else {
-      // Leaf: place at next available row
-      y = nextY;
-      nextY += ROW_SPACING;
-    }
-    // If position would overlap, push down
-    if (positions.size > 0) {
-      const sameDepthPositions = Array.from(positions.values())
-        .filter((_, idx) => {
-          const id = Array.from(positions.keys())[idx];
-          const n = layoutNodes.find(ln => ln.id === id);
-          return n && Math.abs(n.x - depth * COL_SPACING) < 1;
-        })
-        .map(p => p.y);
-      if (sameDepthPositions.length > 0) {
-        const minGap = NODE_SIZE + 12;
-        for (const existingY of sameDepthPositions) {
-          if (Math.abs(y - existingY) < minGap) {
-            y = Math.max(y, existingY + ROW_SPACING);
-          }
-        }
-      }
-    }
-
-    const x = PADDING + depth * COL_SPACING;
-    positions.set(node.id, { x, y: y + PADDING });
-    layoutNodes.push({ id: node.id, img: node.img, x, y: y + PADDING });
-  };
-
-  roots.forEach(root => dfs(root, 0));
-
-  // Edges
+  // 4. Edges from ALL parents (every parent→child pair draws an edge)
   const edges: LayoutEdge[] = [];
-  layoutNodes.forEach(node => {
-    const pos = positions.get(node.id)!;
-    node.img.parents.forEach(pid => {
+  const nodeById = new Map(layoutNodes.map(n => [n.id, n]));
+  images.forEach(img => {
+    const pos = positions.get(img.id)!;
+    for (const pid of parentIds.get(img.id)!) {
       const pp = positions.get(pid);
-      if (!pp) return;
+      if (!pp) continue;
+      const parentNode = nodeById.get(pid);
       edges.push({
-        key: `${pid}→${node.id}`,
+        key: `${pid}→${img.id}`,
         x1: pp.x + NODE_SIZE / 2, y1: pp.y,
         x2: pos.x - NODE_SIZE / 2, y2: pos.y,
         color: getCategoryColor(
-          layoutNodes.find(n => n.id === pid)?.img.generation_method ?? 'batch',
-          layoutNodes.find(n => n.id === pid)?.img.realm ?? 'shoe',
+          parentNode?.img.generation_method ?? 'batch',
+          parentNode?.img.realm ?? 'shoe',
         ),
       });
-    });
+    }
   });
 
   const maxX = Math.max(...layoutNodes.map(n => n.x), 0) + NODE_SIZE + PADDING;
@@ -243,9 +212,8 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
     });
   }, [allImages, hiddenImageIds, batchHiddenImageIds, isolatedImageIds, starFilter, imageRatings, studyMode]);
 
-  // Build tree & layout
-  const { roots } = useMemo(() => buildHierarchy(filteredImages), [filteredImages]);
-  const { nodes, edges, width, height } = useMemo(() => computeLayout(roots), [roots]);
+  // DAG layout (handles multi-parent correctly)
+  const { nodes, edges, width, height } = useMemo(() => computeLayout(filteredImages), [filteredImages]);
   const selectedSet = useMemo(() => new Set(selectedImageIds), [selectedImageIds]);
 
   // Legend categories

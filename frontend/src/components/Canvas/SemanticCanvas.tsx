@@ -396,6 +396,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   const imageLayerMap = useAppStore((state) => state.imageLayerMap);
   const isolatedImageIds = useAppStore((state) => state.isolatedImageIds);
   const starFilter = useAppStore((state) => state.starFilter);
+  const axisTuningMode = useAppStore((state) => state.axisTuningMode);
   const imageRatings = useAppStore((state) => state.imageRatings);
   const studyMode = useAppStore((state) => state.studyMode);
   const hiddenBatchIds = useAppStore((state) => state.hiddenBatchIds);
@@ -1987,7 +1988,11 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
   return (
     <div style={{
       position: "relative", width: "100%", height: "100%",
-      ...(isolatedImageIds !== null ? {
+      ...(axisTuningMode ? {
+        outline: "2px solid rgba(88,166,255,0.75)",
+        outlineOffset: "-2px",
+        boxShadow: "inset 0 0 0 2px rgba(88,166,255,0.35), 0 0 24px rgba(88,166,255,0.12)",
+      } : isolatedImageIds !== null ? {
         outline: "2px solid rgba(239,68,68,0.75)",
         outlineOffset: "-2px",
         boxShadow: "inset 0 0 0 2px rgba(239,68,68,0.4), 0 0 24px rgba(239,68,68,0.15)",

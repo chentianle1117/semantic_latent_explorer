@@ -3,7 +3,7 @@
   position: absolute;
   z-index: 25;
   background: rgba(18, 22, 30, 0.92);
-  border: 1px solid rgba(88, 166, 255, 0.2);
+  border: 1px solid rgba(88, 166, 255, 0.25);
   backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
@@ -15,18 +15,18 @@
 
 /* X axis: horizontal rail along the bottom */
 .axis-tuning-overlay.atr-axis-x {
-  bottom: 48px;
+  bottom: 80px;
   left: 60px;
   right: 60px;
-  max-height: 260px;
+  max-height: 280px;
 }
 
-/* Y axis: vertical rail along the left */
+/* Y axis: vertical rail along the left — offset past axis labels */
 .axis-tuning-overlay.atr-axis-y {
-  left: 48px;
+  left: 70px;
   top: 60px;
   bottom: 60px;
-  width: 320px;
+  width: 260px;
 }
 
 /* ─── Tab switcher ─────────────────────────────────────────────────────────── */
@@ -75,10 +75,25 @@
   background: rgba(224, 80, 80, 0.1);
 }
 
+/* ─── Hint text ───────────────────────────────────────────────────────────── */
+.atr-hint {
+  font-size: 10px;
+  color: rgba(88, 166, 255, 0.55);
+  font-style: italic;
+  text-align: center;
+  padding: 2px 0;
+}
+
 /* ─── Sentence editors ────────────────────────────────────────────────────── */
 .atr-sentences {
   display: flex;
   gap: 12px;
+}
+
+/* Y axis: stack sentences vertically (less horizontal space) */
+.atr-axis-y .atr-sentences {
+  flex-direction: column;
+  gap: 6px;
 }
 
 .atr-sentence-group {
@@ -171,15 +186,17 @@
   flex-shrink: 0;
 }
 
+/* X axis: horizontal rail */
 .atr-axis-x .atr-rail {
-  height: 56px;
+  height: 72px;
   width: 100%;
 }
 
+/* Y axis: vertical rail fills remaining space */
 .atr-axis-y .atr-rail {
   width: 100%;
   flex: 1;
-  min-height: 100px;
+  min-height: 80px;
 }
 
 .atr-rail-track {
@@ -188,15 +205,9 @@
   width: 100%;
 }
 
-/* Tick marks */
-.atr-rail-tick {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
+/* Tick marks — X axis: vertical lines */
 .atr-axis-x .atr-rail-tick {
+  position: absolute;
   top: 0;
   bottom: 0;
   width: 1px;
@@ -204,7 +215,9 @@
   transform: translateX(-50%);
 }
 
+/* Tick marks — Y axis: horizontal lines */
 .atr-axis-y .atr-rail-tick {
+  position: absolute;
   left: 0;
   right: 0;
   height: 1px;
@@ -224,7 +237,7 @@
 }
 
 .atr-axis-y .atr-tick-label {
-  right: -12px;
+  right: -14px;
   transform: translateY(50%);
 }
 
@@ -245,9 +258,9 @@
 /* ─── Anchor thumbnails on rail ─────────────────────────────────────────────── */
 .atr-anchor-thumb {
   position: absolute;
-  width: 40px;
-  height: 40px;
-  border-radius: 4px;
+  width: 52px;
+  height: 52px;
+  border-radius: 5px;
   border: 1.5px solid rgba(88, 166, 255, 0.5);
   overflow: hidden;
   cursor: grab;
@@ -270,10 +283,10 @@
 
 .atr-anchor-remove {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 14px;
-  height: 14px;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: rgba(224, 80, 80, 0.85);
   border: none;
@@ -297,6 +310,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .atr-weight-label {

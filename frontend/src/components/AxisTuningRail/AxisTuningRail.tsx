@@ -71,7 +71,7 @@ const AnchorThumb: React.FC<{
     if (!dragging) return;
     const delta = axis === 'x'
       ? e.clientX - startRef.current.startMouse
-      : -(e.clientY - startRef.current.startMouse); // Y axis is inverted in screen coords
+      : -(e.clientY - startRef.current.startMouse); // Y inverted in screen coords
     const newPos = Math.max(0, Math.min(10, startRef.current.startPos + (delta / railLength) * 10));
     updatePosition(imageId, axis, Math.round(newPos * 10) / 10);
   }, [dragging, axis, imageId, railLength, updatePosition]);
@@ -252,11 +252,15 @@ export const AxisTuningRail: React.FC = () => {
         </button>
       </div>
 
+      {/* Hint */}
+      <div className="atr-hint">
+        Click shoes on the canvas to add as anchors — drag them on the rail to set position
+      </div>
+
       {/* Rail (linear 0-10 scale with anchors) */}
       <div
         ref={railRef}
         className="atr-rail"
-        title="Click a shoe on canvas, then click here to place it as an anchor"
       >
         <div className="atr-rail-track">
           {/* Tick marks */}

@@ -1,7 +1,7 @@
 .canvas-view-toggle {
   position: absolute;
   top: 10px;
-  right: 10px;
+  right: 190px;
   z-index: 20;
   display: flex;
   background: rgba(30, 35, 44, 0.85);

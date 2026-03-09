@@ -1,10 +1,10 @@
 /**
  * Onboarding tutorial step definitions — v5
  *
- * 4 color-coded sections, 32 steps:
+ * 4 color-coded sections, 36 steps:
  *   A  UI Layout   — 11 steps (includes Load Files)
  *   B  Generation  — 5 steps
- *   C  Utilities   — 12 steps
+ *   C  Utilities   — 16 steps (includes Axis Tuning)
  *   D  AI Agent    — 4 steps
  *
  * Steps with `dialButtonId` use two-phase spotlight:
@@ -436,6 +436,54 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     instruction: 'The **axis scale sliders** (below X-axis and left of Y-axis) let you **stretch or compress** the canvas along each dimension to spread out clusters or tighten gaps.',
     targetSelector: '[data-tour="axis-scale-x"]',
     cardPosition: 'above',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-axis-tune-intro',
+    section: 'c',
+    atomicUnit: 'axis-tuning',
+    title: 'Axis Fine-Tuning',
+    description: '',
+    instruction: 'Click the **Tune** button between the axis labels to open **Axis Tuning Mode**. A blue border appears on the canvas — clicking shoes now **adds them as anchors** instead of selecting them.',
+    targetSelector: '[data-tour="axis-tune-btn"]',
+    cardPosition: 'above',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-axis-tune-sentences',
+    section: 'c',
+    atomicUnit: 'axis-tuning',
+    title: 'Tuning Sentences',
+    description: '',
+    instruction: 'The tuning panel shows **4 AI-expanded sentences** for each axis end (e.g. "formal" → "plain canvas, rubber sole"). You can **edit these directly** to refine what each end of the axis means, or use the **AI Refine** box to describe changes in natural language.',
+    targetSelector: '[data-tour="axis-tuning-rail"]',
+    cardPosition: 'right',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-axis-tune-anchors',
+    section: 'c',
+    atomicUnit: 'axis-tuning',
+    title: 'Image Anchors',
+    description: '',
+    instruction: 'With tuning mode active, **click any shoe on the canvas** to add it as an anchor on the rail. **Drag anchors** left/right (or up/down for Y axis) to set their position on the 0-10 scale. Anchors near 10 push the axis toward that shoe; anchors near 0 push it away.',
+    targetSelector: '[data-tour="axis-tuning-rail"]',
+    cardPosition: 'right',
+    isInformational: true,
+  },
+
+  {
+    id: 'c-axis-tune-reproject',
+    section: 'c',
+    atomicUnit: 'axis-tuning',
+    title: 'Reproject',
+    description: '',
+    instruction: 'Adjust the **Text weight** slider to control how much the sentence descriptions vs. image anchors influence the axis. When ready, click **Reproject** — all shoes animate to their new positions based on the tuned axis. Click **✕** to exit tuning mode.',
+    targetSelector: '[data-tour="axis-tuning-rail"]',
+    cardPosition: 'right',
     isInformational: true,
   },
 

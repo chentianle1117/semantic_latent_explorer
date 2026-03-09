@@ -19,24 +19,35 @@ const SentenceEditor: React.FC<{
 }> = ({ label, sentenceKey }) => {
   const sentences = useAppStore(s => s.axisTuningSentences[sentenceKey] || []);
   const updateSentence = useAppStore(s => s.updateAxisTuningSentence);
+  const [expanded, setExpanded] = useState(false);
+
+  const preview = sentences[0] ?? "No sentences loaded";
 
   return (
     <div className="atr-sentence-group">
-      <span className="atr-sentence-label">{label}</span>
-      <div className="atr-sentence-list">
-        {sentences.map((sent, i) => (
-          <input
-            key={`${sentenceKey}-${i}`}
-            className="atr-sentence-input"
-            value={sent}
-            onChange={e => updateSentence(sentenceKey, i, e.target.value)}
-            title={sent}
-          />
-        ))}
-        {sentences.length === 0 && (
-          <span className="atr-sentence-empty">No sentences loaded</span>
+      <button className="atr-sentence-header" onClick={() => setExpanded(v => !v)}>
+        <span className="atr-sentence-label">{label}</span>
+        {!expanded && (
+          <span className="atr-sentence-preview" title={sentences.join(" / ")}>{preview}</span>
         )}
-      </div>
+        <span className="atr-sentence-chevron">{expanded ? "▲" : "▼"}</span>
+      </button>
+      {expanded && (
+        <div className="atr-sentence-list">
+          {sentences.map((sent, i) => (
+            <input
+              key={`${sentenceKey}-${i}`}
+              className="atr-sentence-input"
+              value={sent}
+              onChange={e => updateSentence(sentenceKey, i, e.target.value)}
+              title={sent}
+            />
+          ))}
+          {sentences.length === 0 && (
+            <span className="atr-sentence-empty">No sentences loaded</span>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -213,7 +224,7 @@ export const AxisTuningRail: React.FC = () => {
   const posKey = `${activeAxis}_positive`;
 
   return (
-    <div className={`axis-tuning-overlay atr-axis-${activeAxis}`}>
+    <div className={`axis-tuning-overlay atr-axis-${activeAxis}`} data-tour="axis-tuning-rail">
       {/* Tab switcher */}
       <div className="atr-axis-tabs">
         <button

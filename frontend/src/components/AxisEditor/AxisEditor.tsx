@@ -110,6 +110,7 @@ export const AxisEditor: React.FC<AxisEditorProps> = ({
           {(axis === "x" || axis === "y") && (
             <button
               className="axis-tune-btn"
+              data-tour="axis-tune-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 const store = useAppStore.getState();

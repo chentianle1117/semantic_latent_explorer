@@ -2,15 +2,15 @@
 .axis-tuning-overlay {
   position: absolute;
   z-index: 25;
-  background: rgba(18, 22, 30, 0.92);
+  background: rgba(18, 22, 30, 0.95);
   border: 1px solid rgba(88, 166, 255, 0.25);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
 /* X axis: horizontal rail along the bottom */
@@ -18,7 +18,7 @@
   bottom: 80px;
   left: 60px;
   right: 60px;
-  max-height: 280px;
+  max-height: 340px;
 }
 
 /* Y axis: vertical rail along the left — offset past axis labels */
@@ -26,13 +26,13 @@
   left: 70px;
   top: 60px;
   bottom: 60px;
-  width: 260px;
+  width: 280px;
 }
 
 /* ─── Tab switcher ─────────────────────────────────────────────────────────── */
 .atr-axis-tabs {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   align-items: center;
 }
 
@@ -42,8 +42,8 @@
   color: rgba(150, 165, 180, 0.6);
   font-size: 10px;
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 4px;
+  padding: 4px 12px;
+  border-radius: 5px;
   cursor: pointer;
   transition: all 0.12s ease;
 }
@@ -78,16 +78,17 @@
 /* ─── Hint text ───────────────────────────────────────────────────────────── */
 .atr-hint {
   font-size: 10px;
-  color: rgba(88, 166, 255, 0.55);
+  color: rgba(88, 166, 255, 0.5);
   font-style: italic;
   text-align: center;
-  padding: 2px 0;
+  padding: 0;
+  line-height: 1.4;
 }
 
 /* ─── Sentence editors ────────────────────────────────────────────────────── */
 .atr-sentences {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 /* Y axis: stack sentences vertically (less horizontal space) */
@@ -100,42 +101,87 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Collapsible header row */
+.atr-sentence-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: rgba(88, 166, 255, 0.06);
+  border: 1px solid rgba(88, 166, 255, 0.12);
+  border-radius: 5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.atr-sentence-header:hover {
+  background: rgba(88, 166, 255, 0.12);
 }
 
 .atr-sentence-label {
   font-size: 9px;
-  font-weight: 600;
-  color: rgba(88, 166, 255, 0.7);
+  font-weight: 700;
+  color: rgba(88, 166, 255, 0.8);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Single-line preview of first sentence when collapsed */
+.atr-sentence-preview {
+  flex: 1;
+  font-size: 9px;
+  color: rgba(180, 190, 200, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-style: italic;
+  min-width: 0;
+}
+
+.atr-sentence-chevron {
+  font-size: 7px;
+  color: rgba(88, 166, 255, 0.45);
+  flex-shrink: 0;
 }
 
 .atr-sentence-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  padding: 2px 0 2px 2px;
 }
 
 .atr-sentence-input {
-  background: rgba(30, 38, 50, 0.6);
+  background: rgba(30, 38, 50, 0.7);
   border: 1px solid rgba(88, 166, 255, 0.12);
-  color: rgba(200, 210, 220, 0.85);
+  color: rgba(200, 210, 220, 0.9);
   font-size: 10px;
-  padding: 3px 6px;
-  border-radius: 3px;
+  padding: 4px 8px;
+  border-radius: 4px;
   outline: none;
+  width: 100%;
+  box-sizing: border-box;
   transition: border-color 0.12s;
 }
 
 .atr-sentence-input:focus {
   border-color: rgba(88, 166, 255, 0.4);
+  background: rgba(30, 38, 50, 0.9);
 }
 
 .atr-sentence-empty {
   font-size: 10px;
   color: rgba(150, 165, 180, 0.35);
   font-style: italic;
+  padding: 2px 4px;
 }
 
 /* ─── AI Refine ───────────────────────────────────────────────────────────── */
@@ -184,11 +230,14 @@
 .atr-rail {
   position: relative;
   flex-shrink: 0;
+  background: rgba(88, 166, 255, 0.03);
+  border-radius: 6px;
+  padding: 6px 4px 4px;
 }
 
 /* X axis: horizontal rail */
 .atr-axis-x .atr-rail {
-  height: 72px;
+  height: 96px;
   width: 100%;
 }
 
@@ -258,20 +307,25 @@
 /* ─── Anchor thumbnails on rail ─────────────────────────────────────────────── */
 .atr-anchor-thumb {
   position: absolute;
-  width: 52px;
-  height: 52px;
-  border-radius: 5px;
-  border: 1.5px solid rgba(88, 166, 255, 0.5);
-  overflow: hidden;
+  width: 68px;
+  height: 68px;
+  border-radius: 7px;
+  border: 2px solid rgba(88, 166, 255, 0.55);
+  overflow: visible;
   cursor: grab;
   z-index: 5;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  transition: box-shadow 0.12s;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.55);
+  transition: box-shadow 0.12s, border-color 0.12s;
+  background: rgba(18, 22, 30, 0.9);
+}
+
+.atr-anchor-thumb > img {
+  border-radius: 5px;
 }
 
 .atr-anchor-thumb.dragging {
   cursor: grabbing;
-  box-shadow: 0 4px 16px rgba(88, 166, 255, 0.3);
+  box-shadow: 0 6px 22px rgba(88, 166, 255, 0.4);
   border-color: #58a6ff;
 }
 
@@ -279,19 +333,21 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 5px;
+  display: block;
 }
 
 .atr-anchor-remove {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 16px;
-  height: 16px;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: rgba(224, 80, 80, 0.85);
-  border: none;
+  background: rgba(224, 80, 80, 0.9);
+  border: 1.5px solid rgba(18, 22, 30, 0.8);
   color: white;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
   display: flex;
   align-items: center;
@@ -299,6 +355,7 @@
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s;
+  z-index: 6;
 }
 
 .atr-anchor-thumb:hover .atr-anchor-remove {
@@ -309,14 +366,15 @@
 .atr-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
+  padding-top: 2px;
 }
 
 .atr-weight-label {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   font-size: 10px;
   color: rgba(150, 165, 180, 0.6);
 }

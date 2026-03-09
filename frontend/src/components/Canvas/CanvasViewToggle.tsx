@@ -11,7 +11,7 @@ export const CanvasViewToggle: React.FC = () => {
   const setMode = useAppStore((s) => s.setCanvasViewMode);
 
   return (
-    <div className="canvas-view-toggle">
+    <div className="canvas-view-toggle" data-tour="canvas-view-toggle">
       <button
         className={`cvt-btn ${mode === "semantic" ? "cvt-active" : ""}`}
         onClick={() => setMode("semantic")}

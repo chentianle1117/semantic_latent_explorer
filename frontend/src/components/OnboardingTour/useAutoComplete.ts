@@ -93,22 +93,14 @@ export function useAutoComplete(): void {
     }
   }, [isHistoryExpanded, onboardingSpotlight, onboardingDismissed, completeStep]);
 
-  // ── a-lineage-tab: lineage tab active (DOM class watch) ────────────────
+  // ── a-lineage-toggle: switched to lineage canvas view ─────────────────
+  const canvasViewMode = useAppStore((s) => s.canvasViewMode);
   useEffect(() => {
     if (onboardingDismissed) return;
-    const check = () => {
-      const el = document.querySelector('[data-tour="tab-lineage"]');
-      if (el && el.classList.contains('active')) {
-        completeStep('a-lineage-tab');
-        // Do NOT auto-collapse the drawer — user controls when to close it
-      }
-    };
-    const obs = new MutationObserver(check);
-    const container = document.querySelector('[data-tour="drawer-tabs"]');
-    if (container) obs.observe(container, { attributes: true, subtree: true, attributeFilter: ['class'] });
-    const t = setInterval(check, 300);
-    return () => { obs.disconnect(); clearInterval(t); };
-  }, [onboardingDismissed, completeStep]);
+    if (canvasViewMode === 'lineage') {
+      completeStep('a-lineage-toggle');
+    }
+  }, [canvasViewMode, onboardingDismissed, completeStep]);
 
   // ── a-layers-expand: layers panel expanded ────────────────────────────
   // Complete on transition (false→true) OR when spotlight lands on step with panel already expanded

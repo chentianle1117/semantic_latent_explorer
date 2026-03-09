@@ -159,18 +159,15 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 
   {
-    id: 'a-lineage-tab',
+    id: 'a-lineage-toggle',
     section: 'a',
     atomicUnit: 'ui-orientation',
-    title: 'Lineage Tree',
+    title: 'Lineage View',
     description: '',
-    instruction: '**Click the Lineage Tree tab** to see parent-child genealogy. Node colors: **orange** = reference shoes you loaded, **green** = AI-generated, **purple** = AI agent suggestions. Lines show which shoes were used as parents for each generation.',
-    targetSelector: '[data-tour="tab-lineage"]',
-    cardPosition: 'right',
-    prerequisiteKey: 'a-lineage-tab',
-    prerequisiteGuide: '**Expand the History panel** first (click the bottom bar).',
-    completionKey: 'a-lineage-tab',
-    observationSelector: '[data-tour="bottom-drawer-content"]',
+    instruction: 'Click **Lineage** (top-right toggle) to switch to a full-canvas family tree. Node colors: **orange** = reference shoes, **green** = AI-generated, **purple** = AI agent. Lines show parent→child relationships. **Right-drag** to pan, **scroll** to zoom. Click **Semantic** to return.',
+    targetSelector: '[data-tour="canvas-view-toggle"]',
+    cardPosition: 'left',
+    completionKey: 'a-lineage-toggle',
   },
 
   {

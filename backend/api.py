@@ -17,10 +17,31 @@ import sys
 import os
 from pathlib import Path
 import requests
-from rembg import remove
+# fal.ai rembg called via REST (no fal_client dependency needed)
 import zipfile
 import json
 import tempfile
+
+
+def remove_background(image_bytes: bytes) -> bytes:
+    """Remove background via fal.ai's rembg REST API (replaces local rembg/PyTorch)."""
+    fal_key = os.getenv("FAL_KEY", "")
+    b64_input = base64.b64encode(image_bytes).decode()
+    data_url = f"data:image/png;base64,{b64_input}"
+    resp = requests.post(
+        "https://fal.run/fal-ai/imageutils/rembg",
+        headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
+        json={"image_url": data_url},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    result = resp.json()
+    img_url = result.get("image", {}).get("url", "")
+    if not img_url:
+        raise RuntimeError(f"fal.ai rembg returned no image URL: {result}")
+    img_resp = requests.get(img_url, timeout=30)
+    img_resp.raise_for_status()
+    return img_resp.content
 
 
 class _NumpyEncoder(json.JSONEncoder):
@@ -2083,7 +2104,7 @@ async def rembg_batch(request: RembgBatchRequest):
             buf = BytesIO()
             pil_img.save(buf, format='PNG')
             buf.seek(0)
-            output_bytes = remove(buf.getvalue())
+            output_bytes = remove_background(buf.getvalue())
 
             result_b64 = base64.b64encode(output_bytes).decode()
             results[key] = result_b64
@@ -2567,7 +2588,6 @@ async def add_external_images(request: AddExternalImagesRequest):
 
             # Remove background if requested
             if request.remove_background is True:
-                # rembg needs RGB input
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
                 print(f"  Removing background from image {i+1}...")
@@ -2575,7 +2595,7 @@ async def add_external_images(request: AddExternalImagesRequest):
                 img.save(img_bytes, format='PNG')
                 img_bytes.seek(0)
 
-                output_bytes = remove(img_bytes.getvalue())
+                output_bytes = remove_background(img_bytes.getvalue())
 
                 img = Image.open(BytesIO(output_bytes))
                 if img.mode != 'RGBA':
@@ -3121,6 +3141,76 @@ class GenerateVariationRequest(BaseModel):
     brief: str
     num_variations: int = 2
 
+
+def generate_thumbnail_grid() -> Optional[str]:
+    """Generate a contact sheet of representative shoes on canvas.
+
+    Uses coordinate-stratified sampling (4x4 grid) to pick up to 16 diverse
+    shoes, resizes each to 128x128, pastes onto a dark canvas, and returns
+    a base64 JPEG data URI (quality 70, ~30-50KB).
+
+    Returns None if fewer than 4 visible images exist (not enough diversity).
+    """
+    visible = [img for img in state.images_metadata if img.visible and img.pil_image is not None]
+    if len(visible) < 4:
+        return None
+
+    # Get coordinate bounds
+    coords = [img.coordinates for img in visible]
+    xs = [c[0] for c in coords]
+    ys = [c[1] for c in coords]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    range_x = max(max_x - min_x, 0.01)
+    range_y = max(max_y - min_y, 0.01)
+
+    # Stratified sampling: 4x4 grid, pick nearest image to each cell center
+    cols, rows = 4, 4
+    cell_w = range_x / cols
+    cell_h = range_y / rows
+    selected = {}  # (row, col) -> ImageMetadata
+    for img in visible:
+        ix, iy = img.coordinates
+        col_i = min(int((ix - min_x) / cell_w), cols - 1)
+        row_i = min(int((iy - min_y) / cell_h), rows - 1)
+        key = (row_i, col_i)
+        if key not in selected:
+            selected[key] = img
+        else:
+            # Keep the one closer to cell center
+            cell_cx = min_x + (col_i + 0.5) * cell_w
+            cell_cy = min_y + (row_i + 0.5) * cell_h
+            existing = selected[key]
+            ex_ix, ex_iy = existing.coordinates
+            d_existing = (ex_ix - cell_cx) ** 2 + (ex_iy - cell_cy) ** 2
+            d_new = (ix - cell_cx) ** 2 + (iy - cell_cy) ** 2
+            if d_new < d_existing:
+                selected[key] = img
+
+    chosen = list(selected.values())
+    if not chosen:
+        return None
+
+    thumb_size = 128
+    grid_cols = min(4, len(chosen))
+    grid_rows = (len(chosen) + grid_cols - 1) // grid_cols
+    canvas_img = Image.new("RGB", (grid_cols * thumb_size, grid_rows * thumb_size), (17, 24, 39))
+
+    for idx, img in enumerate(chosen):
+        try:
+            thumb = img.pil_image.convert("RGB").resize((thumb_size, thumb_size), Image.LANCZOS)
+            col_i = idx % grid_cols
+            row_i = idx // grid_cols
+            canvas_img.paste(thumb, (col_i * thumb_size, row_i * thumb_size))
+        except Exception:
+            pass
+
+    buf = BytesIO()
+    canvas_img.save(buf, format="JPEG", quality=70)
+    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
+    return f"data:image/jpeg;base64,{b64}"
+
+
 @app.post("/api/agent/suggest-ghosts")
 async def suggest_ghost_nodes(request: Request):
     """Generate ghost node suggestions for unexplored gaps in the semantic space.
@@ -3181,10 +3271,18 @@ async def suggest_ghost_nodes(request: Request):
                 if f.get("value"):
                     ghosts_fields_section += f"- {f['label']}: {f['value']}\n"
 
+        # Generate thumbnail contact sheet from backend PIL images
+        thumbnail_grid = generate_thumbnail_grid()
+
         # Canvas screenshot visual instruction
         canvas_map_instruction = ""
-        if canvas_screenshot:
-            canvas_map_instruction = "\nI'm also attaching a visual scatter-plot of all current designs in semantic space. Each dot is a shoe. Use it to identify sparse/empty regions and target those for suggestions."
+        if canvas_screenshot or thumbnail_grid:
+            canvas_map_instruction = "\nI'm attaching visual context of the current canvas:"
+            if canvas_screenshot:
+                canvas_map_instruction += "\n- Image 1: scatter-plot showing spatial distribution of all designs (each dot = one shoe)"
+            if thumbnail_grid:
+                canvas_map_instruction += "\n- Image 2: contact sheet of actual shoe thumbnails currently on canvas"
+            canvas_map_instruction += "\nUse both to understand what aesthetic territory is already covered AND where spatial gaps exist. Suggest designs that are visually AND spatially distinct."
 
         prompt = f"""##ABSOLUTE RULE — READ FIRST##
 {_get_shoe_type_constraint()}
@@ -3248,7 +3346,7 @@ Be bold and specific. Push into corners of the design space that are visually em
 
         model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
-        # Build multimodal content — attach canvas scatter-plot if provided
+        # Build multimodal content — attach canvas scatter-plot + thumbnail grid
         ghosts_content: list = [prompt]
         if canvas_screenshot:
             try:
@@ -3258,6 +3356,14 @@ Be bold and specific. Push into corners of the design space that are visually em
                 ghosts_content.append(_canvas_img)
             except Exception:
                 pass  # fall back to text-only if screenshot is malformed
+        if thumbnail_grid:
+            try:
+                _hdr2, _b64_2 = thumbnail_grid.split(",", 1)
+                _grid_bytes = base64.b64decode(_b64_2)
+                _grid_img = Image.open(BytesIO(_grid_bytes))
+                ghosts_content.append(_grid_img)
+            except Exception:
+                pass
 
         response = model.generate_content(ghosts_content)
         text = response.text.strip()
@@ -3341,7 +3447,7 @@ async def embed_ghost_image(request: Request):
         try:
             img_bytes_in = BytesIO()
             img.convert("RGB").save(img_bytes_in, format="PNG")
-            img_bytes_out = remove(img_bytes_in.getvalue())
+            img_bytes_out = remove_background(img_bytes_in.getvalue())
             img = Image.open(BytesIO(img_bytes_out)).convert("RGBA")
             print(f"  [OK] Background removed from ghost image")
         except Exception as rembg_err:
@@ -3414,10 +3520,18 @@ async def concurrent_ghost_prompt(request: ConcurrentPromptRequest):
         # Extract explicit shoe type constraint (hard rule)
         shoe_type_constraint = _get_shoe_type_constraint()
 
+        # Generate thumbnail contact sheet from backend PIL images
+        concurrent_thumbnail_grid = generate_thumbnail_grid()
+
         # Canvas screenshot context
         canvas_map_instruction = ""
-        if request.canvas_screenshot:
-            canvas_map_instruction = "\nI'm also attaching a visual map of the current semantic canvas (scatter plot of all designs in 2D space). Use it to pick a direction that contrasts with the existing cluster and fills an empty region."
+        if request.canvas_screenshot or concurrent_thumbnail_grid:
+            canvas_map_instruction = "\nI'm attaching visual context of the current canvas:"
+            if request.canvas_screenshot:
+                canvas_map_instruction += "\n- Scatter-plot: spatial distribution of all designs (each dot = one shoe)"
+            if concurrent_thumbnail_grid:
+                canvas_map_instruction += "\n- Contact sheet: actual shoe thumbnails currently on canvas"
+            canvas_map_instruction += "\nUse these to pick a direction that is visually AND spatially distinct from what already exists."
 
         prompt = f"""##ABSOLUTE RULE — READ FIRST##
 {shoe_type_constraint}
@@ -3467,13 +3581,21 @@ key_shifts should be 2-3 concise contrasts like "leather → mesh" or "muted →
                         content.append(pil_img)
                     except Exception:
                         pass
-        # Attach canvas scatter-plot so Gemini sees spatial distribution
+        # Attach canvas scatter-plot + thumbnail grid so Gemini sees spatial + visual context
         if request.canvas_screenshot:
             try:
                 header, b64data = request.canvas_screenshot.split(",", 1)
                 img_bytes = base64.b64decode(b64data)
                 canvas_img = Image.open(BytesIO(img_bytes))
                 content.append(canvas_img)
+            except Exception:
+                pass
+        if concurrent_thumbnail_grid:
+            try:
+                header, b64data = concurrent_thumbnail_grid.split(",", 1)
+                img_bytes = base64.b64decode(b64data)
+                grid_img = Image.open(BytesIO(img_bytes))
+                content.append(grid_img)
             except Exception:
                 pass
         response = model.generate_content(content)

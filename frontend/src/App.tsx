@@ -596,7 +596,7 @@ export const App: React.FC = () => {
     // Check if fal.ai is configured
     if (!falClient.isConfigured()) {
       alert(
-        "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
+        "fal.ai API key not configured. Please set FAL_KEY in backend .env file."
       );
       return;
     }
@@ -1054,7 +1054,7 @@ export const App: React.FC = () => {
                   try {
                     if (!falClient.isConfigured()) {
                       alert(
-                        "fal.ai API key not configured. Please set VITE_FAL_API_KEY in your .env file."
+                        "fal.ai API key not configured. Please set FAL_KEY in backend .env file."
                       );
                       setIsGenerating(false);
                       useProgressStore.getState().hideProgress();
@@ -1230,7 +1230,7 @@ export const App: React.FC = () => {
 
                   try {
                     if (!falClient.isConfigured()) {
-                      alert("fal.ai API key not configured. Please set VITE_FAL_API_KEY.");
+                      alert("fal.ai API key not configured. Please set FAL_KEY in backend .env file.");
                       setIsGenerating(false);
                       useProgressStore.getState().hideProgress();
                       return;

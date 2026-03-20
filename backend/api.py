@@ -1031,6 +1031,45 @@ async def test():
     return {"message": "Backend is working!", "status": "ok"}
 
 
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+
+# ─── fal.ai Backend Proxy (API Gateway pattern) ─────────────────────────────
+# All fal.ai calls routed through backend so FAL_KEY stays server-side.
+# Uses asyncio.to_thread to avoid blocking the event loop during long generations.
+
+def _fal_sync_call(endpoint: str, input_data: dict) -> dict:
+    """Blocking HTTP call to fal.ai synchronous endpoint."""
+    fal_key = os.getenv("FAL_KEY", "")
+    resp = requests.post(
+        f"https://fal.run/{endpoint}",
+        headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
+        json=input_data,
+        timeout=180,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+@app.post("/api/fal/run")
+async def fal_run_proxy(request: Request):
+    """Proxy a fal.ai model call. Keeps FAL_KEY server-side.
+    Body: { endpoint: "fal-ai/nano-banana", input: { prompt: "...", ... } }
+    Returns: the fal.ai response JSON directly.
+    """
+    body = await request.json()
+    endpoint = body.get("endpoint", "")
+    input_data = body.get("input", {})
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="Missing 'endpoint' field")
+    print(f"[fal-proxy] {endpoint} — input keys: {list(input_data.keys())}")
+    result = await asyncio.to_thread(_fal_sync_call, endpoint, input_data)
+    print(f"[fal-proxy] {endpoint} — done")
+    return result
+
+
 def _get_expanded_concepts_for_state() -> Optional[Dict[str, List[str]]]:
     """Return cached Gemini expansions for current axis labels, if available."""
     out: Dict[str, List[str]] = {}

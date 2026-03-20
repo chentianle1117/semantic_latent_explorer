@@ -1,8 +1,12 @@
 /**
- * fal.ai API client for nano-banana image generation
+ * fal.ai API client — proxied through backend (/api/fal/run)
+ *
+ * Pattern: Backend-for-Frontend (BFF) / API Gateway
+ * All fal.ai calls route through our FastAPI backend so the FAL_KEY
+ * never reaches the browser. The interface stays identical for callers.
  */
 
-import { fal } from "@fal-ai/client";
+import axios from 'axios';
 import type { ShoeViewType } from '../types';
 
 // ── Shoe render system prompts by view angle ──────────────────────────────────
@@ -41,8 +45,6 @@ export const SHOE_VIEW_LABELS: Record<ShoeViewType, string> = {
 export const SATELLITE_VIEWS: ShoeViewType[] = ['3/4-front', '3/4-back', 'top', 'outsole', 'medial', 'front', 'back'];
 
 // ── Mood board / sketch style presets ────────────────────────────────────────
-// Each prompt is designed to keep generation in the low-fi / sketch / concept realm.
-// They are comprehensive to cover different stylistic approaches designers use.
 export const MOOD_BOARD_STYLES: Record<string, { label: string; prompt: string }> = {
   'concept-sheet': {
     label: 'Concept Sheet',
@@ -121,12 +123,19 @@ export function extractBriefConstraint(briefFields: Array<{ key: string; label: 
   return parts.join(', ') + '. Do not change the shoe type or silhouette — only vary aesthetics, materials, colors, and surface details';
 }
 
-// Configure fal.ai with API key from environment
-const FAL_API_KEY = import.meta.env.VITE_FAL_API_KEY;
+// ── Helper: call backend fal proxy ──────────────────────────────────────────
+async function falRun(endpoint: string, input: Record<string, unknown>): Promise<unknown> {
+  const resp = await axios.post('/api/fal/run', { endpoint, input }, { timeout: 180_000 });
+  return resp.data;
+}
 
-if (FAL_API_KEY && FAL_API_KEY !== 'your_fal_api_key_here') {
-  fal.config({
-    credentials: FAL_API_KEY
+// ── Helper: convert File/Blob to data URI (replaces fal.storage.upload) ─────
+async function fileToDataUri(file: File | Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
   });
 }
 
@@ -206,30 +215,20 @@ class FalClient {
       const allImages: FalImageFile[] = [];
 
       // Generate each image individually with a unique diversity suffix
-      // This produces much more varied results than batching num_images > 1
       const diversitySuffixes = (cfg?.realm === 'mood-board') ? MOOD_BOARD_DIVERSITY_SUFFIXES : DIVERSITY_SUFFIXES;
       for (let i = 0; i < numImages; i++) {
         const suffix = diversitySuffixes[i % diversitySuffixes.length];
         const fullPrompt = numImages > 1 ? `${basePrompt}${suffix}` : basePrompt;
         console.log(`📦 Image ${i + 1}/${numImages}: Generating...`);
 
-        const result = await fal.subscribe("fal-ai/nano-banana", {
-          input: {
-            prompt: fullPrompt,
-            num_images: 1,
-            output_format: request.output_format || "jpeg",
-            aspect_ratio: aspectRatio
-          },
-          logs: true,
-          onQueueUpdate: (update) => {
-            if (update.status === "IN_PROGRESS") {
-              update.logs.map((log) => log.message).forEach(console.log);
-            }
-          },
-        });
+        const result = await falRun("fal-ai/nano-banana", {
+          prompt: fullPrompt,
+          num_images: 1,
+          output_format: request.output_format || "jpeg",
+          aspect_ratio: aspectRatio,
+        }) as FalTextToImageResponse;
 
-        const batchData = result.data as FalTextToImageResponse;
-        allImages.push(...batchData.images);
+        allImages.push(...result.images);
         console.log(`✓ Image ${i + 1}/${numImages} complete`);
       }
 
@@ -269,7 +268,6 @@ class FalClient {
         const stylePrompt = MOOD_BOARD_STYLES[style]?.prompt ?? MOOD_BOARD_STYLES['concept-sheet'].prompt;
         aspectRatio = "3:2";
 
-        // For mood boards: strongly instruct to CREATE A NEW ARTWORK, not reproduce the reference
         basePrompt = [
           `Create a BRAND NEW original artwork: ${stylePrompt}`,
           `Use the reference image(s) ONLY as abstract inspiration — extract their mood, feeling, colors, textures, shapes, and design language`,
@@ -280,7 +278,6 @@ class FalClient {
         ].filter(Boolean).join('. ');
       } else if (isSatelliteView) {
         const viewPrompt = SHOE_VIEW_PROMPTS[cfg!.shoeView!];
-        // For satellite views: strongly instruct to CHANGE THE VIEWING ANGLE
         basePrompt = [
           `Take this exact shoe design and REDRAW it from a completely different camera angle.`,
           `New angle: ${viewPrompt}`,
@@ -289,10 +286,8 @@ class FalClient {
           request.prompt ? `Shoe description: ${request.prompt}` : '',
         ].filter(Boolean).join('. ');
       } else {
-        // Standard shoe iteration from reference
         const view = cfg?.shoeView || 'side';
         const systemPrompt = SHOE_VIEW_PROMPTS[view] ?? SHOE_VIEW_PROMPTS['side'];
-        // Constraint FIRST — ensures image model reads it before any styling instructions
         basePrompt = [
           request.briefConstraint ? `STRICT REQUIREMENT — ${request.briefConstraint}` : null,
           systemPrompt,
@@ -305,7 +300,6 @@ class FalClient {
       }
 
       const numImages = Math.min(request.num_images || 1, 8);
-      // Cap reference images to 4 per fal.ai limits
       const cappedUrls = request.image_urls.slice(0, 4);
       const diversitySuffixes = isMoodBoard ? MOOD_BOARD_DIVERSITY_SUFFIXES : DIVERSITY_SUFFIXES;
 
@@ -319,24 +313,15 @@ class FalClient {
         const fullPrompt = suffix ? `${basePrompt}${suffix}` : basePrompt;
         console.log(`📦 Edit ${i + 1}/${numImages}: Generating...`);
 
-        const result = await fal.subscribe("fal-ai/nano-banana/edit", {
-          input: {
-            prompt: fullPrompt,
-            image_urls: cappedUrls,
-            num_images: 1,
-            output_format: request.output_format || "jpeg",
-            aspect_ratio: aspectRatio,
-          },
-          logs: true,
-          onQueueUpdate: (update) => {
-            if (update.status === "IN_PROGRESS") {
-              update.logs.map((log) => log.message).forEach(console.log);
-            }
-          },
-        });
+        const result = await falRun("fal-ai/nano-banana/edit", {
+          prompt: fullPrompt,
+          image_urls: cappedUrls,
+          num_images: 1,
+          output_format: request.output_format || "jpeg",
+          aspect_ratio: aspectRatio,
+        }) as FalImageEditResponse;
 
-        const data = result.data as FalImageEditResponse;
-        allImages.push(...data.images);
+        allImages.push(...result.images);
         console.log(`✓ Edit ${i + 1}/${numImages} complete`);
       }
 
@@ -354,8 +339,6 @@ class FalClient {
 
   /**
    * Generate a 5-view multi-view sheet using a template + side view as dual reference.
-   * Template provides positional layout; side view provides shoe design.
-   * Returns a single image URL. Use sliceMultiViewSheet() to split into 5 views.
    */
   async generateMultiViewSheet(
     prompt: string,
@@ -378,41 +361,26 @@ class FalClient {
       prompt ? `Shoe: ${prompt}` : '',
     ].filter(Boolean).join('\n');
 
-    // Template FIRST so the model treats it as the layout guide; then side view + any 3/4 refs
     const imageUrls = [templateUrl, sideViewUrl, ...(options?.additionalRefUrls || [])].slice(0, 4);
 
     console.log(`[multi-view-sheet] Generating 2×2 multi-view sheet...`);
-    console.log('[multi-view-sheet] PROMPT:', sheetPrompt);
-    console.log('[multi-view-sheet] image_urls:', imageUrls);
-    console.log('[multi-view-sheet] aspect_ratio: 3:2');
 
-    const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
-      input: {
-        prompt: sheetPrompt,
-        image_urls: imageUrls,
-        num_images: 1,
-        output_format: options?.outputFormat || "png",
-        aspect_ratio: "3:2",
-        resolution: "1K",
-      },
-      logs: true,
-      onQueueUpdate: (update) => {
-        if (update.status === "IN_PROGRESS") {
-          update.logs.map((log) => log.message).forEach(console.log);
-        }
-      },
-    });
+    const result = await falRun("fal-ai/nano-banana-2/edit", {
+      prompt: sheetPrompt,
+      image_urls: imageUrls,
+      num_images: 1,
+      output_format: options?.outputFormat || "png",
+      aspect_ratio: "3:2",
+      resolution: "1K",
+    }) as FalImageEditResponse;
 
-    const data = result.data as FalImageEditResponse;
-    if (!data.images.length) throw new Error('Multi-view sheet generation returned no images');
-    console.log(`[multi-view-sheet] ✓ 2×2 sheet generated, URL:`, data.images[0].url);
-    return { url: data.images[0].url };
+    if (!result.images.length) throw new Error('Multi-view sheet generation returned no images');
+    console.log(`[multi-view-sheet] ✓ 2×2 sheet generated, URL:`, result.images[0].url);
+    return { url: result.images[0].url };
   }
 
   /**
    * Generate a 2-view 3/4 sheet using a template + side view as dual reference.
-   * Template provides positional layout; side view provides shoe design.
-   * Returns a single image URL. Use sliceQuarterSheet() to split into 2 views.
    */
   async generateQuarterViewSheet(
     prompt: string,
@@ -436,51 +404,40 @@ class FalClient {
     ].filter(Boolean).join('\n');
 
     console.log('[quarter-view-sheet] Generating 3/4-view sheet...');
-    console.log('[quarter-view-sheet] PROMPT:', sheetPrompt);
-    console.log('[quarter-view-sheet] image_urls:', [sideViewUrl, templateUrl]);
-    console.log('[quarter-view-sheet] aspect_ratio: 16:9');
 
-    const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
-      input: {
-        prompt: sheetPrompt,
-        image_urls: [sideViewUrl, templateUrl],
-        num_images: 1,
-        output_format: options?.outputFormat || "png",
-        aspect_ratio: "16:9",
-        resolution: "1K",
-      },
-      logs: true,
-      onQueueUpdate: (update) => {
-        if (update.status === "IN_PROGRESS") {
-          update.logs.map((log) => log.message).forEach(console.log);
-        }
-      },
-    });
+    const result = await falRun("fal-ai/nano-banana-2/edit", {
+      prompt: sheetPrompt,
+      image_urls: [sideViewUrl, templateUrl],
+      num_images: 1,
+      output_format: options?.outputFormat || "png",
+      aspect_ratio: "16:9",
+      resolution: "1K",
+    }) as FalImageEditResponse;
 
-    const data = result.data as FalImageEditResponse;
-    if (!data.images.length) throw new Error('3/4 view sheet generation returned no images');
-    console.log('[quarter-view-sheet] ✓ 3/4-view sheet generated, URL:', data.images[0].url);
-    return { url: data.images[0].url };
+    if (!result.images.length) throw new Error('3/4 view sheet generation returned no images');
+    console.log('[quarter-view-sheet] ✓ 3/4-view sheet generated, URL:', result.images[0].url);
+    return { url: result.images[0].url };
   }
 
   /**
-   * Upload a file to fal.ai storage (for reference images)
+   * Convert a File/Blob to a data URI (replaces fal.storage.upload).
+   * fal.ai accepts data URIs as image_url inputs, so no separate upload needed.
    */
-  async uploadFile(file: File): Promise<string> {
+  async uploadFile(file: File | Blob): Promise<string> {
     try {
-      const url = await fal.storage.upload(file);
-      return url;
+      const dataUri = await fileToDataUri(file);
+      return dataUri;
     } catch (error) {
-      console.error("fal.ai file upload failed:", error);
+      console.error("File to data URI conversion failed:", error);
       throw error;
     }
   }
 
   /**
-   * Check if API key is configured
+   * Always configured — backend holds the API key
    */
   isConfigured(): boolean {
-    return !!FAL_API_KEY && FAL_API_KEY !== 'your_fal_api_key_here';
+    return true;
   }
 }
 

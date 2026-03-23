@@ -4424,14 +4424,36 @@ class DeleteCanvasRequest(BaseModel):
 
 @app.post("/api/sessions/delete")
 async def delete_canvas(request: DeleteCanvasRequest):
-    """Delete a saved canvas from disk. Cannot delete the currently active canvas."""
-    if request.canvas_id == state.current_canvas_id:
-        raise HTTPException(status_code=400, detail="Cannot delete the active canvas. Switch to another canvas first.")
+    """Delete a saved canvas from disk. If deleting the active canvas, auto-switch to another."""
     path = _find_session_file(state.participant_id, request.canvas_id)
     if not path:
         raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
+
+    switched_to = None
+    if request.canvas_id == state.current_canvas_id:
+        # Auto-switch to another canvas before deleting the active one
+        all_sessions = _list_sessions(state.participant_id)
+        other = [s for s in all_sessions if s["id"] != request.canvas_id]
+        if other:
+            # Load the most recent other canvas
+            other.sort(key=lambda s: s.get("updatedAt", ""), reverse=True)
+            other_path = _find_session_file(state.participant_id, other[0]["id"])
+            if other_path:
+                _save_canvas_to_disk()  # save current first
+                with open(other_path, encoding="utf-8") as f:
+                    data = json.load(f)
+                _deserialize_canvas(data)
+                switched_to = state.current_canvas_id
+        else:
+            # Last canvas — reset to empty state
+            state.images_metadata.clear()
+            state.history_groups.clear()
+            state.current_canvas_id = str(_uuid.uuid4())
+            state.canvas_name = "Canvas 1"
+            switched_to = state.current_canvas_id
+
     path.unlink()
-    return {"success": True, "deleted": request.canvas_id}
+    return {"success": True, "deleted": request.canvas_id, "switchedTo": switched_to}
 
 
 @app.post("/api/sessions/rename")

@@ -183,7 +183,19 @@ export const CanvasSwitcher: React.FC = () => {
     e.stopPropagation();
     if (!window.confirm('Delete this canvas? This cannot be undone.')) return;
     try {
-      await apiClient.deleteSession(canvasId);
+      const result = await apiClient.deleteSession(canvasId);
+      // If we deleted the active canvas, backend auto-switched — reload state
+      if (result.switchedTo) {
+        const freshState = await apiClient.getState();
+        const session = await apiClient.getCurrentSession();
+        useAppStore.setState({
+          images: freshState.images,
+          canvasBounds: null,
+          currentCanvasId: session.canvasId,
+          canvasName: session.canvasName,
+        });
+        if (freshState.history_groups) useAppStore.getState().setHistoryGroups(freshState.history_groups);
+      }
       await refreshList();
     } catch (err) {
       alert(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);

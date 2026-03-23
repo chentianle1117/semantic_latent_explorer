@@ -372,7 +372,7 @@ class APIClient {
     return response.data;
   }
 
-  async deleteSession(canvasId: string): Promise<{ success: boolean; deleted: string }> {
+  async deleteSession(canvasId: string): Promise<{ success: boolean; deleted: string; switchedTo?: string }> {
     const response = await axios.post(`${API_BASE}/sessions/delete`, { canvas_id: canvasId });
     return response.data;
   }

@@ -442,26 +442,38 @@ def _close_event_log():
 
 
 def _open_event_log():
-    """Create/open a JSONL event log file for the current canvas session."""
+    """Open or append to the daily JSONL event log for the current participant.
+
+    All visits within one calendar day go into one file:
+      Alice_2026-03-23_eventlog.jsonl
+    Subsequent visits append a session_resume marker instead of creating a new file.
+    """
     now = datetime.now()
     state.event_log_session_start = now.isoformat()
-    slug = _slugify(state.canvas_name) or state.current_canvas_id[:8]
-    prefix = (_slugify(state.study_session_name) + "_") if state.study_session_name else ""
-    ts = now.strftime("%Y-%m-%d_%H%M")
-    fname = f"{prefix}{slug}_{ts}_eventlog.jsonl"
-    path = DATA_DIR / state.participant_id / "events" / fname
+    date_str = now.strftime("%Y-%m-%d")
+    participant = state.participant_id or "researcher"
+    fname = f"{participant}_{date_str}_eventlog.jsonl"
+    path = DATA_DIR / participant / "events" / fname
     path.parent.mkdir(parents=True, exist_ok=True)
     state.event_log_path = path
-    # Write header line
+    is_new = not path.exists()
     with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({
-            "type": "session_start",
-            "timestamp": state.event_log_session_start,
-            "canvas_id": state.current_canvas_id,
-            "canvas_name": state.canvas_name,
-            "participant_id": state.participant_id,
-            "study_session": state.study_session_name or None,
-        }) + "\n")
+        if is_new:
+            f.write(json.dumps({
+                "type": "session_start",
+                "timestamp": state.event_log_session_start,
+                "canvas_id": state.current_canvas_id,
+                "canvas_name": state.canvas_name,
+                "participant_id": participant,
+            }) + "\n")
+        else:
+            f.write(json.dumps({
+                "type": "session_resume",
+                "timestamp": state.event_log_session_start,
+                "canvas_id": state.current_canvas_id,
+                "canvas_name": state.canvas_name,
+                "participant_id": participant,
+            }) + "\n")
 
 
 def _log_event_to_file(entry: dict):

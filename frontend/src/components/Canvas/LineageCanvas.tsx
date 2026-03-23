@@ -98,9 +98,12 @@ function computeLayout(
   const maxDepth = Math.max(...Array.from(depth.values()), 0);
   const columns: ImageData[][] = Array.from({ length: maxDepth + 1 }, () => []);
   images.forEach(img => columns[depth.get(img.id)!].push(img));
-  columns.forEach(col => col.sort((a, b) =>
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  ));
+  columns.forEach(col => col.sort((a, b) => {
+    const aRef = a.generation_method === 'dataset' ? 1 : 0;
+    const bRef = b.generation_method === 'dataset' ? 1 : 0;
+    if (aRef !== bRef) return aRef - bRef;
+    return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+  }));
 
   // 3. Position nodes: x by depth, y evenly spaced per column
   const positions = new Map<number, { x: number; y: number }>();
@@ -207,7 +210,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
       if (hiddenSet.has(img.id)) return false;
       if (batchHiddenImageIds.has(img.id)) return false;
       if (isolatedImageIds !== null && !isolatedImageIds.includes(img.id)) return false;
-      if (starFilter !== null && (imageRatings[img.id] ?? 0) < starFilter) return false;
+      if (starFilter !== null && (imageRatings[img.id] ?? 0) !== starFilter) return false;
       return true;
     });
   }, [allImages, hiddenImageIds, batchHiddenImageIds, isolatedImageIds, starFilter, imageRatings, studyMode]);

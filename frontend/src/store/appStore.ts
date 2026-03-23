@@ -281,7 +281,6 @@ const initialState: AppState = {
   // Layer system
   layers: [
     { id: 'default', name: 'Shoes', visible: true, color: '#58a6ff' },
-    { id: 'mood-boards', name: 'Mood Boards', visible: true, color: '#FF6B2B' },
     { id: 'references', name: 'References', visible: true, color: '#ff7b72' },
   ] as CanvasLayer[],
   imageLayerMap: {} as Record<number, string>,

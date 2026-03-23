@@ -1688,7 +1688,7 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
     }
 
     imagesGroup.selectAll(".image-node").each(function(d: any) {
-      const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) >= starFilterVal;
+      const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) === starFilterVal;
       const isolatePasses = isolateSet === null || isolateSet.has(d.id);
       const el = d3.select(this);
 

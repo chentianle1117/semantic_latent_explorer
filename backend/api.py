@@ -1024,12 +1024,11 @@ async def broadcast_state_update():
 
 @app.get("/")
 async def root():
-    print("🏠 ROOT ENDPOINT HIT - NEW VERSION 2025-10-31")
-    return {
-        "message": "Zappos Semantic Explorer API",
-        "status": "running",
-        "version": "2025-10-31-UPDATED"
-    }
+    """Serve frontend in production, API info in dev."""
+    _dist = Path(__file__).resolve().parent.parent / "frontend" / "dist" / "index.html"
+    if _dist.is_file():
+        return FileResponse(str(_dist))
+    return {"message": "Zappos Semantic Explorer API", "status": "running"}
 
 @app.get("/api/test")
 async def test():

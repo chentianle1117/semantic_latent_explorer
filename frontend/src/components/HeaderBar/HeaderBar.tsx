@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import "./HeaderBar.css";
 import { CanvasSwitcher } from "../CanvasSwitcher/CanvasSwitcher";
 import { ProgressBar } from "../OnboardingTour/ProgressBar";
@@ -23,6 +23,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const participantId = useAppStore((s) => s.participantId);
   const participantLockedFromUrl = useAppStore((s) => s.participantLockedFromUrl);
+  const lastSaveStatus = useAppStore((s) => s.lastSaveStatus);
+
+  // Auto-clear "saved" indicator after 3s
+  useEffect(() => {
+    if (lastSaveStatus === 'saved' || lastSaveStatus === 'error') {
+      const t = setTimeout(() => useAppStore.getState().setLastSaveStatus(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [lastSaveStatus]);
 
   const onboardingSpotlight = useAppStore((s) => s.onboardingSpotlight);
   const completedSteps = useAppStore((s) => s.completedSteps);
@@ -79,6 +88,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
           >
             {saveStatus === 'saving' ? '…' : saveStatus === 'done' ? '✓ Saved' : saveStatus === 'error' ? '✗ Error' : '↓ Save'}
           </button>
+          {lastSaveStatus && (
+            <span className={`auto-save-indicator auto-save-${lastSaveStatus}`}>
+              {lastSaveStatus === 'saving' ? 'Auto-saving…' : lastSaveStatus === 'saved' ? '✓ Auto-saved' : '✗ Save failed'}
+            </span>
+          )}
           <button
             className="header-canvas-action"
             onClick={() => window.open('/api/export-zip', '_blank')}

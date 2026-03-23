@@ -170,6 +170,7 @@ interface AppStore extends AppState {
   // Session / Multi-Canvas
   setCurrentCanvasId: (id: string | null) => void;
   setCanvasName: (name: string) => void;
+  setLastSaveStatus: (status: 'saving' | 'saved' | 'error' | null) => void;
   setParticipantId: (id: string) => void;
   setParticipantLockedFromUrl: (locked: boolean) => void;
   setCanvasList: (list: CanvasMeta[]) => void;
@@ -313,6 +314,7 @@ const initialState: AppState = {
   studySessionName: '' as string,
   canvasList: [] as CanvasMeta[],
   eventLog: [] as EventLogEntry[],
+  lastSaveStatus: null as 'saving' | 'saved' | 'error' | null,
 
   // Shoe view filter toggles
   visibleSatelliteViews: {} as Record<string, boolean>,  // all off by default
@@ -793,6 +795,7 @@ export const useAppStore = create<AppStore>((set) => ({
   // Session / Multi-Canvas actions
   setCurrentCanvasId: (id) => set({ currentCanvasId: id }),
   setCanvasName: (name) => set({ canvasName: name }),
+  setLastSaveStatus: (status: 'saving' | 'saved' | 'error' | null) => set({ lastSaveStatus: status }),
   setParticipantId: (id) => set({ participantId: id }),
   setParticipantLockedFromUrl: (locked) => set({ participantLockedFromUrl: locked }),
   setStudySessionName: (name: string) => set({ studySessionName: name }),

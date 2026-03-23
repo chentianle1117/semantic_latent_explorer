@@ -106,6 +106,8 @@ export const App: React.FC = () => {
       console.warn('[login] Failed to load sessions, using default canvas:', err);
     }
 
+    // Persist login so browser refresh doesn't require re-login
+    sessionStorage.setItem('sc_auth', JSON.stringify({ participantId: res.participantId, role: res.role }));
     setShowLoginPrompt(false);
   };
   // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
@@ -203,8 +205,23 @@ export const App: React.FC = () => {
       useAppStore.getState().setParticipantLockedFromUrl(true);
       apiClient.setParticipant(urlParticipant).catch(() => {});
     } else {
-      // No URL param — show login form
-      setShowLoginPrompt(true);
+      // Check sessionStorage for persisted login (survives refresh)
+      const savedAuth = sessionStorage.getItem('sc_auth');
+      if (savedAuth) {
+        try {
+          const { participantId, role } = JSON.parse(savedAuth);
+          useAppStore.getState().setParticipantId(participantId);
+          if (role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
+          // Re-authenticate with backend so server state matches
+          apiClient.setParticipant(participantId).catch(() => {});
+          console.log(`[auth] Restored session for ${participantId} from sessionStorage`);
+        } catch {
+          setShowLoginPrompt(true);
+        }
+      } else {
+        // No URL param, no saved session — show login form
+        setShowLoginPrompt(true);
+      }
     }
 
     // Initialize CLIP on mount

@@ -4254,13 +4254,9 @@ async def get_current_session():
     }
 
 
-class SaveSessionRequest(BaseModel):
-    pass  # body optional — saves current state
-
-
 @app.post("/api/sessions/save")
 async def save_session():
-    """Save the current canvas state to disk."""
+    """Save the current canvas state to disk. Accepts any body (supports sendBeacon text/plain)."""
     try:
         path = _save_canvas_to_disk()
         return {"success": True, "path": str(path)}

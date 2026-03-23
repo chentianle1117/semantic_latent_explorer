@@ -71,6 +71,14 @@ load_dotenv()
 DATA_DIR = Path(__file__).parent / "data"
 ADMIN_KEY = os.getenv("ADMIN_KEY", "zappos-admin")
 
+# Study participant credentials: STUDY_USERS="Alice:pass1,Bob:pass2"
+_STUDY_USERS: Dict[str, str] = {}
+for _pair in os.getenv("STUDY_USERS", "").split(","):
+    _pair = _pair.strip()
+    if ":" in _pair:
+        _u, _p = _pair.split(":", 1)
+        _STUDY_USERS[_u.strip()] = _p.strip()
+
 # Configure Gemini
 gemini_api_key = os.getenv('GOOGLE_API_KEY')
 if gemini_api_key:
@@ -4398,6 +4406,34 @@ async def set_participant(request: SetParticipantRequest):
     """Update the participant ID (affects where future saves are written)."""
     state.participant_id = request.participant_id.strip() or "researcher"
     return {"participantId": state.participant_id}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/login")
+async def login(request: LoginRequest):
+    """Validate study participant or researcher credentials.
+
+    Credentials are configured via env vars:
+      STUDY_USERS=Alice:pass1,Bob:pass2
+      ADMIN_KEY=yourresearcherpassword
+    """
+    username = request.username.strip()
+    password = request.password.strip()
+    # Researcher / admin login
+    if username.lower() == "researcher" and password == ADMIN_KEY:
+        state.participant_id = "researcher"
+        _open_event_log()
+        return {"success": True, "participantId": "researcher", "role": "admin"}
+    # Study participant login
+    if username in _STUDY_USERS and _STUDY_USERS[username] == password:
+        state.participant_id = username
+        _open_event_log()
+        return {"success": True, "participantId": username, "role": "participant"}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 
 class SetStudySessionRequest(BaseModel):

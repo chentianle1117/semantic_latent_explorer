@@ -66,8 +66,10 @@ export const App: React.FC = () => {
   const [showBatchPromptDialog, setShowBatchPromptDialog] = useState(false);
   const [showExternalImageLoader, setShowExternalImageLoader] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [showNamePrompt, setShowNamePrompt] = useState(false);
-  const [namePromptValue, setNamePromptValue] = useState('');
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
   // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
   const setCurrentBrief = useAppStore((s) => s.setDesignBrief);
   // AxisSuggestionModal removed — axes now shown via InlineAxisSuggestions + Dynamic Island
@@ -163,8 +165,8 @@ export const App: React.FC = () => {
       useAppStore.getState().setParticipantLockedFromUrl(true);
       apiClient.setParticipant(urlParticipant).catch(() => {});
     } else {
-      // No URL param — prompt for name so participants don't accidentally share the researcher folder
-      setShowNamePrompt(true);
+      // No URL param — show login form
+      setShowLoginPrompt(true);
     }
 
     // Initialize CLIP on mount
@@ -1380,72 +1382,83 @@ export const App: React.FC = () => {
         <BottomDrawer />
       </div>
 
-      {/* Name prompt — shown on direct URL access (no ?participant= param) */}
-      {showNamePrompt && (
+      {/* Login — shown on direct URL access (no ?participant= param) */}
+      {showLoginPrompt && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 9999,
-          background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <div style={{
             background: '#161b22', border: '1px solid #30363d', borderRadius: '12px',
-            padding: '32px 36px', width: '340px', display: 'flex', flexDirection: 'column', gap: '16px',
+            padding: '36px 40px', width: '360px', display: 'flex', flexDirection: 'column', gap: '16px',
           }}>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: '#e6edf3' }}>Who are you?</div>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#e6edf3' }}>Sign in</div>
             <div style={{ fontSize: '12px', color: '#8b949e', lineHeight: 1.5 }}>
-              Enter your name so your canvas data stays separate from other participants.
+              Enter the username and password provided by the researcher.
             </div>
             <input
               autoFocus
               type="text"
-              placeholder="Your name (e.g. Alice)"
-              value={namePromptValue}
-              onChange={(e) => setNamePromptValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && namePromptValue.trim()) {
-                  const name = namePromptValue.trim();
-                  useAppStore.getState().setParticipantId(name);
-                  apiClient.setParticipant(name).catch(() => {});
-                  setShowNamePrompt(false);
-                }
-              }}
+              placeholder="Username"
+              value={loginUsername}
+              onChange={(e) => { setLoginUsername(e.target.value); setLoginError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (document.getElementById('login-password-input') as HTMLInputElement)?.focus(); }}
               style={{
-                padding: '8px 12px', borderRadius: '8px',
-                border: '1px solid #388bfd', background: '#0d1117',
+                padding: '9px 12px', borderRadius: '8px',
+                border: `1px solid ${loginError ? '#f85149' : '#30363d'}`, background: '#0d1117',
                 color: '#e6edf3', fontSize: '13px', outline: 'none',
               }}
             />
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => {
-                  useAppStore.getState().setParticipantId('researcher');
-                  apiClient.setParticipant('researcher').catch(() => {});
-                  setShowNamePrompt(false);
-                }}
-                style={{
-                  padding: '6px 14px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer',
-                  background: 'transparent', border: '1px solid #30363d', color: '#8b949e',
-                }}
-              >
-                I'm the researcher
-              </button>
-              <button
-                disabled={!namePromptValue.trim()}
-                onClick={() => {
-                  const name = namePromptValue.trim();
-                  useAppStore.getState().setParticipantId(name);
-                  apiClient.setParticipant(name).catch(() => {});
-                  setShowNamePrompt(false);
-                }}
-                style={{
-                  padding: '6px 14px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer',
-                  background: namePromptValue.trim() ? '#388bfd' : '#1c2a3a',
-                  border: '1px solid #388bfd', color: namePromptValue.trim() ? '#fff' : '#555',
-                }}
-              >
-                Continue
-              </button>
-            </div>
+            <input
+              id="login-password-input"
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
+              onKeyDown={async (e) => {
+                if (e.key !== 'Enter' || !loginUsername.trim() || !loginPassword.trim()) return;
+                try {
+                  const res = await apiClient.login(loginUsername.trim(), loginPassword.trim());
+                  useAppStore.getState().setParticipantId(res.participantId);
+                  if (res.role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
+                  setShowLoginPrompt(false);
+                } catch {
+                  setLoginError('Invalid username or password');
+                }
+              }}
+              style={{
+                padding: '9px 12px', borderRadius: '8px',
+                border: `1px solid ${loginError ? '#f85149' : '#30363d'}`, background: '#0d1117',
+                color: '#e6edf3', fontSize: '13px', outline: 'none',
+              }}
+            />
+            {loginError && (
+              <div style={{ fontSize: '12px', color: '#f85149' }}>{loginError}</div>
+            )}
+            <button
+              disabled={!loginUsername.trim() || !loginPassword.trim()}
+              onClick={async () => {
+                setLoginError('');
+                try {
+                  const res = await apiClient.login(loginUsername.trim(), loginPassword.trim());
+                  useAppStore.getState().setParticipantId(res.participantId);
+                  if (res.role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
+                  setShowLoginPrompt(false);
+                } catch {
+                  setLoginError('Invalid username or password');
+                }
+              }}
+              style={{
+                padding: '9px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer',
+                background: loginUsername.trim() && loginPassword.trim() ? '#388bfd' : '#1c2a3a',
+                border: '1px solid #388bfd',
+                color: loginUsername.trim() && loginPassword.trim() ? '#fff' : '#555',
+                fontWeight: 600,
+              }}
+            >
+              Sign in
+            </button>
           </div>
         </div>
       )}

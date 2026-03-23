@@ -363,6 +363,11 @@ class APIClient {
     return response.data;
   }
 
+  async login(username: string, password: string): Promise<{ success: boolean; participantId: string; role: string }> {
+    const response = await axios.post(`${API_BASE}/auth/login`, { username, password });
+    return response.data;
+  }
+
   async setStudySessionName(name: string): Promise<{ studySessionName: string }> {
     const response = await axios.post(`${API_BASE}/session/set-study-name`, { name });
     return response.data;

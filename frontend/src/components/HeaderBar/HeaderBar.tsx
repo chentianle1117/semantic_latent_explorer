@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import "./HeaderBar.css";
 import { CanvasSwitcher } from "../CanvasSwitcher/CanvasSwitcher";
 import { ProgressBar } from "../OnboardingTour/ProgressBar";

@@ -826,6 +826,12 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
                   ? d.parent_side_id : d.id;
                 const curIsolated = useAppStore.getState().isolatedImageIds;
                 if (curIsolated !== null && !curIsolated.includes(targetId)) return;
+                // Block selection of images that don't pass the active star filter
+                const curStarFilter = useAppStore.getState().starFilter;
+                if (curStarFilter !== null) {
+                  const curRatings = useAppStore.getState().imageRatings;
+                  if ((curRatings[targetId] ?? 0) !== curStarFilter) return;
+                }
                 toggleImageSelection(targetId, event.ctrlKey);
                 // Trigger selection change callback
                 setTimeout(() => {
@@ -1687,6 +1693,15 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       });
     }
 
+    // Auto-deselect images that no longer pass the star filter
+    if (starFilterVal !== null) {
+      const curSel = useAppStore.getState().selectedImageIds;
+      const passing = curSel.filter(id => (imageRatingsVal[id] ?? 0) === starFilterVal);
+      if (passing.length !== curSel.length) {
+        useAppStore.getState().setSelectedImageIds(passing);
+      }
+    }
+
     imagesGroup.selectAll(".image-node").each(function(d: any) {
       const starPasses = starFilterVal === null || (imageRatingsVal[d.id] ?? 0) === starFilterVal;
       const isolatePasses = isolateSet === null || isolateSet.has(d.id);
@@ -1698,24 +1713,45 @@ export const SemanticCanvas: React.FC<SemanticCanvasProps> = ({
       if ((!starPasses || !isolatePasses) && !isSelected) {
         el.transition().duration(250).attr("opacity", 0.05);
         el.style("pointer-events", "none");
+        el.select("rect").style("pointer-events", "none");
         return;
       }
 
       // Re-enable pointer-events for visible items
       el.style("pointer-events", null);
+      el.select("rect").style("pointer-events", null);
 
       // Both filters pass — apply selection cascade
-      // Only selected shoes get full opacity; everything else dims equally.
-      // Parent/child relationships are shown via genealogy lines, not opacity.
       if (selectedImageIds.length > 0) {
-        // Selection dimming: selected=1.0, unselected=0.3 on <g>
-        // The <image> element inside already carries the per-image or global imageOpacity
         const opacity = isSelected ? 1.0 : 0.3;
         el.transition().duration(200).attr("opacity", opacity);
       } else {
-        // No selection: reset <g> to 1.0 (fully visible as a group)
-        // Actual imageOpacity is on the <image> element set by the render/fast-path
         el.transition().duration(200).attr("opacity", 1.0);
+      }
+
+      // Star badge: remove old, re-add if rated
+      el.selectAll(".star-badge").remove();
+      const rating = imageRatingsVal[d.id] ?? 0;
+      if (rating > 0) {
+        const sz = imageSizeOverridesRef.current[d.id] ?? useAppStore.getState().visualSettings.imageSize;
+        const badgeG = el.append("g")
+          .attr("class", "star-badge")
+          .attr("transform", `translate(${sz / 2 - 2}, ${sz / 2 - 2})`)
+          .style("pointer-events", "none");
+        badgeG.append("rect")
+          .attr("x", -18).attr("y", -12)
+          .attr("width", 18).attr("height", 12)
+          .attr("rx", 3)
+          .attr("fill", "#c8a000")
+          .attr("opacity", 0.88);
+        badgeG.append("text")
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "central")
+          .attr("x", -9).attr("y", -6)
+          .attr("font-size", 8)
+          .attr("fill", "white")
+          .attr("font-weight", "bold")
+          .text(`${rating}★`);
       }
     });
 

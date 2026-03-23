@@ -394,9 +394,11 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
 
                 {/* Star badge */}
                 {rating > 0 && (
-                  <g transform={`translate(${-hs + 6},${-hs + 6})`}>
-                    <circle r={6} fill="#c8a000" opacity={0.92} />
-                    <text textAnchor="middle" dominantBaseline="central" fontSize={8} fill="white">★</text>
+                  <g transform={`translate(${-hs + 11},${-hs + 8})`}>
+                    <rect x={-11} y={-7} width={22} height={14} rx={4} fill="#c8a000" opacity={0.88} />
+                    <text textAnchor="middle" dominantBaseline="central" fontSize={7} fill="white" fontWeight="bold">
+                      {rating}★
+                    </text>
                   </g>
                 )}
 

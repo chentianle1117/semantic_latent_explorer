@@ -97,6 +97,10 @@ from models.data_structures import ImageMetadata, HistoryGroup
 
 app = FastAPI(title="Zappos Semantic Explorer API")
 
+# Lock to prevent concurrent saves corrupting global state
+import threading
+_save_lock = threading.Lock()
+
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
@@ -420,27 +424,36 @@ def _serialize_canvas() -> dict:
         "nextId": state.next_id,
         "images": images_data,
         "historyGroups": history_data,
+        "layerDefinitions": state.layer_definitions,
+        "imageLayerMap": {str(k): v for k, v in state.image_layer_map.items()},
     }
 
 
 def _save_canvas_to_disk() -> Path:
     """Save current canvas state to disk and return the file path.
 
+    Thread-safe: uses _save_lock to prevent concurrent writes from
+    overlapping (e.g. auto-save firing during canvas switch).
+
     Uses the descriptive {slug}_{canvas_id}.json filename.
     If the canvas was renamed since the last save the old file is deleted.
     Event logs are saved ONLY in the events/ directory as JSONL (see _open_event_log).
     """
-    data = _serialize_canvas()
-    new_path = _session_path(state.participant_id, state.current_canvas_id, state.canvas_name)
-    # Delete old file if it exists under a different name (rename case)
-    old_path = _find_session_file(state.participant_id, state.current_canvas_id)
-    if old_path and old_path.resolve() != new_path.resolve():
-        try:
-            old_path.unlink()
-        except OSError:
-            pass
-    with open(new_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, cls=_NumpyEncoder)
+    with _save_lock:
+        data = _serialize_canvas()
+        new_path = _session_path(state.participant_id, state.current_canvas_id, state.canvas_name)
+        # Delete old file if it exists under a different name (rename case)
+        old_path = _find_session_file(state.participant_id, state.current_canvas_id)
+        if old_path and old_path.resolve() != new_path.resolve():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+        # Write to temp file first, then rename — atomic on most filesystems
+        tmp_path = new_path.with_suffix('.tmp')
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, cls=_NumpyEncoder)
+        tmp_path.replace(new_path)  # atomic rename
 
     # Persist last-active canvas ID so login can restore the correct canvas
     try:
@@ -616,6 +629,12 @@ def _deserialize_canvas(data: dict) -> None:
             thumbnail_id=hg_data.get("thumbnail_id"),
             timestamp=ts,
         ))
+
+    # Restore layer metadata
+    if "layerDefinitions" in data:
+        state.layer_definitions = data["layerDefinitions"]
+    if "imageLayerMap" in data:
+        state.image_layer_map = {int(k): v for k, v in data["imageLayerMap"].items()}
 
     # Reset cluster data
     state.cluster_centroids = []
@@ -4303,13 +4322,36 @@ async def load_session(request: LoadSessionRequest):
         _close_event_log()
         # Save current canvas first
         _save_canvas_to_disk()
+
+        # Snapshot critical state so we can rollback if load fails
+        _snapshot = {
+            "canvas_id": state.current_canvas_id,
+            "canvas_name": state.canvas_name,
+            "participant_id": state.participant_id,
+        }
+
         # Find and load the requested canvas
         path = _find_session_file(state.participant_id, request.canvas_id)
         if not path:
             raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        _deserialize_canvas(data)
+
+        # Validate JSON has required fields before clobbering state
+        if "id" not in data or "images" not in data:
+            raise HTTPException(status_code=400, detail="Corrupted canvas file — missing required fields")
+
+        try:
+            _deserialize_canvas(data)
+        except Exception as deser_err:
+            # Rollback: restore the canvas we just saved so state isn't half-broken
+            print(f"[load_session] Deserialization failed: {deser_err} — rolling back")
+            rollback_path = _find_session_file(_snapshot["participant_id"], _snapshot["canvas_id"])
+            if rollback_path:
+                with open(rollback_path, encoding="utf-8") as f:
+                    _deserialize_canvas(json.load(f))
+            raise HTTPException(status_code=500, detail=f"Failed to load canvas: {deser_err}")
+
         _open_event_log()
         await broadcast_state_update()
         visible = [img for img in state.images_metadata if img.visible]

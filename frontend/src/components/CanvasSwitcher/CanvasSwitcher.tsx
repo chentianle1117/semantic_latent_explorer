@@ -12,6 +12,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { useProgressStore } from '../../store/progressStore';
 import { apiClient } from '../../api/client';
+import { cancelPendingSave } from '../../hooks/useAutoSave';
 import './CanvasSwitcher.css';
 
 export const CanvasSwitcher: React.FC = () => {
@@ -73,6 +74,8 @@ export const CanvasSwitcher: React.FC = () => {
 
   const handleSwitchCanvas = async (canvasId: string) => {
     if (canvasId === currentCanvasId || isSwitching) return;
+    // Cancel any pending auto-save timer to prevent cross-canvas corruption
+    cancelPendingSave();
     setIsOpen(false);
     setIsSwitching(true);
     const ps = useProgressStore.getState();

@@ -30,7 +30,4 @@ COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 # Run from backend/ so relative imports (from models import ...) work
 WORKDIR /app/backend
 
-# Railway injects PORT at runtime
-EXPOSE 8000
-
-CMD sh -c "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"
+CMD sh -c "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8080}"

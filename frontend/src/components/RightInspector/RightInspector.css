@@ -720,6 +720,9 @@
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Neutral hover — all non-primary controls */

@@ -573,7 +573,7 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
                 onClick={handleExportSelected}
                 title={`Save ${selectedImages.length > 1 ? selectedImages.length + ' images' : 'image'} to local disk`}
               >
-                ↓ Save {selectedImages.length > 1 ? `${selectedImages.length} Images` : 'Image'}
+                ↓ Save{selectedImages.length > 1 ? ` (${selectedImages.length})` : ''}
               </button>
               {onRemoveSelected && (
                 <button className="action-danger" onClick={onRemoveSelected} data-tour="action-remove">

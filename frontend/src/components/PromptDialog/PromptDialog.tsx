@@ -99,7 +99,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
       if (labelIdx >= referenceImages.length) continue;
       if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
       parts.push(
-        <span key={match.index} style={{ color: REF_IMAGE_COLORS[labelIdx], fontWeight: 700 }}>
+        <span key={match.index} style={{ color: REF_IMAGE_COLORS[labelIdx] }}>
           {match[0]}
         </span>
       );

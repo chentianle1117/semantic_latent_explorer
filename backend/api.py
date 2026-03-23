@@ -131,6 +131,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         }
     )
 
+import traceback as _traceback
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all: log full traceback server-side and return readable detail to browser."""
+    tb = _traceback.format_exc()
+    print(f"\n💥 UNHANDLED EXCEPTION on {request.method} {request.url}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}"},
+    )
+
 
 # Pydantic models for API
 class AxisUpdateRequest(BaseModel):
@@ -1074,7 +1086,17 @@ def _fal_sync_call(endpoint: str, input_data: dict) -> dict:
         json=input_data,
         timeout=180,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        # Extract fal.ai's error body for readable diagnosis
+        try:
+            err_body = resp.json()
+        except Exception:
+            err_body = resp.text[:500]
+        print(f"[fal-proxy] ERROR {resp.status_code} from {endpoint}: {err_body}")
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"fal.ai {endpoint} → {resp.status_code}: {err_body}",
+        )
     return resp.json()
 
 
@@ -1148,6 +1170,16 @@ def initialize_embedder(model_type: str = "fashionclip"):
         return HuggingFaceCLIPEmbedder()
     else:
         return CLIPEmbedder()
+
+
+def _ensure_embedder():
+    """Auto-initialize embedder + axis builder if they were reset (e.g. after server restart)."""
+    if state.embedder is None:
+        print("[auto-init] embedder is None — re-initializing after server restart...")
+        state.embedder = initialize_embedder(state.clip_model_type)
+        state.axis_builder = SemanticAxisBuilder(state.embedder)
+        state._axis_directions_cache = None
+        print("[auto-init] embedder ready")
 
 
 def expand_concept_with_gemini(concept: str, num_expansions: int = 4) -> List[str]:
@@ -1346,8 +1378,7 @@ async def update_axes_tuned(request: TunedAxesRequest):
     where wᵢ = (position_i - 5) / 5  (maps 0-10 to [-1, +1])
     """
     try:
-        if state.axis_builder is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
+        _ensure_embedder()
 
         print(f"\n=== Tuned Axis Update ===")
         print(f"  Text weight: {request.text_weight}")
@@ -1493,8 +1524,7 @@ Example output:
 async def set_3d_mode(use_3d: bool):
     """Toggle between 2D and 3D visualization mode."""
     try:
-        if state.axis_builder is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
+        _ensure_embedder()
 
         print(f"\n=== Setting 3D Mode: {use_3d} ===")
         state.is_3d_mode = use_3d
@@ -2582,8 +2612,7 @@ async def clear_canvas():
 async def reapply_layout():
     """Re-apply layout spread to all images to fix overlap. Call after loading or when shoes overlap."""
     try:
-        if state.axis_builder is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
+        _ensure_embedder()
         if len(state.images_metadata) < 2:
             return {"status": "success", "message": "Nothing to spread"}
 
@@ -2625,8 +2654,7 @@ async def add_external_images(request: AddExternalImagesRequest):
             print(f"First URL preview (100 chars): {str(first_url)[:100]}")
             print(f"Starts with 'data:': {str(first_url).startswith('data:')}")
 
-        if state.embedder is None:
-            raise HTTPException(status_code=400, detail="CLIP embedder not initialized. Call /api/initialize-clip-only first.")
+        _ensure_embedder()
 
         # Download images from URLs or decode data URLs
         print("Loading images...")
@@ -3507,8 +3535,7 @@ async def embed_ghost_image(request: Request):
         if not image_url:
             raise HTTPException(status_code=400, detail="image_url is required")
 
-        if state.embedder is None:
-            raise HTTPException(status_code=400, detail="CLIP embedder not initialized")
+        _ensure_embedder()
 
         # Load image from data URL or HTTP URL
         if image_url.startswith("data:"):

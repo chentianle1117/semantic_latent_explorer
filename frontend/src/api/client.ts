@@ -16,6 +16,25 @@ import type {
 const API_BASE = '/api';
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
+// Global interceptor: extract FastAPI error detail and log it clearly
+axios.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status ?? 'network error';
+      const url = err.config?.url ?? '?';
+      const method = (err.config?.method ?? 'GET').toUpperCase();
+      const detail =
+        err.response?.data?.detail ??
+        err.response?.data?.message ??
+        err.response?.data ??
+        err.message;
+      console.error(`[API] ${method} ${url} → ${status}`, detail);
+    }
+    return Promise.reject(err);
+  }
+);
+
 class APIClient {
   private ws: WebSocket | null = null;
   private wsCallbacks: Set<(message: WebSocketMessage) => void> = new Set();

@@ -97,6 +97,10 @@
   background: rgba(88, 166, 255, 0.10);
   border-color: rgba(88, 166, 255, 0.28);
 }
+.radial-dial-btn--danger {
+  background: rgba(248, 81, 73, 0.08);
+  border-color: rgba(248, 81, 73, 0.28);
+}
 
 /* Stronger glow on hover */
 .radial-dial-btn--agentic:hover {
@@ -118,6 +122,11 @@
   background: rgba(88, 166, 255, 0.20);
   border-color: rgba(88, 166, 255, 0.58);
   box-shadow: 0 0 14px rgba(88, 166, 255, 0.22);
+}
+.radial-dial-btn--danger:hover {
+  background: rgba(248, 81, 73, 0.18);
+  border-color: rgba(248, 81, 73, 0.6);
+  box-shadow: 0 0 14px rgba(248, 81, 73, 0.22);
 }
 
 .radial-dial-btn-icon {

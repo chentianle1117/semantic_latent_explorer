@@ -1635,7 +1635,7 @@ export const App: React.FC = () => {
                 : hiddenImageIds.length > 0
                 ? `Unhide all ${hiddenImageIds.length} hidden image(s)`
                 : "No images selected to hide",
-            category: "view",
+            category: "global",
             onClick: () => {
               if (selectedImageIds.length > 0) {
                 useAppStore.getState().hideImages([...selectedImageIds]);
@@ -1652,7 +1652,7 @@ export const App: React.FC = () => {
               selectedImageIds.length > 0
                 ? `Remove ${selectedImageIds.length} selected image(s)`
                 : "Clear all images from canvas",
-            category: "global",
+            category: "danger",
             onClick: () => {
               if (selectedImageIds.length > 0) {
                 const ids = [...selectedImageIds];
@@ -1696,7 +1696,7 @@ export const App: React.FC = () => {
             icon: "🔧",
             label: "Settings",
             description: "App & visual preferences",
-            category: "global",
+            category: "system",
             onClick: () => setShowSettingsModal(true),
           },
         ].filter(a => !useAppStore.getState().studyMode || a.id !== 'mood-board') as import('./components/RadialDial/RadialDial').RadialDialAction[]}

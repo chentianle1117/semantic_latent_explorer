@@ -78,18 +78,20 @@ export const App: React.FC = () => {
     useAppStore.getState().setParticipantId(res.participantId);
     if (res.role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
 
-    // Load the participant's most recent canvas instead of creating a new one
+    // Load the participant's last-active canvas (or most recent if marker missing)
     try {
-      const { sessions } = await apiClient.listSessions();
+      const resp = await apiClient.listSessions();
+      const sessions = resp.sessions;
+      const lastActiveId = (resp as any).lastActiveCanvasId;
       useAppStore.getState().setCanvasList(sessions);
       if (sessions.length > 0) {
-        // Sort by updatedAt descending → load the most recent
-        const sorted = [...sessions].sort((a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-        );
-        const latest = sorted[0];
-        console.log(`[login] Loading most recent canvas: "${latest.name}" (${latest.id})`);
-        const loaded = await apiClient.loadSession(latest.id);
+        // Prefer the last-active canvas; fall back to most recently updated
+        const target = (lastActiveId && sessions.find((s: any) => s.id === lastActiveId))
+          || [...sessions].sort((a: any, b: any) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          )[0];
+        console.log(`[login] Loading canvas: "${target.name}" (${target.id})`);
+        const loaded = await apiClient.loadSession(target.id);
         useAppStore.getState().setCurrentCanvasId(loaded.canvasId);
         useAppStore.getState().setCanvasName(loaded.canvasName);
         if (loaded.state?.images) setImages(loaded.state.images);

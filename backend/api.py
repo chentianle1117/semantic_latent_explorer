@@ -442,7 +442,26 @@ def _save_canvas_to_disk() -> Path:
     with open(new_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, cls=_NumpyEncoder)
 
+    # Persist last-active canvas ID so login can restore the correct canvas
+    try:
+        marker = DATA_DIR / state.participant_id / "last_active.txt"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(state.current_canvas_id, encoding="utf-8")
+    except Exception:
+        pass
+
     return new_path
+
+
+def _get_last_active_canvas_id(participant_id: str) -> Optional[str]:
+    """Read the last-active canvas ID for a participant (written on every save)."""
+    try:
+        marker = DATA_DIR / participant_id / "last_active.txt"
+        if marker.exists():
+            return marker.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+    return None
 
 
 def _close_event_log():
@@ -4267,7 +4286,10 @@ async def save_session():
 @app.get("/api/sessions/list")
 async def list_sessions():
     """List all saved canvases for the current participant."""
-    return {"sessions": _list_sessions(state.participant_id)}
+    return {
+        "sessions": _list_sessions(state.participant_id),
+        "lastActiveCanvasId": _get_last_active_canvas_id(state.participant_id),
+    }
 
 
 class LoadSessionRequest(BaseModel):
@@ -4458,8 +4480,9 @@ async def delete_canvas(request: DeleteCanvasRequest):
 
 @app.post("/api/sessions/rename")
 async def rename_canvas(request: RenameCanvasRequest):
-    """Rename the current canvas."""
+    """Rename the current canvas and persist to disk."""
     state.canvas_name = request.name.strip() or "Untitled"
+    _save_canvas_to_disk()  # persist the rename immediately
     return {"canvasId": state.current_canvas_id, "canvasName": state.canvas_name}
 
 

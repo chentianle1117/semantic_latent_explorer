@@ -1,20 +1,9 @@
-# Zappos50K Semantic Explorer - Python Dependencies
-# Use environment.yml for conda, or this file for pip-only installs
+# Semantic Latent Explorer - Python Dependencies
 
 # Core
 numpy>=1.24.0
-pandas>=1.5.0
-scikit-learn>=1.3.0
-scipy>=1.11.0
-
-# PyTorch and Computer Vision
-torch>=2.0.0
-torchvision>=0.15.0
 Pillow>=9.5.0
-opencv-python>=4.6.0
-
-# CLIP embeddings
-open_clip_torch>=3.2.0
+scikit-learn>=1.3.0
 
 # Backend (FastAPI)
 fastapi==0.109.0
@@ -22,12 +11,9 @@ uvicorn[standard]==0.27.0
 python-multipart==0.0.6
 websockets>=12.0
 requests>=2.31.0
-rembg>=2.0.0
 python-jose[cryptography]==3.3.0
+aiofiles>=23.0.0
 
 # AI Agent
 google-generativeai
 python-dotenv
-
-# Utilities
-tqdm>=4.64.0

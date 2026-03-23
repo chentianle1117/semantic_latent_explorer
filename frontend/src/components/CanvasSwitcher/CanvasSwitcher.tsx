@@ -176,9 +176,7 @@ export const CanvasSwitcher: React.FC = () => {
   };
 
   const handleExportZip = () => {
-    const port = window.location.port || '8000';
-    const base = `http://localhost:${port}/api`;
-    window.open(`${base}/export-zip`, '_blank');
+    window.open(`/api/export-zip`, '_blank');
   };
 
   const handleDeleteCanvas = async (canvasId: string, e: React.MouseEvent) => {

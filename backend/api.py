@@ -2,7 +2,8 @@
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Tuple
@@ -91,11 +92,16 @@ app = FastAPI(title="Zappos Semantic Explorer API")
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:5173"],  # React dev servers
+    allow_origins=["*"],  # Allow all origins (Railway + localhost dev)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint for Railway deployment."""
+    return {"status": "ok"}
 
 # Add validation error handler for better error messages
 @app.exception_handler(RequestValidationError)
@@ -4481,6 +4487,21 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         state.websocket_connections.remove(websocket)
+
+
+# ─── Static file serving (production: serve built React app) ───
+_frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _frontend_dist.is_dir():
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="static-assets")
+
+    # SPA fallback: any non-API route returns index.html
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        file_path = _frontend_dist / full_path
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+        return FileResponse(str(_frontend_dist / "index.html"))
 
 
 if __name__ == "__main__":

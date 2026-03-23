@@ -14,7 +14,7 @@ import type {
 } from '../types';
 
 const API_BASE = '/api';
-const WS_URL = `ws://${window.location.host}/ws`;
+const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
 class APIClient {
   private ws: WebSocket | null = null;

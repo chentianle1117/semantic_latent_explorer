@@ -1,0 +1,28 @@
+.git
+.gitignore
+*.md
+LICENSE
+
+# Frontend source (built in Stage 1, not needed in Stage 2)
+frontend/node_modules
+frontend/.env
+
+# Backend data (mounted as persistent volume in production)
+backend/data
+backend/.env
+
+# Python caches
+__pycache__
+*.pyc
+*.pyo
+
+# Analysis scripts (not needed in production)
+analysis/
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,8 +1,8 @@
 /**
  * useAgentBehaviors — Streamlined agent system with 3 active behaviors:
  *
- *  B: Concurrent Ghosts  — fires in parallel with user generation
- *  C: Exploration Ghosts — fires when imagesSinceLastExploration >= 5, then resets
+ *  B: Concurrent Ghosts  — fires on every user generation (no throttle)
+ *  C: Exploration Ghosts — fires every 4 generations, then resets
  *  D: Axis Suggestions   — fires when imagesSinceLastAxisSuggestion >= 20, then resets
  *
  * Ghost images are real fal.ai generated images stored at 45% opacity with colored badges.
@@ -170,12 +170,9 @@ export function useAgentBehaviors() {
     // Skip if not enough context
     if (currentImages.filter(img => img.visible).length < 1) return;
 
-    // Throttle: only fire every 2nd generation, and respect opt-in toggle
+    // Respect opt-in toggle — fires on every generation (no throttle)
     const store = useAppStore.getState();
     if (!store.concurrentGhostsEnabled) return;
-    store.incrementConcurrentGhostCounter();
-    if (store.generationsSinceConcurrentGhost < 2) return;
-    store.resetConcurrentGhostCounter();
 
     console.log('[Agent B] Concurrent ghost triggered for prompt:', userPrompt.substring(0, 50));
 
@@ -424,7 +421,7 @@ export function useAgentBehaviors() {
   // AUTO-TRIGGER C: watch imagesSinceLastExploration
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (imagesSinceLastExploration >= 15) {
+    if (imagesSinceLastExploration >= 4) {
       console.log('[Agent C] Accumulator hit', imagesSinceLastExploration, '— auto-triggering exploration');
       resetExplorationCounter();
       triggerExplorationGhosts();

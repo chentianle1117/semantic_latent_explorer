@@ -189,7 +189,7 @@ export const DesignBriefOverlay: React.FC = () => {
       {/* ── Inline editable brief ── */}
       <div className={`dbo-brief-container${isFocused ? " dbo-brief-focused" : ""}${textJustSynced ? " dbo-brief-synced" : ""}`}>
         <div className="dbo-label-row">
-          <span className="dbo-label">AI Agent Context</span>
+          <span className="dbo-label">Design Brief (Agent Context)</span>
           {isAgentUsingBrief && (
             <span className="dbo-active-indicator" title="Gemini is using this context right now">
               <span className="dbo-active-dot" />
@@ -206,8 +206,8 @@ export const DesignBriefOverlay: React.FC = () => {
           onFocus={handleFocus}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          placeholder="Add context for the AI agent…"
-          rows={isFocused ? 3 : 2}
+          placeholder="Describe your design direction — the AI agent will use this as context for all generations…"
+          rows={isFocused ? 5 : 3}
         />
 
         {(isFocused || localBrief !== (designBrief || '')) && (

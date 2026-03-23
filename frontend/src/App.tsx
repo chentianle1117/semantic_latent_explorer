@@ -1673,6 +1673,25 @@ export const App: React.FC = () => {
             },
           },
           {
+            id: "export",
+            icon: "↓",
+            label: selectedImageIds.length > 0 ? `Save ${selectedImageIds.length} Image${selectedImageIds.length !== 1 ? 's' : ''}` : "Save Image",
+            description: selectedImageIds.length > 0
+              ? `Download ${selectedImageIds.length} selected image(s) to disk`
+              : "Select images first to save them",
+            category: "system",
+            onClick: () => {
+              const imgs = images.filter(img => selectedImageIds.includes(img.id));
+              if (imgs.length === 0) return;
+              imgs.forEach((img) => {
+                const a = document.createElement('a');
+                a.href = `data:image/png;base64,${img.base64_image}`;
+                a.download = `shoe_${img.id}.png`;
+                a.click();
+              });
+            },
+          },
+          {
             id: "settings",
             icon: "🔧",
             label: "Settings",

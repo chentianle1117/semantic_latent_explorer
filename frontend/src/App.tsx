@@ -71,6 +71,43 @@ export const App: React.FC = () => {
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+
+  // Shared login handler: authenticate → load most recent canvas (if any)
+  const handleLogin = async (username: string, password: string) => {
+    const res = await apiClient.login(username, password);
+    useAppStore.getState().setParticipantId(res.participantId);
+    if (res.role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
+
+    // Load the participant's most recent canvas instead of creating a new one
+    try {
+      const { sessions } = await apiClient.listSessions();
+      useAppStore.getState().setCanvasList(sessions);
+      if (sessions.length > 0) {
+        // Sort by updatedAt descending → load the most recent
+        const sorted = [...sessions].sort((a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+        const latest = sorted[0];
+        console.log(`[login] Loading most recent canvas: "${latest.name}" (${latest.id})`);
+        const loaded = await apiClient.loadSession(latest.id);
+        useAppStore.getState().setCurrentCanvasId(loaded.canvasId);
+        useAppStore.getState().setCanvasName(loaded.canvasName);
+        if (loaded.state?.images) setImages(loaded.state.images);
+        if (loaded.state?.history_groups) setHistoryGroups(loaded.state.history_groups);
+        if (loaded.state?.axis_labels) useAppStore.getState().setAxisLabels(loaded.state.axis_labels);
+        if (loaded.state?.design_brief) useAppStore.getState().setDesignBrief(loaded.state.design_brief);
+      } else {
+        // No existing canvases — fetch default state (fresh canvas)
+        const session = await apiClient.getCurrentSession();
+        useAppStore.getState().setCurrentCanvasId(session.canvasId);
+        useAppStore.getState().setCanvasName(session.canvasName);
+      }
+    } catch (err) {
+      console.warn('[login] Failed to load sessions, using default canvas:', err);
+    }
+
+    setShowLoginPrompt(false);
+  };
   // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
   const setCurrentBrief = useAppStore((s) => s.setDesignBrief);
   // AxisSuggestionModal removed — axes now shown via InlineAxisSuggestions + Dynamic Island
@@ -1448,10 +1485,7 @@ export const App: React.FC = () => {
               onKeyDown={async (e) => {
                 if (e.key !== 'Enter' || !loginUsername.trim() || !loginPassword.trim()) return;
                 try {
-                  const res = await apiClient.login(loginUsername.trim(), loginPassword.trim());
-                  useAppStore.getState().setParticipantId(res.participantId);
-                  if (res.role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
-                  setShowLoginPrompt(false);
+                  await handleLogin(loginUsername.trim(), loginPassword.trim());
                 } catch {
                   setLoginError('Invalid username or password');
                 }
@@ -1470,10 +1504,7 @@ export const App: React.FC = () => {
               onClick={async () => {
                 setLoginError('');
                 try {
-                  const res = await apiClient.login(loginUsername.trim(), loginPassword.trim());
-                  useAppStore.getState().setParticipantId(res.participantId);
-                  if (res.role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
-                  setShowLoginPrompt(false);
+                  await handleLogin(loginUsername.trim(), loginPassword.trim());
                 } catch {
                   setLoginError('Invalid username or password');
                 }

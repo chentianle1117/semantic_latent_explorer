@@ -4491,9 +4491,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # ─── Static file serving (production: serve built React app) ───
 _frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+print(f"[SPA] Looking for frontend dist at: {_frontend_dist}")
+print(f"[SPA] Exists: {_frontend_dist.is_dir()}")
 if _frontend_dist.is_dir():
-    # Serve static assets (JS, CSS, images)
-    app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="static-assets")
+    _index_html = _frontend_dist / "index.html"
+    _assets_dir = _frontend_dist / "assets"
+    print(f"[SPA] index.html exists: {_index_html.is_file()}")
+    print(f"[SPA] assets/ exists: {_assets_dir.is_dir()}")
+
+    if _assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="static-assets")
 
     # SPA fallback: any non-API route returns index.html
     @app.get("/{full_path:path}")
@@ -4501,7 +4508,19 @@ if _frontend_dist.is_dir():
         file_path = _frontend_dist / full_path
         if file_path.is_file():
             return FileResponse(str(file_path))
-        return FileResponse(str(_frontend_dist / "index.html"))
+        return FileResponse(str(_index_html))
+else:
+    print(f"[SPA] WARNING: frontend dist not found! Contents of parent: {list((_frontend_dist.parent).iterdir()) if _frontend_dist.parent.is_dir() else 'parent missing'}")
+
+@app.get("/api/debug/spa")
+async def debug_spa():
+    """Debug endpoint to check frontend dist status."""
+    return {
+        "frontend_dist": str(_frontend_dist),
+        "exists": _frontend_dist.is_dir(),
+        "index_html": (_frontend_dist / "index.html").is_file() if _frontend_dist.is_dir() else False,
+        "contents": [str(f.name) for f in _frontend_dist.iterdir()] if _frontend_dist.is_dir() else [],
+    }
 
 
 if __name__ == "__main__":

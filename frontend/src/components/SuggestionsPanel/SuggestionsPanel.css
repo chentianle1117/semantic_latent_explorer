@@ -380,13 +380,10 @@
 /* ─── Inline @A/@B chip for combination prompts ─────────────────────────── */
 
 .sp-combo-text {
+  display: block;
   font-size: 11px;
   color: rgba(200, 210, 220, 0.9);
-  line-height: 1.5;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px;
+  line-height: 1.7;
 }
 
 .sp-combo-mention {

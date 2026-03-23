@@ -19,8 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Backend code
+# Backend code + models
 COPY backend/ ./backend/
+COPY models/ ./models/
 
 # Built frontend from Stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist

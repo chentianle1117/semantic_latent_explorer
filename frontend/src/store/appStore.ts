@@ -171,6 +171,7 @@ interface AppStore extends AppState {
   setCurrentCanvasId: (id: string | null) => void;
   setCanvasName: (name: string) => void;
   setParticipantId: (id: string) => void;
+  setParticipantLockedFromUrl: (locked: boolean) => void;
   setCanvasList: (list: CanvasMeta[]) => void;
   addEventLogEntry: (entry: EventLogEntry) => void;
 
@@ -309,6 +310,7 @@ const initialState: AppState = {
   currentCanvasId: null as string | null,
   canvasName: 'Canvas 1',
   participantId: 'researcher',
+  participantLockedFromUrl: false,
   studySessionName: '' as string,
   canvasList: [] as CanvasMeta[],
   eventLog: [] as EventLogEntry[],
@@ -793,6 +795,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setCurrentCanvasId: (id) => set({ currentCanvasId: id }),
   setCanvasName: (name) => set({ canvasName: name }),
   setParticipantId: (id) => set({ participantId: id }),
+  setParticipantLockedFromUrl: (locked) => set({ participantLockedFromUrl: locked }),
   setStudySessionName: (name: string) => set({ studySessionName: name }),
   setCanvasList: (list) => set({ canvasList: list }),
   addEventLogEntry: (entry) => set((s) => ({ eventLog: [...s.eventLog, entry] })),

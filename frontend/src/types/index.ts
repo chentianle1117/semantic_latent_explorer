@@ -213,6 +213,7 @@ export interface AppState {
   currentCanvasId: string | null;
   canvasName: string;
   participantId: string;
+  participantLockedFromUrl: boolean;
   canvasList: CanvasMeta[];
   eventLog: EventLogEntry[];
 

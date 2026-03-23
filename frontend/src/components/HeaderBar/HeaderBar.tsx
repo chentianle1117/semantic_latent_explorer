@@ -21,6 +21,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onOpenSettings,
 }) => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
+  const participantId = useAppStore((s) => s.participantId);
+  const participantLockedFromUrl = useAppStore((s) => s.participantLockedFromUrl);
   const studySessionName = useAppStore((s) => s.studySessionName);
   const setStudySessionName = useAppStore((s) => s.setStudySessionName);
   const [sessionDraft, setSessionDraft] = useState(studySessionName);
@@ -108,6 +110,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               title="Study session name — prefixed to all saved files for traceability"
             />
           </div>
+          {participantLockedFromUrl && (
+            <span className="participant-pill" title={`Logged in as ${participantId}`}>
+              {participantId}
+            </span>
+          )}
           <button
             className="header-canvas-action"
             data-tour="save"

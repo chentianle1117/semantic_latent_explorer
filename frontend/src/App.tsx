@@ -154,6 +154,14 @@ export const App: React.FC = () => {
   }, [layers, imageLayerMap]);
 
   useEffect(() => {
+    // Lock participant identity from URL param (e.g. ?participant=Alice)
+    const urlParticipant = new URLSearchParams(window.location.search).get('participant');
+    if (urlParticipant) {
+      useAppStore.getState().setParticipantId(urlParticipant);
+      useAppStore.getState().setParticipantLockedFromUrl(true);
+      apiClient.setParticipant(urlParticipant).catch(() => {});
+    }
+
     // Initialize CLIP on mount
     console.log("🚀 Initializing CLIP embedder...");
 

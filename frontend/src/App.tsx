@@ -25,6 +25,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { OnboardingTour } from "./components/OnboardingTour/OnboardingTour";
 import { MultiViewEditor } from "./components/MultiViewEditor/MultiViewEditor";
 import { AxisTuningRail } from "./components/AxisTuningRail/AxisTuningRail";
+import { FeedbackNotepad } from "./components/FeedbackNotepad/FeedbackNotepad";
 import { useAppStore } from "./store/appStore";
 import type { ImageData, ShoeViewType } from "./types";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
@@ -1479,6 +1480,9 @@ export const App: React.FC = () => {
         isOpen={showExplorationTreeModal}
         onClose={() => setShowExplorationTreeModal(false)}
       />
+
+      {/* Floating feedback notepad — always visible for study participants */}
+      <FeedbackNotepad />
 
       {/* Multi-View Editor overlay */}
       {multiViewTarget && (

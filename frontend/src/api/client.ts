@@ -368,6 +368,23 @@ class APIClient {
     return response.data;
   }
 
+  async submitFeedback(payload: {
+    category: string;
+    content: string;
+    userId: string;
+    context: { currentRoute: string; activeCanvasId: string; browser: string };
+  }): Promise<{ feedbackId: string }> {
+    const response = await axios.post(`${API_BASE}/feedback`, {
+      feedback_id: crypto.randomUUID(),
+      user_id: payload.userId,
+      timestamp: new Date().toISOString(),
+      category: payload.category,
+      content: payload.content,
+      context: payload.context,
+    });
+    return response.data;
+  }
+
   async setStudySessionName(name: string): Promise<{ studySessionName: string }> {
     const response = await axios.post(`${API_BASE}/session/set-study-name`, { name });
     return response.data;

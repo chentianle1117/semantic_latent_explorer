@@ -4494,6 +4494,46 @@ async def log_event(request: EventLogRequest):
     _log_event_to_file(entry)
     return {"ok": True}
 
+class FeedbackContext(BaseModel):
+    currentRoute: str = ""
+    activeCanvasId: str = ""
+    browser: str = ""
+
+class FeedbackRequest(BaseModel):
+    feedback_id: str
+    user_id: str
+    timestamp: str
+    category: str
+    content: str
+    context: FeedbackContext = FeedbackContext()
+
+
+@app.post("/api/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """Save a participant feedback note to a dedicated JSONL feedback log.
+
+    Stored at: backend/data/{user_id}/feedback.jsonl
+    Each line is one JSON object with the full payload.
+    """
+    participant = request.user_id.strip() or "unknown"
+    feedback_dir = DATA_DIR / participant
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    feedback_path = feedback_dir / "feedback.jsonl"
+    entry = {
+        "feedbackId": request.feedback_id,
+        "userId": participant,
+        "timestamp": request.timestamp,
+        "category": request.category,
+        "content": request.content,
+        "context": request.context.dict(),
+    }
+    try:
+        with open(feedback_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write feedback: {e}")
+    return {"feedbackId": request.feedback_id}
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 

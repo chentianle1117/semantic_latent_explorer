@@ -124,6 +124,7 @@ export const CanvasSwitcher: React.FC = () => {
     setIsOpen(false);
     const name = window.prompt('New canvas name:', 'Canvas ' + (canvasList.length + 2));
     if (!name) return;
+    cancelPendingSave(); // prevent stale auto-save from firing after switch
     try {
       apiClient.logEvent('canvas_switch', { fromCanvasId: currentCanvasId, action: 'new', newName: name });
       const result = await apiClient.newCanvas(name);
@@ -146,6 +147,7 @@ export const CanvasSwitcher: React.FC = () => {
     setIsOpen(false);
     const name = window.prompt('Branch canvas name:', canvasName + ' – Branch');
     if (!name) return;
+    cancelPendingSave(); // prevent stale auto-save from firing after switch
     try {
       const result = await apiClient.branchCanvas(name, selectedImageIds);
       // Reload state from backend after branch
@@ -185,6 +187,7 @@ export const CanvasSwitcher: React.FC = () => {
   const handleDeleteCanvas = async (canvasId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!window.confirm('Delete this canvas? This cannot be undone.')) return;
+    cancelPendingSave(); // prevent stale auto-save if deleting active canvas
     try {
       const result = await apiClient.deleteSession(canvasId);
       // If we deleted the active canvas, backend auto-switched — reload state

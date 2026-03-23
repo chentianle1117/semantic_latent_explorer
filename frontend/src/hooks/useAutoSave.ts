@@ -48,10 +48,14 @@ export function useAutoSave() {
   useEffect(() => { isInitializedRef.current = isInitialized; }, [isInitialized]);
   useEffect(() => { imagesLengthRef.current = images.length; }, [images.length]);
   // Track canvas ID so we never save after a switch with stale state
+  // Also reset hasEverHadImages when canvas changes (new canvas = fresh tracking)
   useEffect(() => {
     return useAppStore.subscribe(
       (s) => s.currentCanvasId,
-      (id) => { canvasIdRef.current = id; }
+      (id) => {
+        canvasIdRef.current = id;
+        hasEverHadImagesRef.current = false; // reset on canvas switch
+      }
     );
   }, []);
 

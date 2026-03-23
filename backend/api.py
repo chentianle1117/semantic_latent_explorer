@@ -97,7 +97,9 @@ from models.data_structures import ImageMetadata, HistoryGroup
 
 app = FastAPI(title="Zappos Semantic Explorer API")
 
-# Lock to prevent concurrent saves corrupting global state
+# Lock to prevent concurrent saves corrupting global state.
+# threading.Lock is correct here: _save_canvas_to_disk is synchronous and may be
+# called from asyncio.to_thread. asyncio.Lock wouldn't protect across threads.
 import threading
 _save_lock = threading.Lock()
 
@@ -4294,9 +4296,11 @@ async def get_current_session():
 
 @app.post("/api/sessions/save")
 async def save_session():
-    """Save the current canvas state to disk. Accepts any body (supports sendBeacon text/plain)."""
+    """Save the current canvas state to disk. Accepts any body (supports sendBeacon text/plain).
+    Offloaded to thread pool so the event loop isn't blocked during large JSON writes.
+    """
     try:
-        path = _save_canvas_to_disk()
+        path = await asyncio.to_thread(_save_canvas_to_disk)
         return {"success": True, "path": str(path)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

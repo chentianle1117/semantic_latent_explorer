@@ -9,7 +9,7 @@
  * - Descriptor tags from reference analysis shown as colored pills
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import type { ImageData, ReferenceImageAnalysis } from '../../types';
 import { useAppStore } from '../../store/appStore';
 import { apiClient } from '../../api/client';
@@ -43,7 +43,10 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const [freeText, setFreeText] = useState('');
   const [numImages, setNumImages] = useState(2);
   const [showMentionDrop, setShowMentionDrop] = useState(false);
+  const [dropdownIdx, setDropdownIdx] = useState(0);
+  const [textScrollTop, setTextScrollTop] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   // All available pills from SuggestionsPanel (kept for future use)
   const [_availablePills, setAvailablePills] = useState<PillDef[]>([]);
@@ -72,6 +75,39 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const showTutorialGuide = !guideDismissed && onboardingSpotlight === 'b-gen-ref';
 
   const labels = referenceImages.map((_, i) => String.fromCharCode(65 + i)); // A, B, C...
+
+  // Active mention labels in freeText — drives overlay highlight + thumbnail pulse
+  const activeMentionLabels = useMemo(() => {
+    const s = new Set<string>();
+    const re = /@([A-D])/gi;
+    let m;
+    while ((m = re.exec(freeText)) !== null) s.add(m[1].toUpperCase());
+    return s;
+  }, [freeText]);
+  const hasMentions = activeMentionLabels.size > 0 && referenceImages.length > 1;
+
+  // Render freeText with colored spans for @A/@B/@C/@D mentions
+  const highlightMentions = (text: string): React.ReactNode[] => {
+    if (!text) return [''];
+    const re = /@([A-D])(?:'s)?/gi;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    re.lastIndex = 0;
+    let match;
+    while ((match = re.exec(text)) !== null) {
+      const labelIdx = match[1].toUpperCase().charCodeAt(0) - 65;
+      if (labelIdx >= referenceImages.length) continue;
+      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+      parts.push(
+        <span key={match.index} style={{ color: REF_IMAGE_COLORS[labelIdx], fontWeight: 700 }}>
+          {match[0]}
+        </span>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts;
+  };
 
   // Composed prompt = chips (flat text) + free text, separated by commas
   const composedPrompt = [
@@ -114,9 +150,10 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const handleFreeTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setFreeText(val);
-    // Show @mention dropdown when the last typed char is @
     const pos = e.target.selectionStart ?? val.length;
-    setShowMentionDrop(val[pos - 1] === '@');
+    const showDrop = val[pos - 1] === '@';
+    setShowMentionDrop(showDrop);
+    if (showDrop) setDropdownIdx(0);
   };
 
   const insertMention = (label: string) => {
@@ -163,13 +200,34 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      if (showMentionDrop) {
+    if (showMentionDrop && referenceImages.length > 1) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setDropdownIdx(i => (i + 1) % referenceImages.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setDropdownIdx(i => (i - 1 + referenceImages.length) % referenceImages.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        insertMention(labels[dropdownIdx]);
+        return;
+      }
+      if (e.key === 'Escape') {
         setShowMentionDrop(false);
-      } else {
-        onClose();
+        return;
       }
     }
+    if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  const handleTextareaScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    setTextScrollTop((e.target as HTMLTextAreaElement).scrollTop);
   };
 
   // Refine prompt via AI — directly replaces freeText
@@ -312,22 +370,29 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
               ) : (
                 <>
                   <div className="reference-grid">
-                    {referenceImages.map((img, i) => (
-                      <div key={img.id} className="ref-thumb-wrapper">
-                        <img
-                          src={`data:image/png;base64,${img.base64_image}`}
-                          alt={`Reference ${img.id}`}
-                          className="reference-thumb"
-                          style={{ borderColor: REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length] }}
-                        />
-                        <span
-                          className="ref-thumb-label"
-                          style={{ color: REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length] }}
-                        >
-                          @{labels[i]}
-                        </span>
-                      </div>
-                    ))}
+                    {referenceImages.map((img, i) => {
+                      const isActive = activeMentionLabels.has(labels[i]);
+                      const color = REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length];
+                      return (
+                        <div key={img.id} className={`ref-thumb-wrapper${isActive ? ' ref-thumb-active' : ''}`}>
+                          <img
+                            src={`data:image/png;base64,${img.base64_image}`}
+                            alt={`Reference ${img.id}`}
+                            className="reference-thumb"
+                            style={{
+                              borderColor: color,
+                              ...(isActive ? { boxShadow: `0 0 10px ${color}80, 0 0 20px ${color}40` } : {}),
+                            }}
+                          />
+                          <span
+                            className={`ref-thumb-label${isActive ? ' ref-thumb-label--active' : ''}`}
+                            style={{ color }}
+                          >
+                            @{labels[i]}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                   <p className="reference-label">{referenceImages.length} Reference Images</p>
                 </>
@@ -374,6 +439,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                     value={freeText}
                     onChange={handleFreeTextChange}
                     onKeyDown={handleKeyDown}
+                    onScroll={handleTextareaScroll}
                     placeholder={
                       hasChips
                         ? 'Add more details...'
@@ -383,24 +449,45 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
                     }
                     rows={hasChips ? 2 : 4}
                     autoFocus
-                    className="ttd-textarea no-overlay"
+                    className="ttd-textarea"
+                    style={hasMentions ? { color: 'transparent', caretColor: 'rgba(200, 210, 220, 0.9)' } : undefined}
                   />
+                  {/* Inline syntax highlight overlay — shows colored @A/@B spans */}
+                  {hasMentions && (
+                    <div ref={overlayRef} className="ref-highlight-overlay" aria-hidden>
+                      <div
+                        className="ref-highlight-overlay-inner"
+                        style={{ transform: `translateY(-${textScrollTop}px)` }}
+                      >
+                        {highlightMentions(freeText)}
+                      </div>
+                    </div>
+                  )}
                   {/* @mention dropdown — only when multiple references */}
                   {showMentionDrop && referenceImages.length > 1 && (
                     <div className="ref-mention-drop">
-                      {referenceImages.map((_, i) => (
+                      {referenceImages.map((img, i) => (
                         <button
                           key={i}
-                          className="ref-mention-opt"
+                          className={`ref-mention-opt${dropdownIdx === i ? ' ref-mention-opt--active' : ''}`}
                           style={{
                             color: REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length],
                             borderColor: `${REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length]}44`,
+                            background: dropdownIdx === i
+                              ? `${REF_IMAGE_COLORS[i % REF_IMAGE_COLORS.length]}18`
+                              : undefined,
                           }}
+                          onMouseEnter={() => setDropdownIdx(i)}
                           onMouseDown={(e) => {
                             e.preventDefault();
                             insertMention(labels[i]);
                           }}
                         >
+                          <img
+                            src={`data:image/png;base64,${img.base64_image}`}
+                            alt=""
+                            className="ref-mention-thumb"
+                          />
                           @{labels[i]}
                           <span className="ref-mention-opt-desc">Image {labels[i]}</span>
                         </button>

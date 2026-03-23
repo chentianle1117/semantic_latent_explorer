@@ -464,11 +464,13 @@ function renderAll() {
           .attr("width", xTimeline(p.end)-xTimeline(p.start)).attr("height",h)
           .attr("fill",p.color).attr("opacity",0.03);
       });
-      // Faint axis-change division line running through all tracks (Formal/Sporty → Retro/Futuristic)
-      const axX = xTimeline(AXES[1].start);
-      g.append("line").attr("x1",axX).attr("x2",axX).attr("y1",0).attr("y2",h)
-        .attr("stroke","rgba(245,158,11,0.22)").attr("stroke-width",1.5)
-        .attr("stroke-dasharray","5 3");
+      // Faint axis-change division line running through all tracks (only if >1 axis)
+      if (AXES.length > 1) {
+        const axX = xTimeline(AXES[1].start);
+        g.append("line").attr("x1",axX).attr("x2",axX).attr("y1",0).attr("y2",h)
+          .attr("stroke","rgba(245,158,11,0.22)").attr("stroke-width",1.5)
+          .attr("stroke-dasharray","5 3");
+      }
     }
   }
 

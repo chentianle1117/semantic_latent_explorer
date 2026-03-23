@@ -119,23 +119,32 @@ def transform_render_all(fn):
     fn = re.sub(r'\bPROMPTS\b', 'S.prompts', fn)
     fn = re.sub(r'\bTHUMBS\b', 'S.thumbs', fn)
     fn = re.sub(r'\bDUR\b', 'S.dur', fn)
+    # Add data-nid attribute to node groups so quote overlay can find them
+    fn = fn.replace(
+        'const ng = nodeG.append("g").style("cursor","pointer")',
+        'const ng = nodeG.append("g").attr("data-nid", n.id).style("cursor","pointer")'
+    )
     # Namespace clip IDs so multiple sessions + view modes don't collide
     fn = fn.replace('`clip-${n.id}`', '`clip-${S.id}-${vMode}-${n.id}`')
     fn = fn.replace('`url(#clip-${n.id})`', '`url(#clip-${S.id}-${vMode}-${n.id})`')
     fn = fn.replace('`url(#${clipId})`', '`url(#${clipId})`')  # leave dynamic reference alone
     # Replace global W and plotW with local versions inside renderTracks
-    fn = fn.replace('.attr("width",W)', '.attr("width",_localW)')
+    fn = fn.replace('.attr("width",W)', '.attr("width",_localW + 120)')
     fn = fn.replace('range([ML,ML+plotW])', 'range([ML,ML+_localPlotW])')
     fn = fn.replace('ML+plotW', 'ML+_localPlotW')
+    # Replace ALL remaining bare plotW references (e.g. colW = plotW / ...)
+    fn = re.sub(r'\bplotW\b', '_localPlotW', fn)
     # Make secondary arc rail params configurable via globals
     fn = fn.replace(
         'const secRailBase = 8, secRailGap = 8;',
         'const secRailBase = window._secRailBase || 8, secRailGap = window._secRailGap || 8;'
     )
+    # Increase timeline-mode genealogy height (320→480) so lane-2 nodes have room
+    fn = fn.replace('let h = useTree ? 700 : 320;', 'let h = useTree ? 700 : 480;')
     # Make topPad configurable for tree layout compression
     fn = fn.replace(
         'const topPad = useTree ? 180 : 40;',
-        'const topPad = useTree ? (window._treeTopPad || 180) : 40;'
+        'const topPad = useTree ? (window._treeTopPad || 180) : 60;'
     )
     # Make node spacing configurable
     fn = fn.replace(
@@ -227,7 +236,7 @@ new_css += """
 }
 .tab-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .session-view { }
-/* ── SVG overflow: clip vertically, allow right-side labels ── */
+/* ── track layout ── */
 .track { position: relative; }
 /* ── Compare view ──────────────────────────────────────────── */
 .compare-view { padding: 16px 20px 48px; overflow-x: auto; overflow-y: visible; }
@@ -341,11 +350,25 @@ new_css += """
 # Run: python analysis/gen_evan_data.py  (requires evan_thumbs.json)
 _evan_data_path = Path("analysis/evan_data_real.txt")
 _kaustubh_data_path = Path("analysis/kaustubh_data_real.txt")
+_ty_data_path = Path("analysis/ty_data_real.txt")
 if _kaustubh_data_path.exists():
     kaustubh_data = _kaustubh_data_path.read_text(encoding="utf-8")
     print(f"Loaded real Kaustubh data: {len(kaustubh_data)//1024}KB")
 else:
     kaustubh_data = '    id: "kaustubh-s1", participant: "Kaustubh Sadekar", role: "AI/ML Researcher", task: "Rugged + lightweight trail shoe & performance runner", color: "#a855f7", dur: 2793, speakerNames: { participant: "Kaustubh", researcher: "David" }, kpis: { batches: 13, images: 26, starred: 9, deleted: 2, agentGens: 7, axisChanges: 4 }, thumbs: {}, phases: [], batches: [], nodes: [], prompts: [], axes: [], canvas: [], quotes: [], catColors: {}, preSurvey: {}, csiFact: [], csiLabels: [],'
+
+if _ty_data_path.exists():
+    ty_data = _ty_data_path.read_text(encoding="utf-8")
+    print(f"Loaded real Ty data: {len(ty_data)//1024}KB")
+else:
+    ty_data = '    id: "ty-s1", participant: "Ty DeHaven", role: "Senior Footwear Designer", task: "Rugged + lightweight trail shoe & slide spin-off", color: "#22c55e", dur: 2030, speakerNames: { participant: "Ty", researcher: "David" }, kpis: { batches: 10, images: 28, starred: 6, deleted: 0, agentGens: 0, axisChanges: 0 }, thumbs: {}, phases: [], batches: [], nodes: [], prompts: [], axes: [], canvas: [], quotes: [], catColors: {}, preSurvey: {}, csiFact: [], csiLabels: [],'
+
+_mikele_data_path = Path("analysis/mikele_data_real.txt")
+if _mikele_data_path.exists():
+    mikele_data = _mikele_data_path.read_text(encoding="utf-8")
+    print(f"Loaded real Mikele data: {len(mikele_data)//1024}KB")
+else:
+    mikele_data = '    id: "mikele-s1", participant: "Mikele Schnitman", role: "Footwear Designer & 3D Artist", task: "Rugged + lightweight trail shoe & slide spin-off", color: "#f97316", dur: 1755, speakerNames: { participant: "Mikele", researcher: "David" }, kpis: { batches: 11, images: 29, starred: 11, deleted: 0, agentGens: 2, axisChanges: 1 }, thumbs: {}, phases: [], batches: [], nodes: [], prompts: [], axes: [], canvas: [], quotes: [], catColors: {}, preSurvey: {}, csiFact: [], csiLabels: [],'
 
 if _evan_data_path.exists():
     evan_data = _evan_data_path.read_text(encoding="utf-8")
@@ -550,7 +573,7 @@ html = f"""<!DOCTYPE html>
 // ═══════════════════════════════════════════════════════════════════
 // SHARED CONSTANTS
 // ═══════════════════════════════════════════════════════════════════
-const SESSION_COLORS = ["#58a6ff", "#f97316", "#a855f7", "#22c55e"];
+const SESSION_COLORS = ["#58a6ff", "#f97316", "#a855f7", "#22c55e", "#ec4899"];
 const ML = 118, MR = 80;
 const dashW = document.querySelector('.dashboard')?.clientWidth || (window.innerWidth - 56);
 const W = Math.min(dashW - 4, 1700);
@@ -615,6 +638,14 @@ const SESSIONS = [
   {{
 {kaustubh_data}
   }},
+  // ─── P4: Ty ─────────────────────────────────────────────────
+  {{
+{ty_data}
+  }},
+  // ─── P5: Mikele ─────────────────────────────────────────────
+  {{
+{mikele_data}
+  }},
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -661,7 +692,7 @@ const compareState = {{ activeTab: "metrics" }};
 let _compareDataInit = false;
 
 function initSessionState(S) {{
-  sessionState[S.id] = {{ edgeStyle: "curved", rendered: false }};
+  sessionState[S.id] = {{ edgeStyle: "straight", rendered: false }};
 }}
 
 function initCompareData() {{
@@ -732,8 +763,193 @@ function renderReportSection(S, sid, key) {{
     renderTracks(S, `#tracks-bt-${{sid}}`, "batch", es);
   }} else if (key === "thumbnail") {{
     renderSectionHeader(sec, "Thumbnail Grid");
+    // Quote overlay toggle
+    const toggleRow = sec.append("div").style("display","flex").style("align-items","center")
+      .style("gap","8px").style("padding","6px 20px").style("font-size","11px").style("color","#8b949e");
+    const cb = toggleRow.append("input").attr("type","checkbox").attr("id",`quote-overlay-${{sid}}`)
+      .style("accent-color","#a855f7");
+    toggleRow.append("label").attr("for",`quote-overlay-${{sid}}`).text("Show Quote Overlay")
+      .style("cursor","pointer");
     const c = sec.append("div").attr("class","tracks-container").attr("id",`tracks-th-${{sid}}`);
     renderTracks(S, `#tracks-th-${{sid}}`, "thumbnail", es);
+    // Build quote-to-image mapping
+    const quoteMap = new Map();
+    (S.quotes || []).forEach(q => {{
+      // Explicit imageRef mapping
+      if (q.imageRef && q.imageRef.length > 0) {{
+        q.imageRef.forEach(iid => {{
+          if (!quoteMap.has(iid)) quoteMap.set(iid, []);
+          quoteMap.get(iid).push({{ text: q.text, cat: q.cat, ts: q.ts, speaker: q.speaker }});
+        }});
+      }} else {{
+        // Temporal proximity: map quote to images generated within ±60s
+        const qSec = q.sec;
+        S.nodes.forEach(n => {{
+          const batch = S.batches[n.batch];
+          if (batch && Math.abs(batch.t - qSec) < 60) {{
+            if (!quoteMap.has(n.id)) quoteMap.set(n.id, []);
+            quoteMap.get(n.id).push({{ text: q.text, cat: q.cat, ts: q.ts, speaker: q.speaker }});
+          }}
+        }});
+      }}
+    }});
+    // Quote overlay: cards placed in tree space, X locked to batch X-position,
+    // Y floats to find gap. Shows ALL quotes (one card per quote, very compact).
+    // Soft-avoids thumbnails (prefers gaps, tolerates partial overlap).
+    function applyQuoteOverlay(show) {{
+      const container = d3.select(`#tracks-th-${{sid}}`);
+      container.selectAll(".qo-overlay").remove();
+      if (!show) return;
+
+      const svg = container.select("svg");
+      if (svg.empty()) return;
+      const svgW = +svg.attr("width") || 1400;
+      const svgH = +svg.attr("height") || 600;
+
+      // 1. Collect thumbnail rects + batch X/Y ranges
+      const thumbRects = [];
+      const batchXCenter = new Map();
+      const batchYBounds = new Map();
+      container.selectAll("g[data-nid]").each(function() {{
+        const nid = +d3.select(this).attr("data-nid");
+        const node = S.nodes.find(n => n.id === nid);
+        if (!node) return;
+        const imgEl = d3.select(this).select("image");
+        if (imgEl.empty()) return;
+        const x = +imgEl.attr("x"), y = +imgEl.attr("y");
+        const w = +imgEl.attr("width"), h = +imgEl.attr("height");
+        thumbRects.push({{ x, y, w, h }});
+        const bi = node.batch;
+        const cx = x + w/2;
+        if (!batchXCenter.has(bi)) batchXCenter.set(bi, []);
+        batchXCenter.get(bi).push(cx);
+        if (!batchYBounds.has(bi)) batchYBounds.set(bi, {{ minY: y, maxY: y+h }});
+        else {{
+          const r = batchYBounds.get(bi);
+          r.minY = Math.min(r.minY, y);
+          r.maxY = Math.max(r.maxY, y+h);
+        }}
+      }});
+
+      // 2. Map ALL quotes to nearest batch (no filtering — every quote shown)
+      const allQuoteCards = [];
+      (S.quotes || []).forEach(q => {{
+        let bi = -1;
+        if (q.imageRef && q.imageRef.length > 0) {{
+          const node = S.nodes.find(n => q.imageRef.includes(n.id));
+          if (node) bi = node.batch;
+        }}
+        if (bi < 0) {{
+          let bestD = Infinity;
+          S.batches.forEach((b, i) => {{
+            const d = Math.abs(b.t - q.sec);
+            if (d < bestD) {{ bestD = d; bi = i; }}
+          }});
+        }}
+        // Fallback: post-interview quotes go to last batch
+        if (bi < 0) bi = S.batches.length - 1;
+        allQuoteCards.push({{ bi, q }});
+      }});
+      if (allQuoteCards.length === 0) return;
+
+      // 3. Card dimensions
+      const CARD_W = 165, CARD_PAD = 3, LINE_H = 10;
+
+      // 4. Place cards at the SAME X as their batch but in vertical gaps
+      //    (above/below/between thumbnails in the column).
+      function overlapArea(a, b) {{
+        const ox = Math.max(0, Math.min(a.x+a.w, b.x+b.w) - Math.max(a.x, b.x));
+        const oy = Math.max(0, Math.min(a.y+a.h, b.y+b.h) - Math.max(a.y, b.y));
+        return ox * oy;
+      }}
+
+      const placedCards = [];
+
+      allQuoteCards.forEach(cd => {{
+        const bxArr = batchXCenter.get(cd.bi) || [200];
+        const anchorX = d3.mean(bxArr);
+        const yb = batchYBounds.get(cd.bi);
+        const anchorY = yb ? (yb.minY + yb.maxY) / 2 : svgH / 2;
+
+        const maxChars = 90;
+        const charsPerLine = 22;
+        const txtLen = Math.min(cd.q.text.length, maxChars);
+        const lines = Math.ceil(txtLen / charsPerLine);
+        const cardH = CARD_PAD*2 + lines * LINE_H + 10;
+
+        // X candidates: lock to batch X, allow small drift only
+        const xCandidates = [
+          anchorX - CARD_W/2,       // centered on batch
+          anchorX - CARD_W - 5,     // just left of batch
+          anchorX + 55,             // just right of batch
+        ];
+
+        // Y candidates: scan full height in fine steps
+        const yCandidates = [];
+        for (let y = 5; y <= svgH - cardH - 5; y += 12) {{
+          yCandidates.push(y);
+        }}
+
+        let bestRect = null, bestScore = -Infinity;
+        for (const tx of xCandidates) {{
+          for (const ty of yCandidates) {{
+            const cand = {{
+              x: Math.max(5, Math.min(tx, svgW - CARD_W - 5)),
+              y: ty, w: CARD_W, h: cardH
+            }};
+            let score = 0;
+            // Strongly avoid thumbnails
+            for (const tr of thumbRects) score -= overlapArea(cand, tr) * 5;
+            // Very strongly avoid other cards
+            for (const pr of placedCards) score -= overlapArea(cand, pr) * 12;
+            // Strong preference for batch X alignment
+            score -= Math.abs((cand.x + CARD_W/2) - anchorX) * 0.5;
+            // Mild preference for Y near anchor
+            score -= Math.abs((cand.y + cardH/2) - anchorY) * 0.06;
+
+            if (score > bestScore) {{ bestScore = score; bestRect = cand; }}
+          }}
+        }}
+
+        cd.rect = bestRect;
+        cd.cardH = cardH;
+        placedCards.push(bestRect);
+      }});
+
+      // 5. Render
+      const overlay = svg.append("g").attr("class","qo-overlay").style("pointer-events","none");
+      allQuoteCards.forEach(cd => {{
+        const r = cd.rect;
+        const catClr = S.catColors[cd.q.cat] || "#8b949e";
+
+        // Card bg
+        overlay.append("rect")
+          .attr("x", r.x).attr("y", r.y).attr("width", r.w).attr("height", cd.cardH)
+          .attr("rx", 4).attr("fill","rgba(13,17,23,0.8)")
+          .attr("stroke", catClr).attr("stroke-opacity", 0.25).attr("stroke-width",0.6);
+
+        // Top accent
+        overlay.append("rect")
+          .attr("x", r.x+3).attr("y", r.y).attr("width", r.w-6).attr("height", 1.5)
+          .attr("rx", 0.75).attr("fill", catClr).attr("opacity", 0.45);
+
+        // Content
+        const fo = overlay.append("foreignObject")
+          .attr("x", r.x+2).attr("y", r.y+1).attr("width", r.w-4).attr("height", cd.cardH-2);
+        const div = fo.append("xhtml:div")
+          .style("padding", CARD_PAD+"px").style("font-size","9px")
+          .style("line-height","1.25").style("color","#c9d1d9").style("overflow","hidden");
+
+        const row = div.append("div");
+        row.append("span").style("color",catClr).style("font-weight","700")
+          .style("font-size","7px").style("letter-spacing","0.2px")
+          .text(cd.q.cat.toUpperCase()+" ");
+        const txt = cd.q.text.length > 90 ? cd.q.text.slice(0,87)+"..." : cd.q.text;
+        row.append("span").style("font-size","8px").style("color","rgba(201,209,217,0.78)")
+          .text(txt);
+      }});
+    }}
+    cb.on("change", function() {{ applyQuoteOverlay(this.checked); }});
   }} else if (key === "quotes") {{
     renderSectionHeader(sec, "Quotes Analysis");
     const c = sec.append("div").attr("id",`quotes-${{sid}}`)
@@ -1142,7 +1358,7 @@ function buildSessionView(S, idx) {{
   const etg = header.append("div").attr("class","edge-toggle-group").attr("id",`edge-toggle-${{sid}}`);
   etg.append("span").style("font-size","9px").style("color","#6e7681").style("margin-right","6px").text("Edges:");
   ["curved","straight"].forEach(es => {{
-    etg.append("button").attr("class","edge-toggle-btn" + (es === "curved" ? " active" : ""))
+    etg.append("button").attr("class","edge-toggle-btn" + (es === "straight" ? " active" : ""))
       .attr("data-es", es)
       .on("click", () => setGlobalEdgeStyle(sid, es))
       .text(es.charAt(0).toUpperCase() + es.slice(1));

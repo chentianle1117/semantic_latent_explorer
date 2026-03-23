@@ -94,8 +94,10 @@ export const DynamicIsland: React.FC = () => {
   const agentWorkingLabel = useAppStore((s) => s.agentWorkingLabel);
   const agentInsights = useAppStore((s) => s.agentInsights);
   const dismissInsight = useAppStore((s) => s.dismissInsight);
+  const clearGhostNodes = useAppStore((s) => s.clearGhostNodes);
   const minimapGhostDots = useAppStore((s) => s.minimapGhostDots);
   const minimapViewport = useAppStore((s) => s.minimapViewport);
+  const ghostNodes = useAppStore((s) => s.ghostNodes);
   const [hovered, setHovered] = useState(false);
   const autoDismissRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const diRef = useRef<HTMLDivElement>(null);
@@ -157,9 +159,12 @@ export const DynamicIsland: React.FC = () => {
     : "New insight";
 
   // Compute directional blobs — only for unaccepted ghost nodes
-  // Direction computed from DI's screen position (top-center of viewport)
+  // Cross-reference minimapGhostDots with live ghostNodes to avoid stale blobs
   const blobs = useMemo(() => {
-    const agentDots = minimapGhostDots;
+    // Guard: if no ghost nodes exist, never show blobs (prevents stale state)
+    if (ghostNodes.length === 0) return [];
+    const liveIds = new Set(ghostNodes.map(g => g.id));
+    const agentDots = minimapGhostDots.filter(d => liveIds.has(d.id));
     if (agentDots.length === 0) return [];
 
     // DI is positioned at top-center of canvas area
@@ -178,7 +183,7 @@ export const DynamicIsland: React.FC = () => {
     const ry = diSize.h / 2 + margin;
 
     return computeBlobs(agentDots, diScreenX, diScreenY, rx, ry);
-  }, [minimapGhostDots, minimapViewport, diSize]);
+  }, [minimapGhostDots, minimapViewport, diSize, ghostNodes]);
 
   return (
     <div
@@ -212,7 +217,7 @@ export const DynamicIsland: React.FC = () => {
           {count > 1 && (
             <span className="di-count-badge">{count}</span>
           )}
-          <button className="di-dismiss-btn" onClick={() => { dismissInsight(); setHovered(false); }}>
+          <button className="di-dismiss-btn" onClick={() => { dismissInsight(); clearGhostNodes(); setHovered(false); }}>
             ×
           </button>
         </div>

@@ -553,7 +553,13 @@ export const useAppStore = create<AppStore>((set) => ({
   setAgentMode: (mode) => set({ agentMode: mode }),
 
   // Ghost nodes
-  addGhostNode: (ghost) => set((state) => ({ ghostNodes: [...state.ghostNodes, ghost] })),
+  addGhostNode: (ghost) => set((state) => {
+    const MAX_GHOSTS = 4;
+    const current = state.ghostNodes;
+    // FIFO eviction: if at cap, drop the oldest ghost before adding new one
+    const trimmed = current.length >= MAX_GHOSTS ? current.slice(current.length - MAX_GHOSTS + 1) : current;
+    return { ghostNodes: [...trimmed, ghost] };
+  }),
   removeGhostNode: (id) => set((state) => ({ ghostNodes: state.ghostNodes.filter(g => g.id !== id) })),
   clearGhostNodes: () => set({ ghostNodes: [] }),
   acceptGhostNode: (id) => {

@@ -74,14 +74,14 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 160px;
+  min-width: 180px;
 }
 
 .ref-mention-opt {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 7px 12px;
   background: transparent;
   border: none;
   border-bottom: 1px solid rgba(48, 54, 61, 0.4);
@@ -90,15 +90,24 @@
   font-weight: 700;
   font-family: monospace;
   text-align: left;
-  transition: background 0.12s;
+  transition: background 0.1s;
 }
 
 .ref-mention-opt:last-child {
   border-bottom: none;
 }
 
-.ref-mention-opt:hover {
-  background: rgba(255, 255, 255, 0.05);
+.ref-mention-opt--active {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.ref-mention-thumb {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .ref-mention-opt-desc {
@@ -106,6 +115,43 @@
   font-weight: 400;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: rgba(150, 165, 180, 0.7);
+  margin-left: auto;
+}
+
+/* ─── Inline highlight overlay ───────────────────────────────────────────── */
+
+.ref-highlight-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ref-highlight-overlay-inner {
+  /* Match textarea font + padding exactly */
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: rgba(200, 210, 220, 0.9);
+  width: 100%;
+}
+
+/* ─── Active thumbnail pulse ─────────────────────────────────────────────── */
+
+.ref-thumb-label--active {
+  animation: mention-label-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes mention-label-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 /* ─── Refine gate warning ────────────────────────────────────────────────── */

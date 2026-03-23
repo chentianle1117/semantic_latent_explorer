@@ -1748,7 +1748,8 @@ async def suggest_tags(request: SuggestTagsRequest):
 
         if effective_mode == "reference" and request.reference_image_ids:
             # ── Reference mode: multimodal analysis ──────────────────────────
-            ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
+            _ref_lookup = {img.id: img for img in state.images_metadata}
+            ref_imgs = [_ref_lookup[img_id] for img_id in request.reference_image_ids if img_id in _ref_lookup]
             labels = [chr(65 + i) for i in range(len(ref_imgs))]  # A, B, C...
             label_map = {img.id: labels[i] for i, img in enumerate(ref_imgs)}
 
@@ -1829,11 +1830,20 @@ Return JSON ONLY (no markdown):
             # Build content list: [text, pil_img_A, pil_img_B, ...]
             content = [prompt_text]
             for img in ref_imgs:
-                try:
-                    resized = img.pil_image.resize((256, 256))
-                    content.append(resized)
-                except Exception:
-                    pass
+                pil = img.pil_image
+                if pil is None and hasattr(img, 'base64_image') and img.base64_image:
+                    try:
+                        b64 = img.base64_image.split(",", 1)[-1]
+                        pil = Image.open(BytesIO(base64.b64decode(b64))).convert("RGBA")
+                    except Exception as _e:
+                        print(f"[suggest_tags] base64 fallback failed for {img.id}: {_e}")
+                if pil is not None:
+                    try:
+                        content.append(pil.resize((256, 256)))
+                    except Exception as _e:
+                        print(f"[suggest_tags] resize failed for {img.id}: {_e}")
+                else:
+                    print(f"[suggest_tags] WARNING: no image data for id={img.id}, skipping")
 
             response = model.generate_content(content)
             text = (getattr(response, "text", None) or "").strip()
@@ -1882,7 +1892,8 @@ Return JSON ONLY (no markdown):
             # ── Mood board reference mode: multimodal analysis + concept categories ──
             # Combines per-image visual analysis (A/B/C/D descriptors) with mood-board
             # concept categories, so users iterating on boards get both.
-            ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
+            _ref_lookup = {img.id: img for img in state.images_metadata}
+            ref_imgs = [_ref_lookup[img_id] for img_id in request.reference_image_ids if img_id in _ref_lookup]
             labels = [chr(65 + i) for i in range(len(ref_imgs))]
             label_map = {img.id: labels[i] for i, img in enumerate(ref_imgs)}
 
@@ -1963,11 +1974,20 @@ Return JSON ONLY (no markdown):
             # Build content list: [text, pil_img_A, pil_img_B, ...]
             content = [prompt_text]
             for img in ref_imgs:
-                try:
-                    resized = img.pil_image.resize((256, 256))
-                    content.append(resized)
-                except Exception as img_err:
-                    print(f"[suggest_tags] mood-board-reference: failed to load image {img.id}: {img_err}")
+                pil = img.pil_image
+                if pil is None and hasattr(img, 'base64_image') and img.base64_image:
+                    try:
+                        b64 = img.base64_image.split(",", 1)[-1]
+                        pil = Image.open(BytesIO(base64.b64decode(b64))).convert("RGBA")
+                    except Exception as _e:
+                        print(f"[suggest_tags] mood-board-reference: base64 fallback failed for {img.id}: {_e}")
+                if pil is not None:
+                    try:
+                        content.append(pil.resize((256, 256)))
+                    except Exception as _e:
+                        print(f"[suggest_tags] mood-board-reference: resize failed for {img.id}: {_e}")
+                else:
+                    print(f"[suggest_tags] mood-board-reference: WARNING no image data for id={img.id}, skipping")
 
             print(f"[suggest_tags] mood-board-reference: sending {len(content)-1} images to Gemini")
             response = model.generate_content(content)
@@ -2490,7 +2510,8 @@ Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
 
         # If reference images are provided, include them for multimodal context
         if request.reference_image_ids:
-            ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
+            _ref_lookup = {img.id: img for img in state.images_metadata}
+            ref_imgs = [_ref_lookup[img_id] for img_id in request.reference_image_ids if img_id in _ref_lookup]
             content = [prompt_text]
             for img in ref_imgs:
                 try:

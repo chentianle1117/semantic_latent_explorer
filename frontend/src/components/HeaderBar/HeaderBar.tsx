@@ -110,11 +110,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               title="Study session name — prefixed to all saved files for traceability"
             />
           </div>
-          {participantLockedFromUrl && (
-            <span className="participant-pill" title={`Logged in as ${participantId}`}>
-              {participantId}
-            </span>
-          )}
+          <span
+            className={`participant-pill${participantLockedFromUrl ? ' participant-pill-locked' : ''}`}
+            title={participantLockedFromUrl ? `Logged in as ${participantId}` : 'Click Settings to change'}
+          >
+            {participantId}
+          </span>
           <button
             className="header-canvas-action"
             data-tour="save"

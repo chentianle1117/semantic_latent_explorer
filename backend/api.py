@@ -4739,6 +4739,20 @@ async def get_study_session_name():
     return {"studySessionName": state.study_session_name}
 
 
+@app.post("/api/admin/backup-now")
+async def admin_backup_now(admin_key: str = ""):
+    """Trigger an immediate Google Drive backup (admin only)."""
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    if not _GDRIVE_FOLDER_ID or not _GDRIVE_SA_JSON_B64:
+        raise HTTPException(status_code=503, detail="Google Drive env vars not configured")
+    try:
+        filename = await asyncio.to_thread(_backup_data_dir)
+        return {"ok": True, "filename": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/admin/sessions")
 async def admin_sessions(admin_key: str = ""):
     """List all participants' canvases (admin only)."""

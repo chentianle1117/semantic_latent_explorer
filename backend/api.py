@@ -97,11 +97,52 @@ from models.data_structures import ImageMetadata, HistoryGroup
 
 app = FastAPI(title="Zappos Semantic Explorer API")
 
-# Lock to prevent concurrent saves corrupting global state.
-# threading.Lock is correct here: _save_canvas_to_disk is synchronous and may be
-# called from asyncio.to_thread. asyncio.Lock wouldn't protect across threads.
+# ── Per-participant state isolation ───────────────────────────────────────────
+# Each participant gets their own AppState so concurrent users never share data.
+# _StateProxy transparently delegates attribute access to the current request's
+# AppState via a ContextVar — zero changes required to the 370+ state.xxx calls.
 import threading
-_save_lock = threading.Lock()
+from contextvars import ContextVar
+
+_participant_states: Dict[str, "AppState"] = {}
+_participant_locks: Dict[str, threading.Lock] = {}
+_current_participant_id: ContextVar[str] = ContextVar("current_participant_id", default="researcher")
+
+
+def _get_participant_state(pid: str) -> "AppState":
+    if pid not in _participant_states:
+        s = AppState.__new__(AppState)
+        s.__init__()
+        s.participant_id = pid
+        _participant_states[pid] = s
+        _participant_locks[pid] = threading.Lock()
+    return _participant_states[pid]
+
+
+def _get_save_lock(pid: str) -> threading.Lock:
+    if pid not in _participant_locks:
+        _participant_locks[pid] = threading.Lock()
+    return _participant_locks[pid]
+
+
+class _StateProxy:
+    """Transparent proxy to the current request's AppState (resolved via ContextVar)."""
+    def __getattr__(self, name: str):
+        return getattr(_get_participant_state(_current_participant_id.get()), name)
+    def __setattr__(self, name: str, value):
+        setattr(_get_participant_state(_current_participant_id.get()), name, value)
+
+
+state: "AppState" = _StateProxy()  # type: ignore[assignment]
+
+# Legacy single lock — redirects to per-participant lock for the current request
+class _LockProxy:
+    def __enter__(self):
+        return _get_save_lock(_current_participant_id.get()).__enter__()
+    def __exit__(self, *args):
+        return _get_save_lock(_current_participant_id.get()).__exit__(*args)
+
+_save_lock = _LockProxy()
 
 # Enable CORS
 app.add_middleware(
@@ -111,6 +152,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def participant_context_middleware(request: Request, call_next):
+    """Set the current participant ContextVar for every request.
+    Reads X-Participant-Id header (sent by frontend on every call).
+    Falls back to 'researcher' so unauthenticated / legacy requests still work.
+    """
+    pid = request.headers.get("X-Participant-Id", "researcher").strip() or "researcher"
+    token = _current_participant_id.set(pid)
+    try:
+        response = await call_next(request)
+    finally:
+        _current_participant_id.reset(token)
+    return response
 
 @app.get("/api/health")
 async def health_check():
@@ -281,8 +336,6 @@ class AppState:
             {"id": "default", "name": "Shoes", "color": "#58a6ff", "visible": True},
             {"id": "references", "name": "References", "color": "#f0883e", "visible": True},
         ]
-
-state = AppState()
 
 
 def pil_to_base64(pil_image: Image.Image) -> str:

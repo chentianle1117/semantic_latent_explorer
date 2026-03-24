@@ -17,6 +17,12 @@ import { apiClient } from "../../api/client";
 import type { BriefSuggestedParam, BriefHighlight } from "../../types";
 import "./DesignBriefOverlay.css";
 
+// Exported so App.tsx chip clicks can trigger full commit+interpret without blur
+let _commitBriefExternal: ((text: string) => void) | null = null;
+export function commitBriefExternal(text: string) {
+  _commitBriefExternal?.(text);
+}
+
 export const DesignBriefOverlay: React.FC = () => {
   const designBrief = useAppStore((s) => s.designBrief);
   const setDesignBrief = useAppStore((s) => s.setDesignBrief);
@@ -90,6 +96,20 @@ export const DesignBriefOverlay: React.FC = () => {
     }
   }, [setBriefLoading, setBriefInterpretation, setBriefFields, setBriefSuggestedParams, setBriefHighlights,
       setIsAgentWorking, setIsAgentUsingBrief, setAgentWorkingLabel]);
+
+  // Wire up the external commit hook (for chip clicks in App.tsx)
+  useEffect(() => {
+    _commitBriefExternal = (text: string) => {
+      setLocalBrief(text);
+      setDesignBrief(text || null);
+      apiClient.updateDesignBrief(text || "").catch(() => {});
+      if (text && text !== lastInterpretedRef.current) {
+        lastInterpretedRef.current = text;
+        runInterpretation(text);
+      }
+    };
+    return () => { _commitBriefExternal = null; };
+  }, [setDesignBrief, runInterpretation]);
 
   // Save brief on blur or Save click — fire-and-forget to avoid freezing the UI
   const commitBrief = useCallback((value: string) => {
@@ -235,24 +255,26 @@ export const DesignBriefOverlay: React.FC = () => {
           )}
         </div>
 
-        {briefHighlights.length > 0 && (
-          <div ref={mirrorRef} className="dbo-highlight-mirror">
-            {renderHighlightedText(localBrief, briefHighlights)}
-          </div>
-        )}
-        <textarea
-          ref={textareaRef}
-          className="dbo-inline-textarea"
-          value={localBrief}
-          onChange={(e) => setLocalBrief(e.target.value)}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          onScroll={(e) => { if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop; }}
-          placeholder="Describe your design direction — the AI agent will use this as context for all generations…"
-          rows={isFocused ? 5 : 3}
-          style={briefHighlights.length > 0 ? { color: 'transparent', caretColor: 'rgba(200, 210, 220, 0.9)', background: 'transparent' } : undefined}
-        />
+        <div className="dbo-textarea-wrapper">
+          {briefHighlights.length > 0 && (
+            <div ref={mirrorRef} className="dbo-highlight-mirror">
+              {renderHighlightedText(localBrief, briefHighlights)}
+            </div>
+          )}
+          <textarea
+            ref={textareaRef}
+            className="dbo-inline-textarea"
+            value={localBrief}
+            onChange={(e) => setLocalBrief(e.target.value)}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            onScroll={(e) => { if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop; }}
+            placeholder="Describe your design direction — the AI agent will use this as context for all generations…"
+            rows={isFocused ? 5 : 3}
+            style={briefHighlights.length > 0 ? { color: 'transparent', caretColor: 'rgba(200, 210, 220, 0.9)', background: 'transparent' } : undefined}
+          />
+        </div>
 
         {(isFocused || localBrief !== (designBrief || '')) && (
           <div className="dbo-save-row">

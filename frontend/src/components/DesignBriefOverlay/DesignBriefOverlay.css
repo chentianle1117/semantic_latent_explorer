@@ -91,7 +91,13 @@
   font-style: italic;
 }
 
-/* ── Highlight mirror (positioned behind textarea) ── */
+/* ── Textarea wrapper: positions mirror behind textarea only ── */
+.dbo-textarea-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* ── Highlight mirror (positioned behind textarea only, inside wrapper) ── */
 .dbo-highlight-mirror {
   position: absolute;
   top: 0;
@@ -99,22 +105,22 @@
   right: 0;
   bottom: 0;
   pointer-events: none;
-  font-size: 15px;           /* matches .dbo-inline-textarea font-size (unfocused) */
+  font-size: 15px;
   font-family: inherit;
-  line-height: 1.45;         /* matches textarea line-height */
-  padding: 0;                /* matches textarea (no padding in unfocused state) */
+  line-height: 1.45;
+  padding: 0;
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow: hidden;
-  color: rgba(210, 225, 240, 0.92); /* base text color matches textarea */
-  border: 1px solid transparent;    /* match textarea border width to align */
+  color: rgba(210, 225, 240, 0.92);
   box-sizing: border-box;
 }
 
-/* When container is focused, mirror font/padding must match the focused textarea */
+/* Focused state: match textarea's font-size and padding exactly */
 .dbo-brief-focused .dbo-highlight-mirror {
-  font-size: 13px;           /* matches .dbo-brief-focused .dbo-inline-textarea font-size */
-  padding: 7px 9px;          /* matches .dbo-brief-focused .dbo-inline-textarea padding */
+  font-size: 13px;
+  padding: 7px 9px;
+  border: 1px solid transparent; /* match focused textarea border width */
   overflow: auto;
 }
 

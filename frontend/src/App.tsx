@@ -19,7 +19,7 @@ import { MoodBoardDialog } from "./components/MoodBoardDialog/MoodBoardDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
 import { DynamicIsland } from "./components/DynamicIsland/DynamicIsland";
-import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefOverlay";
+import { DesignBriefOverlay, commitBriefExternal } from "./components/DesignBriefOverlay/DesignBriefOverlay";
 import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { OnboardingTour } from "./components/OnboardingTour/OnboardingTour";
@@ -1077,10 +1077,7 @@ export const App: React.FC = () => {
                       <button
                         key={label}
                         className="empty-canvas-chip"
-                        onClick={() => {
-                          useAppStore.getState().setDesignBrief(brief);
-                          apiClient.updateDesignBrief(brief).catch(() => {});
-                        }}
+                        onClick={() => commitBriefExternal(brief)}
                       >
                         {label}
                       </button>

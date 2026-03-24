@@ -1700,7 +1700,7 @@ Rules:
 2. Values should be specific but faithful to the brief (2-5 words max)
 3. All parameters NOT mentioned go in "unmentioned" with 3-5 example hints
 4. interpretation = one sentence describing what the user seems to be designing
-5. highlights = up to 5 exact phrases from the brief that are conceptually important, with level "primary" (1-2 most critical: key concept, main axis poles) or "secondary" (2-3 supporting ideas). Use exact text from the brief.
+5. highlights = the 3-4 most important individual words or very short phrases (1-3 words max each) from the brief. Primary (1-2): the single most critical concept(s) — e.g. shoe type, a key material, a defining axis pole. Secondary (1-2): notable supporting terms. NEVER highlight more than 3 words in a single entry. Use exact text from the brief.
 
 Return JSON ONLY (no markdown):
 {{
@@ -1716,7 +1716,7 @@ Return JSON ONLY (no markdown):
   "highlights": [
     {{"text": "running shoe", "level": "primary"}},
     {{"text": "Biomimetic Organic", "level": "primary"}},
-    {{"text": "Machined Aerospace", "level": "primary"}},
+    {{"text": "Machined Aerospace", "level": "secondary"}},
     {{"text": "design space", "level": "secondary"}}
   ]
 }}"""

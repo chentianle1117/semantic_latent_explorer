@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry, BriefField, BriefSuggestedParam, MinimapDot, ViewportRect, MultiViewHistoryEntry } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry, BriefField, BriefSuggestedParam, BriefHighlight, MinimapDot, ViewportRect, MultiViewHistoryEntry } from '../types';
 import { apiClient } from '../api/client';
 
 interface AppStore extends AppState {
@@ -163,6 +163,7 @@ interface AppStore extends AppState {
   setBriefSuggestedParams: (params: BriefSuggestedParam[]) => void;
   setBriefInterpretation: (text: string | null) => void;
   setBriefLoading: (v: boolean) => void;
+  setBriefHighlights: (highlights: BriefHighlight[]) => void;
   updateBriefFieldValue: (key: string, value: string) => void;
   addBriefField: (param: BriefSuggestedParam) => void;
   removeBriefField: (key: string) => void;
@@ -302,6 +303,7 @@ const initialState: AppState = {
   briefSuggestedParams: [] as BriefSuggestedParam[],
   briefInterpretation: null as string | null,
   briefLoading: false,
+  briefHighlights: [] as BriefHighlight[],
 
   // Deletion undo stack
   deletedImageStack: [] as ImageData[],
@@ -781,6 +783,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setBriefSuggestedParams: (params) => set({ briefSuggestedParams: params }),
   setBriefInterpretation: (text) => set({ briefInterpretation: text }),
   setBriefLoading: (v) => set({ briefLoading: v }),
+  setBriefHighlights: (highlights) => set({ briefHighlights: highlights }),
   updateBriefFieldValue: (key, value) => set((s) => ({
     briefFields: s.briefFields.map((f) => f.key === key ? { ...f, value } : f),
   })),

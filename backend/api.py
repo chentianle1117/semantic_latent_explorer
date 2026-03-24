@@ -274,6 +274,7 @@ class AppState:
         self.brief_fields: List[Dict] = []               # [{key, label, value}, ...]
         self.brief_interpretation: Optional[str] = None  # AI one-sentence summary
         self.brief_suggested_params: List[Dict] = []     # [{key, label, hint}, ...]
+        self.brief_highlights: List[Dict] = []           # [{text, level}, ...]
         # Frontend-synced layer state (for export)
         self.image_layer_map: Dict[int, str] = {}   # image_id -> layer_id
         self.layer_definitions: List[Dict] = [      # ordered list of layer descriptors
@@ -423,6 +424,7 @@ def _serialize_canvas() -> dict:
         "briefFields": state.brief_fields,
         "briefInterpretation": state.brief_interpretation,
         "briefSuggestedParams": state.brief_suggested_params,
+        "briefHighlights": state.brief_highlights,
         "nextId": state.next_id,
         "images": images_data,
         "historyGroups": history_data,
@@ -556,6 +558,7 @@ def _deserialize_canvas(data: dict) -> None:
     state.brief_fields = data.get("briefFields", [])
     state.brief_interpretation = data.get("briefInterpretation")
     state.brief_suggested_params = data.get("briefSuggestedParams", [])
+    state.brief_highlights = data.get("briefHighlights", [])
     state.next_id = data.get("nextId", 0)
 
     # Restore axis labels (tuples)
@@ -1671,7 +1674,7 @@ async def interpret_brief(request: InterpretBriefRequest):
     """Use Gemini to extract structured design parameters from the raw brief text."""
     brief = request.brief.strip()
     if not brief:
-        return {"status": "success", "interpretation": "", "extracted": [], "unmentioned": []}
+        return {"status": "success", "interpretation": "", "extracted": [], "unmentioned": [], "highlights": []}
 
     try:
         prompt = f"""You are a shoe design expert. The user described their design intent:
@@ -1697,17 +1700,24 @@ Rules:
 2. Values should be specific but faithful to the brief (2-5 words max)
 3. All parameters NOT mentioned go in "unmentioned" with 3-5 example hints
 4. interpretation = one sentence describing what the user seems to be designing
+5. highlights = up to 5 exact phrases from the brief that are conceptually important, with level "primary" (1-2 most critical: key concept, main axis poles) or "secondary" (2-3 supporting ideas). Use exact text from the brief.
 
 Return JSON ONLY (no markdown):
 {{
-  "interpretation": "A basketball shoe inspired by the Nike Air Force 1 silhouette",
+  "interpretation": "A running shoe exploring the tension between Biomimetic Organic and Machined Aerospace design languages",
   "extracted": [
-    {{"key": "shoe_type", "label": "Shoe Type", "value": "Basketball shoe"}},
-    {{"key": "brand_ref", "label": "Brand Reference", "value": "Nike Air Force 1"}}
+    {{"key": "shoe_type", "label": "Shoe Type", "value": "running shoe"}},
+    {{"key": "mood", "label": "Mood", "value": "Biomimetic Organic vs Machined Aerospace"}}
   ],
   "unmentioned": [
     {{"key": "material", "label": "Material", "hint": "leather, mesh, suede, synthetic"}},
     {{"key": "color", "label": "Color Palette", "hint": "monochrome, earth tones, neon"}}
+  ],
+  "highlights": [
+    {{"text": "running shoe", "level": "primary"}},
+    {{"text": "Biomimetic Organic", "level": "primary"}},
+    {{"text": "Machined Aerospace", "level": "primary"}},
+    {{"text": "design space", "level": "secondary"}}
   ]
 }}"""
 
@@ -1725,17 +1735,20 @@ Return JSON ONLY (no markdown):
         extracted = data.get("extracted", [])
         unmentioned = data.get("unmentioned", [])
         interpretation = data.get("interpretation", "")
+        highlights = data.get("highlights", [])
 
         # Persist in state
         state.brief_fields = extracted
         state.brief_interpretation = interpretation
         state.brief_suggested_params = unmentioned
+        state.brief_highlights = highlights
 
         return {
             "status": "success",
             "interpretation": interpretation,
             "extracted": extracted,
             "unmentioned": unmentioned,
+            "highlights": highlights,
         }
     except Exception as e:
         print(f"ERROR in interpret_brief: {e}")
@@ -4178,6 +4191,7 @@ async def export_zip(ids: Optional[str] = None):
                 "briefFields": state.brief_fields,
                 "briefInterpretation": state.brief_interpretation,
                 "briefSuggestedParams": state.brief_suggested_params,
+                "briefHighlights": state.brief_highlights,
                 "nextId": state.next_id,
                 "layerDefinitions": state.layer_definitions,
                 "imageLayerMap": {str(k): v for k, v in state.image_layer_map.items()},

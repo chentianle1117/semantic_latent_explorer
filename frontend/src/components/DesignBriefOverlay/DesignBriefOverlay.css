@@ -28,6 +28,7 @@
 
 /* ── Inline brief container ── */
 .dbo-brief-container {
+  position: relative;
   border-left: 3px solid rgba(0, 210, 255, 0.55);
   padding: 3px 0 4px 11px;
   transition: all 0.2s ease;
@@ -88,6 +89,33 @@
 .dbo-inline-textarea::placeholder {
   color: rgba(150, 165, 180, 0.45);
   font-style: italic;
+}
+
+/* ── Highlight mirror (positioned behind textarea) ── */
+.dbo-highlight-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  font-size: 15px;           /* matches .dbo-inline-textarea font-size (unfocused) */
+  font-family: inherit;
+  line-height: 1.45;         /* matches textarea line-height */
+  padding: 0;                /* matches textarea (no padding in unfocused state) */
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow: hidden;
+  color: rgba(210, 225, 240, 0.92); /* base text color matches textarea */
+  border: 1px solid transparent;    /* match textarea border width to align */
+  box-sizing: border-box;
+}
+
+/* When container is focused, mirror font/padding must match the focused textarea */
+.dbo-brief-focused .dbo-highlight-mirror {
+  font-size: 13px;           /* matches .dbo-brief-focused .dbo-inline-textarea font-size */
+  padding: 7px 9px;          /* matches .dbo-brief-focused .dbo-inline-textarea padding */
+  overflow: auto;
 }
 
 .dbo-edit-hint {

@@ -208,6 +208,7 @@ export interface AppState {
   briefSuggestedParams: BriefSuggestedParam[];
   briefInterpretation: string | null;
   briefLoading: boolean;
+  briefHighlights: BriefHighlight[];
 
   // Session / Multi-Canvas
   currentCanvasId: string | null;
@@ -362,6 +363,11 @@ export interface BriefSuggestedParam {
   key: string;      // e.g. "material"
   label: string;    // e.g. "Material"
   hint: string;     // e.g. "leather, mesh, suede, synthetic"
+}
+
+export interface BriefHighlight {
+  text: string;          // exact phrase to highlight (case-insensitive match)
+  level: 'primary' | 'secondary';
 }
 
 // ─── Prompt Builder (SuggestionsPanel) ────────────────────────────────────────

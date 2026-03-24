@@ -11,6 +11,7 @@ import type {
   WebSocketMessage,
   SuggestTagsResponse,
   ViewAnalysisResponse,
+  BriefHighlight,
 } from '../types';
 
 const API_BASE = '/api';
@@ -225,6 +226,7 @@ class APIClient {
     interpretation: string;
     extracted: Array<{ key: string; label: string; value: string }>;
     unmentioned: Array<{ key: string; label: string; hint: string }>;
+    highlights: BriefHighlight[];
   }> {
     const response = await axios.post(`${API_BASE}/agent/interpret-brief`, { brief });
     return response.data;

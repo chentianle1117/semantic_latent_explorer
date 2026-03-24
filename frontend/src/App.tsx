@@ -52,7 +52,6 @@ function buildBriefConstraint(shoeTypeOverride?: string): string {
 export const App: React.FC = () => {
   // floatingPanelPos removed — actions now in RightInspector
   const [showTextToImageDialog, setShowTextToImageDialog] = useState(false);
-  const [inspirationPrompt, setInspirationPrompt] = useState<string | undefined>(undefined);
   const [showMoodBoardDialog, setShowMoodBoardDialog] = useState(false);
   const [showPromptDialog, setShowPromptDialog] = useState(false);
 
@@ -1068,17 +1067,20 @@ export const App: React.FC = () => {
                   </button>
                 </div>
                 <div className="empty-canvas-inspiration">
-                  <p className="empty-canvas-inspiration-label">or start with an idea →</p>
+                  <p className="empty-canvas-inspiration-label">or set a design direction →</p>
                   <div className="empty-canvas-chips">
                     {[
-                      { label: '🌿  Material Shift', prompt: 'Explore how a conventional running shoe shifts across a Biomimetic Organic ↔ Machined Aerospace axis — evolve the silhouette toward each extreme' },
-                      { label: '🌳  Branch a Lineage', prompt: 'Start with a single shoe concept and branch it into a large family — explore how small design decisions diverge into very different directions over multiple generations' },
-                      { label: '⚡  Opposite Worlds', prompt: 'Generate two shoes from completely opposite design directions — one highly geometric and structural, one fluid and organic — then find the crossover point between them' },
-                    ].map(({ label, prompt }) => (
+                      { label: '🌿  Material Shift', brief: 'I want to explore how a shoe concept shifts across a Biomimetic Organic ↔ Machined Aerospace axis — building out the design space between these two material extremes.' },
+                      { label: '🌳  Branch a Lineage', brief: 'Start with a single baseline shoe and branch it into a large family of variations. I want to explore how small design decisions diverge into very different directions across multiple generations.' },
+                      { label: '⚡  Opposite Worlds', brief: 'I want to combine two opposite design directions — one highly geometric and structural, one fluid and organic — and explore the creative space between them.' },
+                    ].map(({ label, brief }) => (
                       <button
                         key={label}
                         className="empty-canvas-chip"
-                        onClick={() => { setInspirationPrompt(prompt); setShowTextToImageDialog(true); }}
+                        onClick={() => {
+                          useAppStore.getState().setDesignBrief(brief);
+                          apiClient.updateDesignBrief(brief).catch(() => {});
+                        }}
                       >
                         {label}
                       </button>
@@ -1155,8 +1157,7 @@ export const App: React.FC = () => {
             {/* Text-to-Image Dialog */}
             {showTextToImageDialog && (
               <TextToImageDialog
-                onClose={() => { setShowTextToImageDialog(false); setInspirationPrompt(undefined); }}
-                initialPrompt={inspirationPrompt}
+                onClose={() => setShowTextToImageDialog(false)}
                 onGenerate={async (prompt, count, shoeType) => {
                   setShowTextToImageDialog(false);
                   setIsGenerating(true);

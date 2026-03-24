@@ -144,6 +144,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
     resolved = resolved.replace(/@[A-D]'s\b/gi, 'the reference image\'s').replace(/@[A-D]\b/gi, 'the reference image');
 
     const referenceIds = referenceImages.map(img => img.id);
+    apiClient.logEvent('reference_generation', { referenceIds, prompt: resolved, rawPrompt: composedPrompt, count: numImages, shoeType: shoeType.trim() || null });
     onGenerate(referenceIds, resolved, numImages, shoeType.trim() || undefined);
   };
 

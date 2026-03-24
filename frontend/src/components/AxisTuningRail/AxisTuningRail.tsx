@@ -285,6 +285,12 @@ export const AxisTuningRail: React.FC = () => {
   const handleReproject = useCallback(async () => {
     setLoading(true);
     useProgressStore.getState().showProgress("reprojecting", "Reprojecting with tuned axes...", false);
+    apiClient.logEvent('axis_tuning_reproject', {
+      sentences,
+      anchorCount: anchors.length,
+      anchors: anchors.map(a => ({ imageId: a.imageId, axis: a.axis, position: a.position })),
+      textWeight,
+    });
     try {
       await apiClient.updateAxesTuned({
         custom_sentences: sentences,

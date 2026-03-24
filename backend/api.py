@@ -107,21 +107,26 @@ from contextvars import ContextVar
 _participant_states: Dict[str, "AppState"] = {}
 _participant_locks: Dict[str, threading.Lock] = {}
 _current_participant_id: ContextVar[str] = ContextVar("current_participant_id", default="researcher")
+_state_creation_lock = threading.Lock()  # guards first-time AppState creation only
 
 
 def _get_participant_state(pid: str) -> "AppState":
-    if pid not in _participant_states:
-        s = AppState.__new__(AppState)
-        s.__init__()
-        s.participant_id = pid
-        _participant_states[pid] = s
-        _participant_locks[pid] = threading.Lock()
+    # Fast path: already exists (no lock needed — dict read is safe in CPython)
+    if pid in _participant_states:
+        return _participant_states[pid]
+    # Slow path: first-time creation — serialize with a lock to prevent double-init
+    with _state_creation_lock:
+        if pid not in _participant_states:  # re-check inside lock
+            s = AppState.__new__(AppState)
+            s.__init__()
+            s.participant_id = pid
+            _participant_locks[pid] = threading.Lock()
+            _participant_states[pid] = s   # assign last so other threads see fully-init state
     return _participant_states[pid]
 
 
 def _get_save_lock(pid: str) -> threading.Lock:
-    if pid not in _participant_locks:
-        _participant_locks[pid] = threading.Lock()
+    _get_participant_state(pid)  # ensures lock entry exists
     return _participant_locks[pid]
 
 

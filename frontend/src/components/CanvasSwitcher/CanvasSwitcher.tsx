@@ -128,6 +128,7 @@ export const CanvasSwitcher: React.FC = () => {
     try {
       apiClient.logEvent('canvas_switch', { fromCanvasId: currentCanvasId, action: 'new', newName: name });
       const result = await apiClient.newCanvas(name);
+      apiClient.logEvent('canvas_created', { canvasId: result.canvasId, canvasName: result.canvasName, fromCanvasId: currentCanvasId });
       setMinimapDots([]);
       setMinimapGhostDots([]);
       setIsolatedImageIds(null);
@@ -150,6 +151,7 @@ export const CanvasSwitcher: React.FC = () => {
     cancelPendingSave(); // prevent stale auto-save from firing after switch
     try {
       const result = await apiClient.branchCanvas(name, selectedImageIds);
+      apiClient.logEvent('branch_created', { newCanvasId: result.canvasId, newCanvasName: result.canvasName, fromCanvasId: currentCanvasId, imageCount: selectedImageIds.length, imageIds: selectedImageIds });
       // Reload state from backend after branch
       const loadResult = await apiClient.loadSession(result.canvasId);
       const s = loadResult.state;

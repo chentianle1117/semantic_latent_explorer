@@ -108,6 +108,7 @@ export const App: React.FC = () => {
       console.warn('[login] Failed to load sessions, using default canvas:', err);
     }
 
+    apiClient.logEvent('login', { participantId: res.participantId, role: res.role });
     // Persist login so browser refresh doesn't require re-login
     sessionStorage.setItem('sc_auth', JSON.stringify({ participantId: res.participantId, role: res.role }));
     setShowLoginPrompt(false);

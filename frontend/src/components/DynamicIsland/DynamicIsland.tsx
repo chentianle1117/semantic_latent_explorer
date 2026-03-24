@@ -16,6 +16,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useAppStore } from "../../store/appStore";
+import { apiClient } from "../../api/client";
 import "./DynamicIsland.css";
 
 const MERGE_ANGLE_RAD = 0.35; // ~20°
@@ -217,7 +218,7 @@ export const DynamicIsland: React.FC = () => {
           {count > 1 && (
             <span className="di-count-badge">{count}</span>
           )}
-          <button className="di-dismiss-btn" onClick={() => { dismissInsight(); clearGhostNodes(); setHovered(false); }}>
+          <button className="di-dismiss-btn" onClick={() => { const gs = useAppStore.getState().ghostNodes; if (gs.length > 0) apiClient.logEvent('ghost_skipped', { ghostIds: gs.map(g => g.id), count: gs.length, source: 'dismiss_all' }); dismissInsight(); clearGhostNodes(); setHovered(false); }}>
             ×
           </button>
         </div>

@@ -76,6 +76,7 @@ export const FeedbackNotepad: React.FC = () => {
           browser: navigator.userAgent,
         },
       });
+      apiClient.logEvent('feedback_submitted', { category, contentLength: draft.trim().length, canvasId: currentCanvasId ?? '' });
       setSubmitState('success');
       setDraft('');
       setCategory(CATEGORIES[0].value);

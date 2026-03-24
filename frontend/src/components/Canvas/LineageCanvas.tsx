@@ -422,6 +422,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
   // Ghost accept handler
   const handleGhostAccept = useCallback(async (ghost: GhostNode) => {
     setAcceptingGhostId(ghost.id);
+    apiClient.logEvent('ghost_accepted', { ghostId: ghost.id, prompt: ghost.prompt, source: ghost.source ?? 'agent', parentIds: ghost.parents ?? [] });
     try {
       removeGhostNode(ghost.id);
       await apiClient.addExternalImages({
@@ -667,7 +668,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
                       rx={11}
                       fill="rgba(239,68,68,0.88)"
                       style={{ cursor: 'pointer' }}
-                      onClick={(e) => { e.stopPropagation(); removeGhostNode(ghost.id); }}
+                      onClick={(e) => { e.stopPropagation(); apiClient.logEvent('ghost_skipped', { ghostId: ghost.id, prompt: ghost.prompt, source: ghost.source ?? 'agent', parentIds: ghost.parents ?? [] }); removeGhostNode(ghost.id); }}
                     />
                     <text
                       x={NODE_SIZE / 4 + 1} y={hs + 44}

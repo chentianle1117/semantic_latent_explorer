@@ -287,6 +287,7 @@ function _renderGhostNodes(
 
       // Optimistic: remove ghost immediately so the canvas feels instantaneous
       useAppStore.getState().removeGhostNode(d.id);
+      apiClient.logEvent('ghost_accepted', { ghostId: d.id, prompt: d.prompt, source: d.source ?? 'agent', parentIds: d.parents ?? [] });
 
       const ps = useProgressStore.getState();
       const taskId = ps.showProgress("loading", "Accepting suggestion…", true);
@@ -326,6 +327,7 @@ function _renderGhostNodes(
 
     discardBg.on("click", function(event: any) {
       event.stopPropagation();
+      apiClient.logEvent('ghost_skipped', { ghostId: d.id, prompt: d.prompt, source: d.source ?? 'agent', parentIds: d.parents ?? [] });
       useAppStore.getState().removeGhostNode(d.id);
     });
 

@@ -97,6 +97,80 @@ from models.data_structures import ImageMetadata, HistoryGroup
 
 app = FastAPI(title="Zappos Semantic Explorer API")
 
+# ── Google Drive backup ───────────────────────────────────────────────────────
+# Set GOOGLE_SERVICE_ACCOUNT_JSON (base64-encoded service account JSON) and
+# GOOGLE_DRIVE_FOLDER_ID in Railway env vars to enable automatic backups.
+# Backups run every 4 hours and keep the last 14 files in the Drive folder.
+_GDRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "")
+_GDRIVE_SA_JSON_B64 = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
+_BACKUP_KEEP_N = 14  # keep last 14 backups (~2 days at 4h interval)
+
+def _build_gdrive_service():
+    """Build an authenticated Google Drive API service from env-var service account."""
+    import base64 as _b64
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    sa_bytes = _b64.b64decode(_GDRIVE_SA_JSON_B64)
+    sa_info = json.loads(sa_bytes)
+    creds = service_account.Credentials.from_service_account_info(
+        sa_info, scopes=["https://www.googleapis.com/auth/drive.file"]
+    )
+    return build("drive", "v3", credentials=creds, cache_discovery=False)
+
+def _backup_data_dir() -> str:
+    """Tar-gz the entire DATA_DIR and upload to Google Drive. Returns file name."""
+    import tarfile, io
+    from googleapiclient.http import MediaIoBaseUpload
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    filename = f"study_backup_{timestamp}.tar.gz"
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        if DATA_DIR.exists():
+            tar.add(str(DATA_DIR), arcname="data")
+    buf.seek(0)
+    size = buf.getbuffer().nbytes
+    print(f"[Backup] Uploading {filename} ({size / 1024:.0f} KB) to Google Drive…")
+
+    service = _build_gdrive_service()
+    meta = {"name": filename, "parents": [_GDRIVE_FOLDER_ID]}
+    media = MediaIoBaseUpload(buf, mimetype="application/gzip", chunksize=5 * 1024 * 1024, resumable=True)
+    uploaded = service.files().create(body=meta, media_body=media, fields="id,name").execute()
+    print(f"[Backup] Uploaded: {uploaded['name']} (id={uploaded['id']})")
+
+    # Prune old backups — keep only _BACKUP_KEEP_N most recent
+    results = service.files().list(
+        q=f"'{_GDRIVE_FOLDER_ID}' in parents and name contains 'study_backup_' and trashed=false",
+        orderBy="createdTime desc",
+        fields="files(id,name)",
+    ).execute().get("files", [])
+    for old in results[_BACKUP_KEEP_N:]:
+        service.files().delete(fileId=old["id"]).execute()
+        print(f"[Backup] Pruned old backup: {old['name']}")
+
+    return filename
+
+def _run_backup():
+    """Wrapper with error handling for scheduled calls."""
+    if not _GDRIVE_FOLDER_ID or not _GDRIVE_SA_JSON_B64:
+        return  # env vars not configured — skip silently
+    try:
+        _backup_data_dir()
+    except Exception as e:
+        print(f"[Backup] ERROR: {e}")
+
+# Start APScheduler — every 4 hours, aligned to wall clock (00:00, 04:00, 08:00…)
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    _scheduler = BackgroundScheduler()
+    _scheduler.add_job(_run_backup, "cron", hour="0,4,8,12,16,20", minute=5,
+                       id="gdrive_backup", replace_existing=True)
+    _scheduler.start()
+    print("[Backup] Scheduler started — backups every 4 hours at :05 past the hour")
+except ImportError:
+    _scheduler = None
+    print("[Backup] apscheduler not installed — periodic backups disabled")
+
 # ── Per-participant state isolation ───────────────────────────────────────────
 # Each participant gets their own AppState so concurrent users never share data.
 # _StateProxy transparently delegates attribute access to the current request's

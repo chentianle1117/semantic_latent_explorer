@@ -17,13 +17,14 @@ import type {
 const API_BASE = '/api';
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
 
+// Lazy getter — resolves after all modules are initialized (avoids circular dep at parse time)
+let _getParticipantId: (() => string) | null = null;
+export function _registerParticipantIdGetter(fn: () => string) { _getParticipantId = fn; }
+
 // Inject X-Participant-Id on every outgoing request so the backend
 // can isolate per-participant state for concurrent users.
 axios.interceptors.request.use((config) => {
-  // Import lazily to avoid circular dependency at module init time
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { useAppStore } = require('../store/appStore');
-  const pid: string = useAppStore.getState().participantId || 'researcher';
+  const pid = _getParticipantId ? _getParticipantId() : 'researcher';
   config.headers = config.headers ?? {};
   config.headers['X-Participant-Id'] = pid;
   return config;

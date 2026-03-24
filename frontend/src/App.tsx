@@ -31,7 +31,9 @@ import type { ImageData, ShoeViewType } from "./types";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useEventLog } from "./hooks/useEventLog";
-import { apiClient } from "./api/client";
+import { apiClient, _registerParticipantIdGetter } from "./api/client";
+// Register getter so axios interceptor can read participantId without require()
+_registerParticipantIdGetter(() => useAppStore.getState().participantId || 'researcher');
 import { falClient, extractBriefConstraint, SATELLITE_VIEWS } from "./api/falClient";
 import { generateAllViews } from "./utils/generateAllViews";
 import "./styles/app.css";

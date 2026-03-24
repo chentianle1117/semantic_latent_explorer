@@ -369,9 +369,9 @@ class FalClient {
       prompt: sheetPrompt,
       image_urls: imageUrls,
       num_images: 1,
-      output_format: options?.outputFormat || "png",
+      output_format: options?.outputFormat || "jpeg",
       aspect_ratio: "3:2",
-      resolution: "1K",
+      resolution: "0.5K",
     }) as FalImageEditResponse;
 
     if (!result.images.length) throw new Error('Multi-view sheet generation returned no images');
@@ -409,9 +409,9 @@ class FalClient {
       prompt: sheetPrompt,
       image_urls: [sideViewUrl, templateUrl],
       num_images: 1,
-      output_format: options?.outputFormat || "png",
+      output_format: options?.outputFormat || "jpeg",
       aspect_ratio: "16:9",
-      resolution: "1K",
+      resolution: "0.5K",
     }) as FalImageEditResponse;
 
     if (!result.images.length) throw new Error('3/4 view sheet generation returned no images');

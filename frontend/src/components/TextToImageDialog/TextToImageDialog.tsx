@@ -28,7 +28,7 @@ export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   useEffect(() => {
     if (initialPrompt) setFreeText(initialPrompt);
   }, [initialPrompt]);
-  const [imageCount, setImageCount] = useState(2);
+  const [imageCount, setImageCount] = useState(1);
   // All available pills from SuggestionsPanel (kept for future use)
   const [_availablePills, setAvailablePills] = useState<PillDef[]>([]);
 

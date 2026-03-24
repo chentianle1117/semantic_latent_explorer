@@ -41,7 +41,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const [chipMap, setChipMap] = useState<Map<string, string>>(new Map());
   // Free-form text typed in the textarea (may contain @A/@B mentions)
   const [freeText, setFreeText] = useState('');
-  const [numImages, setNumImages] = useState(2);
+  const [numImages, setNumImages] = useState(1);
   const [showMentionDrop, setShowMentionDrop] = useState(false);
   const [dropdownIdx, setDropdownIdx] = useState(0);
   const [textScrollTop, setTextScrollTop] = useState(0);

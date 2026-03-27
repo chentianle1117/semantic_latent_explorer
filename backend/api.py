@@ -71,6 +71,14 @@ load_dotenv()
 DATA_DIR = Path(__file__).parent / "data"
 ADMIN_KEY = os.getenv("ADMIN_KEY", "zappos-admin")
 
+# Study participant credentials: STUDY_USERS="Alice:pass1,Bob:pass2"
+_STUDY_USERS: Dict[str, str] = {}
+for _pair in os.getenv("STUDY_USERS", "").split(","):
+    _pair = _pair.strip()
+    if ":" in _pair:
+        _u, _p = _pair.split(":", 1)
+        _STUDY_USERS[_u.strip()] = _p.strip()
+
 # Configure Gemini
 gemini_api_key = os.getenv('GOOGLE_API_KEY')
 if gemini_api_key:
@@ -89,6 +97,62 @@ from models.data_structures import ImageMetadata, HistoryGroup
 
 app = FastAPI(title="Zappos Semantic Explorer API")
 
+# ── Data download endpoint (no external deps needed) ─────────────────────────
+# Hit /api/admin/download-data?admin_key=032423 in a browser to get a tar.gz
+# of the entire data directory. Bookmark it for periodic local backups.
+
+# ── Per-participant state isolation ───────────────────────────────────────────
+# Each participant gets their own AppState so concurrent users never share data.
+# _StateProxy transparently delegates attribute access to the current request's
+# AppState via a ContextVar — zero changes required to the 370+ state.xxx calls.
+import threading
+from contextvars import ContextVar
+
+_participant_states: Dict[str, "AppState"] = {}
+_participant_locks: Dict[str, threading.Lock] = {}
+_current_participant_id: ContextVar[str] = ContextVar("current_participant_id", default="researcher")
+_state_creation_lock = threading.Lock()  # guards first-time AppState creation only
+
+
+def _get_participant_state(pid: str) -> "AppState":
+    # Fast path: already exists (no lock needed — dict read is safe in CPython)
+    if pid in _participant_states:
+        return _participant_states[pid]
+    # Slow path: first-time creation — serialize with a lock to prevent double-init
+    with _state_creation_lock:
+        if pid not in _participant_states:  # re-check inside lock
+            s = AppState.__new__(AppState)
+            s.__init__()
+            s.participant_id = pid
+            _participant_locks[pid] = threading.Lock()
+            _participant_states[pid] = s   # assign last so other threads see fully-init state
+    return _participant_states[pid]
+
+
+def _get_save_lock(pid: str) -> threading.Lock:
+    _get_participant_state(pid)  # ensures lock entry exists
+    return _participant_locks[pid]
+
+
+class _StateProxy:
+    """Transparent proxy to the current request's AppState (resolved via ContextVar)."""
+    def __getattr__(self, name: str):
+        return getattr(_get_participant_state(_current_participant_id.get()), name)
+    def __setattr__(self, name: str, value):
+        setattr(_get_participant_state(_current_participant_id.get()), name, value)
+
+
+state: "AppState" = _StateProxy()  # type: ignore[assignment]
+
+# Legacy single lock — redirects to per-participant lock for the current request
+class _LockProxy:
+    def __enter__(self):
+        return _get_save_lock(_current_participant_id.get()).__enter__()
+    def __exit__(self, *args):
+        return _get_save_lock(_current_participant_id.get()).__exit__(*args)
+
+_save_lock = _LockProxy()
+
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
@@ -97,6 +161,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def participant_context_middleware(request: Request, call_next):
+    """Set the current participant ContextVar for every request.
+    Reads X-Participant-Id header (sent by frontend on every call).
+    Falls back to 'researcher' so unauthenticated / legacy requests still work.
+    """
+    pid = request.headers.get("X-Participant-Id", "researcher").strip() or "researcher"
+    token = _current_participant_id.set(pid)
+    try:
+        response = await call_next(request)
+    finally:
+        _current_participant_id.reset(token)
+    return response
 
 @app.get("/api/health")
 async def health_check():
@@ -121,6 +199,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "detail": exc.errors(),
             "body_preview": body_str
         }
+    )
+
+import traceback as _traceback
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all: log full traceback server-side and return readable detail to browser."""
+    tb = _traceback.format_exc()
+    print(f"\n💥 UNHANDLED EXCEPTION on {request.method} {request.url}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {exc}"},
     )
 
 
@@ -248,14 +338,13 @@ class AppState:
         self.brief_fields: List[Dict] = []               # [{key, label, value}, ...]
         self.brief_interpretation: Optional[str] = None  # AI one-sentence summary
         self.brief_suggested_params: List[Dict] = []     # [{key, label, hint}, ...]
+        self.brief_highlights: List[Dict] = []           # [{text, level}, ...]
         # Frontend-synced layer state (for export)
         self.image_layer_map: Dict[int, str] = {}   # image_id -> layer_id
         self.layer_definitions: List[Dict] = [      # ordered list of layer descriptors
             {"id": "default", "name": "Shoes", "color": "#58a6ff", "visible": True},
             {"id": "references", "name": "References", "color": "#f0883e", "visible": True},
         ]
-
-state = AppState()
 
 
 def pil_to_base64(pil_image: Image.Image) -> str:
@@ -397,32 +486,61 @@ def _serialize_canvas() -> dict:
         "briefFields": state.brief_fields,
         "briefInterpretation": state.brief_interpretation,
         "briefSuggestedParams": state.brief_suggested_params,
+        "briefHighlights": state.brief_highlights,
         "nextId": state.next_id,
         "images": images_data,
         "historyGroups": history_data,
+        "layerDefinitions": state.layer_definitions,
+        "imageLayerMap": {str(k): v for k, v in state.image_layer_map.items()},
     }
 
 
 def _save_canvas_to_disk() -> Path:
     """Save current canvas state to disk and return the file path.
 
+    Thread-safe: uses _save_lock to prevent concurrent writes from
+    overlapping (e.g. auto-save firing during canvas switch).
+
     Uses the descriptive {slug}_{canvas_id}.json filename.
     If the canvas was renamed since the last save the old file is deleted.
     Event logs are saved ONLY in the events/ directory as JSONL (see _open_event_log).
     """
-    data = _serialize_canvas()
-    new_path = _session_path(state.participant_id, state.current_canvas_id, state.canvas_name)
-    # Delete old file if it exists under a different name (rename case)
-    old_path = _find_session_file(state.participant_id, state.current_canvas_id)
-    if old_path and old_path.resolve() != new_path.resolve():
-        try:
-            old_path.unlink()
-        except OSError:
-            pass
-    with open(new_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, cls=_NumpyEncoder)
+    with _save_lock:
+        data = _serialize_canvas()
+        new_path = _session_path(state.participant_id, state.current_canvas_id, state.canvas_name)
+        # Delete old file if it exists under a different name (rename case)
+        old_path = _find_session_file(state.participant_id, state.current_canvas_id)
+        if old_path and old_path.resolve() != new_path.resolve():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+        # Write to temp file first, then rename — atomic on most filesystems
+        tmp_path = new_path.with_suffix('.tmp')
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, cls=_NumpyEncoder)
+        tmp_path.replace(new_path)  # atomic rename
+
+    # Persist last-active canvas ID so login can restore the correct canvas
+    try:
+        marker = DATA_DIR / state.participant_id / "last_active.txt"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text(state.current_canvas_id, encoding="utf-8")
+    except Exception:
+        pass
 
     return new_path
+
+
+def _get_last_active_canvas_id(participant_id: str) -> Optional[str]:
+    """Read the last-active canvas ID for a participant (written on every save)."""
+    try:
+        marker = DATA_DIR / participant_id / "last_active.txt"
+        if marker.exists():
+            return marker.read_text(encoding="utf-8").strip()
+    except Exception:
+        pass
+    return None
 
 
 def _close_event_log():
@@ -442,26 +560,38 @@ def _close_event_log():
 
 
 def _open_event_log():
-    """Create/open a JSONL event log file for the current canvas session."""
+    """Open or append to the daily JSONL event log for the current participant.
+
+    All visits within one calendar day go into one file:
+      Alice_2026-03-23_eventlog.jsonl
+    Subsequent visits append a session_resume marker instead of creating a new file.
+    """
     now = datetime.now()
     state.event_log_session_start = now.isoformat()
-    slug = _slugify(state.canvas_name) or state.current_canvas_id[:8]
-    prefix = (_slugify(state.study_session_name) + "_") if state.study_session_name else ""
-    ts = now.strftime("%Y-%m-%d_%H%M")
-    fname = f"{prefix}{slug}_{ts}_eventlog.jsonl"
-    path = DATA_DIR / state.participant_id / "events" / fname
+    date_str = now.strftime("%Y-%m-%d")
+    participant = state.participant_id or "researcher"
+    fname = f"{participant}_{date_str}_eventlog.jsonl"
+    path = DATA_DIR / participant / "events" / fname
     path.parent.mkdir(parents=True, exist_ok=True)
     state.event_log_path = path
-    # Write header line
+    is_new = not path.exists()
     with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps({
-            "type": "session_start",
-            "timestamp": state.event_log_session_start,
-            "canvas_id": state.current_canvas_id,
-            "canvas_name": state.canvas_name,
-            "participant_id": state.participant_id,
-            "study_session": state.study_session_name or None,
-        }) + "\n")
+        if is_new:
+            f.write(json.dumps({
+                "type": "session_start",
+                "timestamp": state.event_log_session_start,
+                "canvas_id": state.current_canvas_id,
+                "canvas_name": state.canvas_name,
+                "participant_id": participant,
+            }) + "\n")
+        else:
+            f.write(json.dumps({
+                "type": "session_resume",
+                "timestamp": state.event_log_session_start,
+                "canvas_id": state.current_canvas_id,
+                "canvas_name": state.canvas_name,
+                "participant_id": participant,
+            }) + "\n")
 
 
 def _log_event_to_file(entry: dict):
@@ -490,6 +620,7 @@ def _deserialize_canvas(data: dict) -> None:
     state.brief_fields = data.get("briefFields", [])
     state.brief_interpretation = data.get("briefInterpretation")
     state.brief_suggested_params = data.get("briefSuggestedParams", [])
+    state.brief_highlights = data.get("briefHighlights", [])
     state.next_id = data.get("nextId", 0)
 
     # Restore axis labels (tuples)
@@ -565,6 +696,12 @@ def _deserialize_canvas(data: dict) -> None:
             thumbnail_id=hg_data.get("thumbnail_id"),
             timestamp=ts,
         ))
+
+    # Restore layer metadata
+    if "layerDefinitions" in data:
+        state.layer_definitions = data["layerDefinitions"]
+    if "imageLayerMap" in data:
+        state.image_layer_map = {int(k): v for k, v in data["imageLayerMap"].items()}
 
     # Reset cluster data
     state.cluster_centroids = []
@@ -1024,12 +1161,11 @@ async def broadcast_state_update():
 
 @app.get("/")
 async def root():
-    print("🏠 ROOT ENDPOINT HIT - NEW VERSION 2025-10-31")
-    return {
-        "message": "Zappos Semantic Explorer API",
-        "status": "running",
-        "version": "2025-10-31-UPDATED"
-    }
+    """Serve frontend in production, API info in dev."""
+    _dist = Path(__file__).resolve().parent.parent / "frontend" / "dist" / "index.html"
+    if _dist.is_file():
+        return FileResponse(str(_dist))
+    return {"message": "Zappos Semantic Explorer API", "status": "running"}
 
 @app.get("/api/test")
 async def test():
@@ -1055,7 +1191,17 @@ def _fal_sync_call(endpoint: str, input_data: dict) -> dict:
         json=input_data,
         timeout=180,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        # Extract fal.ai's error body for readable diagnosis
+        try:
+            err_body = resp.json()
+        except Exception:
+            err_body = resp.text[:500]
+        print(f"[fal-proxy] ERROR {resp.status_code} from {endpoint}: {err_body}")
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"fal.ai {endpoint} → {resp.status_code}: {err_body}",
+        )
     return resp.json()
 
 
@@ -1129,6 +1275,16 @@ def initialize_embedder(model_type: str = "fashionclip"):
         return HuggingFaceCLIPEmbedder()
     else:
         return CLIPEmbedder()
+
+
+def _ensure_embedder():
+    """Auto-initialize embedder + axis builder if they were reset (e.g. after server restart)."""
+    if state.embedder is None:
+        print("[auto-init] embedder is None — re-initializing after server restart...")
+        state.embedder = initialize_embedder(state.clip_model_type)
+        state.axis_builder = SemanticAxisBuilder(state.embedder)
+        state._axis_directions_cache = None
+        print("[auto-init] embedder ready")
 
 
 def expand_concept_with_gemini(concept: str, num_expansions: int = 4) -> List[str]:
@@ -1327,8 +1483,7 @@ async def update_axes_tuned(request: TunedAxesRequest):
     where wᵢ = (position_i - 5) / 5  (maps 0-10 to [-1, +1])
     """
     try:
-        if state.axis_builder is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
+        _ensure_embedder()
 
         print(f"\n=== Tuned Axis Update ===")
         print(f"  Text weight: {request.text_weight}")
@@ -1474,8 +1629,7 @@ Example output:
 async def set_3d_mode(use_3d: bool):
     """Toggle between 2D and 3D visualization mode."""
     try:
-        if state.axis_builder is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
+        _ensure_embedder()
 
         print(f"\n=== Setting 3D Mode: {use_3d} ===")
         state.is_3d_mode = use_3d
@@ -1582,7 +1736,7 @@ async def interpret_brief(request: InterpretBriefRequest):
     """Use Gemini to extract structured design parameters from the raw brief text."""
     brief = request.brief.strip()
     if not brief:
-        return {"status": "success", "interpretation": "", "extracted": [], "unmentioned": []}
+        return {"status": "success", "interpretation": "", "extracted": [], "unmentioned": [], "highlights": []}
 
     try:
         prompt = f"""You are a shoe design expert. The user described their design intent:
@@ -1608,17 +1762,24 @@ Rules:
 2. Values should be specific but faithful to the brief (2-5 words max)
 3. All parameters NOT mentioned go in "unmentioned" with 3-5 example hints
 4. interpretation = one sentence describing what the user seems to be designing
+5. highlights = the 3-4 most important individual words or very short phrases (1-3 words max each) from the brief. Primary (1-2): the single most critical concept(s) — e.g. shoe type, a key material, a defining axis pole. Secondary (1-2): notable supporting terms. NEVER highlight more than 3 words in a single entry. Use exact text from the brief.
 
 Return JSON ONLY (no markdown):
 {{
-  "interpretation": "A basketball shoe inspired by the Nike Air Force 1 silhouette",
+  "interpretation": "A running shoe exploring the tension between Biomimetic Organic and Machined Aerospace design languages",
   "extracted": [
-    {{"key": "shoe_type", "label": "Shoe Type", "value": "Basketball shoe"}},
-    {{"key": "brand_ref", "label": "Brand Reference", "value": "Nike Air Force 1"}}
+    {{"key": "shoe_type", "label": "Shoe Type", "value": "running shoe"}},
+    {{"key": "mood", "label": "Mood", "value": "Biomimetic Organic vs Machined Aerospace"}}
   ],
   "unmentioned": [
     {{"key": "material", "label": "Material", "hint": "leather, mesh, suede, synthetic"}},
     {{"key": "color", "label": "Color Palette", "hint": "monochrome, earth tones, neon"}}
+  ],
+  "highlights": [
+    {{"text": "running shoe", "level": "primary"}},
+    {{"text": "Biomimetic Organic", "level": "primary"}},
+    {{"text": "Machined Aerospace", "level": "secondary"}},
+    {{"text": "design space", "level": "secondary"}}
   ]
 }}"""
 
@@ -1636,17 +1797,20 @@ Return JSON ONLY (no markdown):
         extracted = data.get("extracted", [])
         unmentioned = data.get("unmentioned", [])
         interpretation = data.get("interpretation", "")
+        highlights = data.get("highlights", [])
 
         # Persist in state
         state.brief_fields = extracted
         state.brief_interpretation = interpretation
         state.brief_suggested_params = unmentioned
+        state.brief_highlights = highlights
 
         return {
             "status": "success",
             "interpretation": interpretation,
             "extracted": extracted,
             "unmentioned": unmentioned,
+            "highlights": highlights,
         }
     except Exception as e:
         print(f"ERROR in interpret_brief: {e}")
@@ -1729,7 +1893,8 @@ async def suggest_tags(request: SuggestTagsRequest):
 
         if effective_mode == "reference" and request.reference_image_ids:
             # ── Reference mode: multimodal analysis ──────────────────────────
-            ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
+            _ref_lookup = {img.id: img for img in state.images_metadata}
+            ref_imgs = [_ref_lookup[img_id] for img_id in request.reference_image_ids if img_id in _ref_lookup]
             labels = [chr(65 + i) for i in range(len(ref_imgs))]  # A, B, C...
             label_map = {img.id: labels[i] for i, img in enumerate(ref_imgs)}
 
@@ -1810,11 +1975,20 @@ Return JSON ONLY (no markdown):
             # Build content list: [text, pil_img_A, pil_img_B, ...]
             content = [prompt_text]
             for img in ref_imgs:
-                try:
-                    resized = img.pil_image.resize((256, 256))
-                    content.append(resized)
-                except Exception:
-                    pass
+                pil = img.pil_image
+                if pil is None and hasattr(img, 'base64_image') and img.base64_image:
+                    try:
+                        b64 = img.base64_image.split(",", 1)[-1]
+                        pil = Image.open(BytesIO(base64.b64decode(b64))).convert("RGBA")
+                    except Exception as _e:
+                        print(f"[suggest_tags] base64 fallback failed for {img.id}: {_e}")
+                if pil is not None:
+                    try:
+                        content.append(pil.resize((256, 256)))
+                    except Exception as _e:
+                        print(f"[suggest_tags] resize failed for {img.id}: {_e}")
+                else:
+                    print(f"[suggest_tags] WARNING: no image data for id={img.id}, skipping")
 
             response = model.generate_content(content)
             text = (getattr(response, "text", None) or "").strip()
@@ -1863,7 +2037,8 @@ Return JSON ONLY (no markdown):
             # ── Mood board reference mode: multimodal analysis + concept categories ──
             # Combines per-image visual analysis (A/B/C/D descriptors) with mood-board
             # concept categories, so users iterating on boards get both.
-            ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
+            _ref_lookup = {img.id: img for img in state.images_metadata}
+            ref_imgs = [_ref_lookup[img_id] for img_id in request.reference_image_ids if img_id in _ref_lookup]
             labels = [chr(65 + i) for i in range(len(ref_imgs))]
             label_map = {img.id: labels[i] for i, img in enumerate(ref_imgs)}
 
@@ -1944,11 +2119,20 @@ Return JSON ONLY (no markdown):
             # Build content list: [text, pil_img_A, pil_img_B, ...]
             content = [prompt_text]
             for img in ref_imgs:
-                try:
-                    resized = img.pil_image.resize((256, 256))
-                    content.append(resized)
-                except Exception as img_err:
-                    print(f"[suggest_tags] mood-board-reference: failed to load image {img.id}: {img_err}")
+                pil = img.pil_image
+                if pil is None and hasattr(img, 'base64_image') and img.base64_image:
+                    try:
+                        b64 = img.base64_image.split(",", 1)[-1]
+                        pil = Image.open(BytesIO(base64.b64decode(b64))).convert("RGBA")
+                    except Exception as _e:
+                        print(f"[suggest_tags] mood-board-reference: base64 fallback failed for {img.id}: {_e}")
+                if pil is not None:
+                    try:
+                        content.append(pil.resize((256, 256)))
+                    except Exception as _e:
+                        print(f"[suggest_tags] mood-board-reference: resize failed for {img.id}: {_e}")
+                else:
+                    print(f"[suggest_tags] mood-board-reference: WARNING no image data for id={img.id}, skipping")
 
             print(f"[suggest_tags] mood-board-reference: sending {len(content)-1} images to Gemini")
             response = model.generate_content(content)
@@ -2471,7 +2655,8 @@ Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
 
         # If reference images are provided, include them for multimodal context
         if request.reference_image_ids:
-            ref_imgs = [img for img in state.images_metadata if img.id in request.reference_image_ids]
+            _ref_lookup = {img.id: img for img in state.images_metadata}
+            ref_imgs = [_ref_lookup[img_id] for img_id in request.reference_image_ids if img_id in _ref_lookup]
             content = [prompt_text]
             for img in ref_imgs:
                 try:
@@ -2542,8 +2727,7 @@ async def clear_canvas():
 async def reapply_layout():
     """Re-apply layout spread to all images to fix overlap. Call after loading or when shoes overlap."""
     try:
-        if state.axis_builder is None or state.embedder is None:
-            raise HTTPException(status_code=400, detail="Models not initialized")
+        _ensure_embedder()
         if len(state.images_metadata) < 2:
             return {"status": "success", "message": "Nothing to spread"}
 
@@ -2585,8 +2769,7 @@ async def add_external_images(request: AddExternalImagesRequest):
             print(f"First URL preview (100 chars): {str(first_url)[:100]}")
             print(f"Starts with 'data:': {str(first_url).startswith('data:')}")
 
-        if state.embedder is None:
-            raise HTTPException(status_code=400, detail="CLIP embedder not initialized. Call /api/initialize-clip-only first.")
+        _ensure_embedder()
 
         # Download images from URLs or decode data URLs
         print("Loading images...")
@@ -3467,8 +3650,7 @@ async def embed_ghost_image(request: Request):
         if not image_url:
             raise HTTPException(status_code=400, detail="image_url is required")
 
-        if state.embedder is None:
-            raise HTTPException(status_code=400, detail="CLIP embedder not initialized")
+        _ensure_embedder()
 
         # Load image from data URL or HTTP URL
         if image_url.startswith("data:"):
@@ -4071,6 +4253,7 @@ async def export_zip(ids: Optional[str] = None):
                 "briefFields": state.brief_fields,
                 "briefInterpretation": state.brief_interpretation,
                 "briefSuggestedParams": state.brief_suggested_params,
+                "briefHighlights": state.brief_highlights,
                 "nextId": state.next_id,
                 "layerDefinitions": state.layer_definitions,
                 "imageLayerMap": {str(k): v for k, v in state.image_layer_map.items()},
@@ -4187,15 +4370,13 @@ async def get_current_session():
     }
 
 
-class SaveSessionRequest(BaseModel):
-    pass  # body optional — saves current state
-
-
 @app.post("/api/sessions/save")
 async def save_session():
-    """Save the current canvas state to disk."""
+    """Save the current canvas state to disk. Accepts any body (supports sendBeacon text/plain).
+    Offloaded to thread pool so the event loop isn't blocked during large JSON writes.
+    """
     try:
-        path = _save_canvas_to_disk()
+        path = await asyncio.to_thread(_save_canvas_to_disk)
         return {"success": True, "path": str(path)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -4204,7 +4385,10 @@ async def save_session():
 @app.get("/api/sessions/list")
 async def list_sessions():
     """List all saved canvases for the current participant."""
-    return {"sessions": _list_sessions(state.participant_id)}
+    return {
+        "sessions": _list_sessions(state.participant_id),
+        "lastActiveCanvasId": _get_last_active_canvas_id(state.participant_id),
+    }
 
 
 class LoadSessionRequest(BaseModel):
@@ -4218,13 +4402,36 @@ async def load_session(request: LoadSessionRequest):
         _close_event_log()
         # Save current canvas first
         _save_canvas_to_disk()
+
+        # Snapshot critical state so we can rollback if load fails
+        _snapshot = {
+            "canvas_id": state.current_canvas_id,
+            "canvas_name": state.canvas_name,
+            "participant_id": state.participant_id,
+        }
+
         # Find and load the requested canvas
         path = _find_session_file(state.participant_id, request.canvas_id)
         if not path:
             raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        _deserialize_canvas(data)
+
+        # Validate JSON has required fields before clobbering state
+        if "id" not in data or "images" not in data:
+            raise HTTPException(status_code=400, detail="Corrupted canvas file — missing required fields")
+
+        try:
+            _deserialize_canvas(data)
+        except Exception as deser_err:
+            # Rollback: restore the canvas we just saved so state isn't half-broken
+            print(f"[load_session] Deserialization failed: {deser_err} — rolling back")
+            rollback_path = _find_session_file(_snapshot["participant_id"], _snapshot["canvas_id"])
+            if rollback_path:
+                with open(rollback_path, encoding="utf-8") as f:
+                    _deserialize_canvas(json.load(f))
+            raise HTTPException(status_code=500, detail=f"Failed to load canvas: {deser_err}")
+
         _open_event_log()
         await broadcast_state_update()
         visible = [img for img in state.images_metadata if img.visible]
@@ -4361,20 +4568,43 @@ class DeleteCanvasRequest(BaseModel):
 
 @app.post("/api/sessions/delete")
 async def delete_canvas(request: DeleteCanvasRequest):
-    """Delete a saved canvas from disk. Cannot delete the currently active canvas."""
-    if request.canvas_id == state.current_canvas_id:
-        raise HTTPException(status_code=400, detail="Cannot delete the active canvas. Switch to another canvas first.")
+    """Delete a saved canvas from disk. If deleting the active canvas, auto-switch to another."""
     path = _find_session_file(state.participant_id, request.canvas_id)
     if not path:
         raise HTTPException(status_code=404, detail=f"Canvas {request.canvas_id} not found")
+
+    switched_to = None
+    if request.canvas_id == state.current_canvas_id:
+        # Auto-switch to another canvas before deleting the active one
+        all_sessions = _list_sessions(state.participant_id)
+        other = [s for s in all_sessions if s["id"] != request.canvas_id]
+        if other:
+            # Load the most recent other canvas
+            other.sort(key=lambda s: s.get("updatedAt", ""), reverse=True)
+            other_path = _find_session_file(state.participant_id, other[0]["id"])
+            if other_path:
+                _save_canvas_to_disk()  # save current first
+                with open(other_path, encoding="utf-8") as f:
+                    data = json.load(f)
+                _deserialize_canvas(data)
+                switched_to = state.current_canvas_id
+        else:
+            # Last canvas — reset to empty state
+            state.images_metadata.clear()
+            state.history_groups.clear()
+            state.current_canvas_id = str(_uuid.uuid4())
+            state.canvas_name = "Canvas 1"
+            switched_to = state.current_canvas_id
+
     path.unlink()
-    return {"success": True, "deleted": request.canvas_id}
+    return {"success": True, "deleted": request.canvas_id, "switchedTo": switched_to}
 
 
 @app.post("/api/sessions/rename")
 async def rename_canvas(request: RenameCanvasRequest):
-    """Rename the current canvas."""
+    """Rename the current canvas and persist to disk."""
     state.canvas_name = request.name.strip() or "Untitled"
+    _save_canvas_to_disk()  # persist the rename immediately
     return {"canvasId": state.current_canvas_id, "canvasName": state.canvas_name}
 
 
@@ -4387,6 +4617,34 @@ async def set_participant(request: SetParticipantRequest):
     """Update the participant ID (affects where future saves are written)."""
     state.participant_id = request.participant_id.strip() or "researcher"
     return {"participantId": state.participant_id}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/login")
+async def login(request: LoginRequest):
+    """Validate study participant or researcher credentials.
+
+    Credentials are configured via env vars:
+      STUDY_USERS=Alice:pass1,Bob:pass2
+      ADMIN_KEY=yourresearcherpassword
+    """
+    username = request.username.strip()
+    password = request.password.strip()
+    # Researcher / admin login
+    if username.lower() == "researcher" and password == ADMIN_KEY:
+        state.participant_id = "researcher"
+        _open_event_log()
+        return {"success": True, "participantId": "researcher", "role": "admin"}
+    # Study participant login
+    if username in _STUDY_USERS and _STUDY_USERS[username] == password:
+        state.participant_id = username
+        _open_event_log()
+        return {"success": True, "participantId": username, "role": "participant"}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 
 class SetStudySessionRequest(BaseModel):
@@ -4409,6 +4667,28 @@ async def set_study_session_name(request: SetStudySessionRequest):
 async def get_study_session_name():
     """Get the current study session name."""
     return {"studySessionName": state.study_session_name}
+
+
+@app.get("/api/admin/download-data")
+async def admin_download_data(admin_key: str = ""):
+    """Stream the entire data directory as a tar.gz for local backup.
+    Visit this URL in a browser to download: /api/admin/download-data?admin_key=YOUR_KEY
+    """
+    if admin_key != ADMIN_KEY:
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+    import tarfile, io
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    filename = f"study_backup_{timestamp}.tar.gz"
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        if DATA_DIR.exists():
+            tar.add(str(DATA_DIR), arcname="data")
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/gzip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @app.get("/api/admin/sessions")
@@ -4446,6 +4726,46 @@ async def log_event(request: EventLogRequest):
     state.event_log.append(entry)
     _log_event_to_file(entry)
     return {"ok": True}
+
+class FeedbackContext(BaseModel):
+    currentRoute: str = ""
+    activeCanvasId: str = ""
+    browser: str = ""
+
+class FeedbackRequest(BaseModel):
+    feedback_id: str
+    user_id: str
+    timestamp: str
+    category: str
+    content: str
+    context: FeedbackContext = FeedbackContext()
+
+
+@app.post("/api/feedback")
+async def submit_feedback(request: FeedbackRequest):
+    """Save a participant feedback note to a dedicated JSONL feedback log.
+
+    Stored at: backend/data/{user_id}/feedback.jsonl
+    Each line is one JSON object with the full payload.
+    """
+    participant = request.user_id.strip() or "unknown"
+    feedback_dir = DATA_DIR / participant
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    feedback_path = feedback_dir / "feedback.jsonl"
+    entry = {
+        "feedbackId": request.feedback_id,
+        "userId": participant,
+        "timestamp": request.timestamp,
+        "category": request.category,
+        "content": request.content,
+        "context": request.context.dict(),
+    }
+    try:
+        with open(feedback_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write feedback: {e}")
+    return {"feedbackId": request.feedback_id}
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -4491,9 +4811,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # ─── Static file serving (production: serve built React app) ───
 _frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+print(f"[SPA] Looking for frontend dist at: {_frontend_dist}")
+print(f"[SPA] Exists: {_frontend_dist.is_dir()}")
 if _frontend_dist.is_dir():
-    # Serve static assets (JS, CSS, images)
-    app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="static-assets")
+    _index_html = _frontend_dist / "index.html"
+    _assets_dir = _frontend_dist / "assets"
+    print(f"[SPA] index.html exists: {_index_html.is_file()}")
+    print(f"[SPA] assets/ exists: {_assets_dir.is_dir()}")
+
+    if _assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="static-assets")
 
     # SPA fallback: any non-API route returns index.html
     @app.get("/{full_path:path}")
@@ -4501,7 +4828,19 @@ if _frontend_dist.is_dir():
         file_path = _frontend_dist / full_path
         if file_path.is_file():
             return FileResponse(str(file_path))
-        return FileResponse(str(_frontend_dist / "index.html"))
+        return FileResponse(str(_index_html))
+else:
+    print(f"[SPA] WARNING: frontend dist not found! Contents of parent: {list((_frontend_dist.parent).iterdir()) if _frontend_dist.parent.is_dir() else 'parent missing'}")
+
+@app.get("/api/debug/spa")
+async def debug_spa():
+    """Debug endpoint to check frontend dist status."""
+    return {
+        "frontend_dist": str(_frontend_dist),
+        "exists": _frontend_dist.is_dir(),
+        "index_html": (_frontend_dist / "index.html").is_file() if _frontend_dist.is_dir() else False,
+        "contents": [str(f.name) for f in _frontend_dist.iterdir()] if _frontend_dist.is_dir() else [],
+    }
 
 
 if __name__ == "__main__":

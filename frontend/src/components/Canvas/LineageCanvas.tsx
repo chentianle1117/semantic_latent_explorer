@@ -6,7 +6,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import { useAppStore } from "../../store/appStore";
-import type { ImageData } from "../../types";
+import type { ImageData, GhostNode } from "../../types";
+import { apiClient } from "../../api/client";
 import {
   getCategoryColor,
   getDisplayCategory,
@@ -98,9 +99,12 @@ function computeLayout(
   const maxDepth = Math.max(...Array.from(depth.values()), 0);
   const columns: ImageData[][] = Array.from({ length: maxDepth + 1 }, () => []);
   images.forEach(img => columns[depth.get(img.id)!].push(img));
-  columns.forEach(col => col.sort((a, b) =>
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  ));
+  columns.forEach(col => col.sort((a, b) => {
+    const aRef = a.generation_method === 'dataset' ? 1 : 0;
+    const bRef = b.generation_method === 'dataset' ? 1 : 0;
+    if (aRef !== bRef) return aRef - bRef;
+    return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+  }));
 
   // 3. Position nodes: x by depth, y evenly spaced per column
   const positions = new Map<number, { x: number; y: number }>();
@@ -162,6 +166,11 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
   const hiddenBatchIds = useAppStore(s => s.hiddenBatchIds);
   const historyGroups = useAppStore(s => s.historyGroups);
   const studyMode = useAppStore(s => s.studyMode);
+  const ghostNodes = useAppStore(s => s.ghostNodes);
+  const removeGhostNode = useAppStore(s => s.removeGhostNode);
+
+  const [hoveredGhostId, setHoveredGhostId] = useState<number | null>(null);
+  const [acceptingGhostId, setAcceptingGhostId] = useState<number | null>(null);
 
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -171,6 +180,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
   useEffect(() => { onMiddleClickRef.current = onMiddleClick; }, [onMiddleClick]);
 
   const [containerSize, setContainerSize] = useState({ w: 800, h: 600 });
+  const [brush, setBrush] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
   // Measure container
   useEffect(() => {
@@ -207,7 +217,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
       if (hiddenSet.has(img.id)) return false;
       if (batchHiddenImageIds.has(img.id)) return false;
       if (isolatedImageIds !== null && !isolatedImageIds.includes(img.id)) return false;
-      if (starFilter !== null && (imageRatings[img.id] ?? 0) < starFilter) return false;
+      if (starFilter !== null && (imageRatings[img.id] ?? 0) !== starFilter) return false;
       return true;
     });
   }, [allImages, hiddenImageIds, batchHiddenImageIds, isolatedImageIds, starFilter, imageRatings, studyMode]);
@@ -256,10 +266,95 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
       }
     });
 
+    // ── Rubber-band box select (left-click drag on background) ──
+    let brushStart: { x: number; y: number } | null = null;
+    let isBrushDragging = false;
+    let docCleanup: (() => void) | null = null;
+
+    const svgCoords = (e: MouseEvent) => {
+      const rect = svgEl.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return; // left-click only
+      const target = e.target as Element;
+      if (target.closest("g[style]")) return; // clicked a node, not background
+      if (target !== svgEl && target.tagName !== 'svg' && !target.classList.contains('lineage-canvas-svg')) return;
+      e.preventDefault();
+      brushStart = svgCoords(e);
+      isBrushDragging = true;
+
+      const onDocMove = (ev: MouseEvent) => {
+        if (!isBrushDragging || !brushStart) return;
+        const cur = svgCoords(ev);
+        const rect = {
+          x: Math.min(brushStart.x, cur.x),
+          y: Math.min(brushStart.y, cur.y),
+          w: Math.abs(cur.x - brushStart.x),
+          h: Math.abs(cur.y - brushStart.y),
+        };
+        setBrush(rect);
+      };
+
+      const onDocUp = (ev: MouseEvent) => {
+        isBrushDragging = false;
+        if (docCleanup) { docCleanup(); docCleanup = null; }
+        const curBrush = brushStart ? {
+          x: Math.min(brushStart.x, svgCoords(ev).x),
+          y: Math.min(brushStart.y, svgCoords(ev).y),
+          w: Math.abs(svgCoords(ev).x - brushStart.x),
+          h: Math.abs(svgCoords(ev).y - brushStart.y),
+        } : null;
+        setBrush(null);
+        brushStart = null;
+        if (!curBrush || curBrush.w < 4 || curBrush.h < 4) return;
+
+        // Find nodes inside the brush (screen-space comparison)
+        const svgRect = svgEl.getBoundingClientRect();
+        const bx1 = curBrush.x, by1 = curBrush.y;
+        const bx2 = bx1 + curBrush.w, by2 = by1 + curBrush.h;
+
+        const inside: number[] = [];
+        svgEl.querySelectorAll('g[transform]').forEach(gEl => {
+          const r = gEl.getBoundingClientRect();
+          const nx1 = r.left - svgRect.left, nx2 = r.right - svgRect.left;
+          const ny1 = r.top - svgRect.top, ny2 = r.bottom - svgRect.top;
+          // Check overlap
+          if (nx2 > bx1 && nx1 < bx2 && ny2 > by1 && ny1 < by2) {
+            const id = parseInt(gEl.getAttribute('data-node-id') || '', 10);
+            if (!isNaN(id) && id > 0) inside.push(id);
+          }
+        });
+
+        if (inside.length > 0) {
+          const store = useAppStore.getState();
+          if (ev.shiftKey) {
+            const next = new Set(store.selectedImageIds);
+            inside.forEach(id => next.add(id));
+            store.setSelectedImageIds([...next]);
+          } else {
+            store.setSelectedImageIds(inside);
+          }
+        }
+      };
+
+      document.addEventListener('mousemove', onDocMove);
+      document.addEventListener('mouseup', onDocUp);
+      docCleanup = () => {
+        document.removeEventListener('mousemove', onDocMove);
+        document.removeEventListener('mouseup', onDocUp);
+      };
+    };
+
+    svgEl.addEventListener('mousedown', onMouseDown);
+
     return () => {
       svg.on(".zoom", null);
       svg.on("auxclick", null);
       svgEl.removeEventListener("contextmenu", suppressCtx);
+      svgEl.removeEventListener('mousedown', onMouseDown);
+      if (docCleanup) docCleanup();
     };
   }, []);
 
@@ -297,6 +392,54 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
     setSelectedImageIds([]);
     onSelectionChange(0, 0, 0);
   }, [setSelectedImageIds, onSelectionChange]);
+
+  // Position ghost nodes in the tree: next column after their deepest parent
+  const ghostLayout = useMemo(() => {
+    if (ghostNodes.length === 0) return [];
+    const nodePositions = new Map(nodes.map(n => [n.id, { x: n.x, y: n.y }]));
+    const maxX = nodes.length > 0 ? Math.max(...nodes.map(n => n.x)) : PADDING;
+    const result: { ghost: GhostNode; x: number; y: number }[] = [];
+
+    ghostNodes.forEach((ghost, gi) => {
+      // Find the deepest parent position
+      let parentX = -1;
+      let parentY = 0;
+      for (const pid of ghost.parents) {
+        const pos = nodePositions.get(pid);
+        if (pos && pos.x > parentX) { parentX = pos.x; parentY = pos.y; }
+      }
+      if (parentX >= 0) {
+        // Place one column after the deepest parent
+        result.push({ ghost, x: parentX + COL_SPACING, y: parentY + gi * ROW_SPACING });
+      } else {
+        // No parents in view — place at end
+        result.push({ ghost, x: maxX + COL_SPACING, y: PADDING + gi * ROW_SPACING });
+      }
+    });
+    return result;
+  }, [ghostNodes, nodes]);
+
+  // Ghost accept handler
+  const handleGhostAccept = useCallback(async (ghost: GhostNode) => {
+    setAcceptingGhostId(ghost.id);
+    apiClient.logEvent('ghost_accepted', { ghostId: ghost.id, prompt: ghost.prompt, source: ghost.source ?? 'agent', parentIds: ghost.parents ?? [] });
+    try {
+      removeGhostNode(ghost.id);
+      await apiClient.addExternalImages({
+        images: [{ url: `data:image/png;base64,${ghost.base64_image}` }],
+        prompt: ghost.prompt,
+        generation_method: ghost.source === 'concurrent' ? 'agent' : 'agent',
+        remove_background: true,
+        parent_ids: ghost.parents,
+        precomputed_coordinates: ghost.coordinates as [number, number],
+        realm: 'shoe',
+        shoe_view: 'side',
+      });
+    } catch (err) {
+      console.error('[LineageCanvas] Ghost accept failed:', err);
+    }
+    setAcceptingGhostId(null);
+  }, [removeGhostNode]);
 
   return (
     <div ref={containerRef} className="lineage-canvas-container">
@@ -348,6 +491,7 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
             return (
               <g
                 key={n.id}
+                data-node-id={n.id}
                 transform={`translate(${n.x},${n.y})`}
                 onClick={(e) => handleNodeClick(e, n.id)}
                 onDoubleClick={(e) => handleNodeDoubleClick(e, n.id)}
@@ -391,9 +535,11 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
 
                 {/* Star badge */}
                 {rating > 0 && (
-                  <g transform={`translate(${-hs + 6},${-hs + 6})`}>
-                    <circle r={6} fill="#c8a000" opacity={0.92} />
-                    <text textAnchor="middle" dominantBaseline="central" fontSize={8} fill="white">★</text>
+                  <g transform={`translate(${-hs + 11},${-hs + 8})`}>
+                    <rect x={-11} y={-7} width={22} height={14} rx={4} fill="#c8a000" opacity={0.88} />
+                    <text textAnchor="middle" dominantBaseline="central" fontSize={7} fill="white" fontWeight="bold">
+                      {rating}★
+                    </text>
                   </g>
                 )}
 
@@ -401,8 +547,155 @@ export const LineageCanvas: React.FC<LineageCanvasProps> = ({
               </g>
             );
           })}
+
+          {/* Ghost Nodes — AI suggestions with Keep/Skip UI */}
+          {ghostLayout.map(({ ghost, x, y }) => {
+            const hs = NODE_SIZE / 2;
+            const isHovered = hoveredGhostId === ghost.id;
+            const isAccepting = acceptingGhostId === ghost.id;
+            const glowColor = ghost.source === 'concurrent' ? '#a855f7' : '#14b8a6';
+            const label = ghost.source === 'concurrent'
+              ? (ghost.this_explores || ghost.prompt.slice(0, 60))
+              : (ghost.target_region || ghost.prompt.slice(0, 60));
+
+            return (
+              <g
+                key={`ghost-${ghost.id}`}
+                transform={`translate(${x},${y})`}
+                onMouseEnter={() => setHoveredGhostId(ghost.id)}
+                onMouseLeave={() => setHoveredGhostId(null)}
+                style={{ cursor: 'pointer' }}
+                opacity={isAccepting ? 0.3 : 1}
+              >
+                {/* Glow background */}
+                <circle
+                  r={NODE_SIZE * 0.6}
+                  fill={glowColor}
+                  opacity={isHovered ? 0.3 : 0.12}
+                  style={{ filter: `blur(${isHovered ? 12 : 8}px)` }}
+                />
+
+                {/* Dashed edge to parents */}
+                {ghost.parents.map(pid => {
+                  const parentNode = nodes.find(n => n.id === pid);
+                  if (!parentNode) return null;
+                  return (
+                    <path
+                      key={`ghost-edge-${pid}-${ghost.id}`}
+                      d={edgePath(parentNode.x + hs - x, parentNode.y - y, -hs, 0)}
+                      fill="none"
+                      stroke={glowColor}
+                      strokeWidth={1.4}
+                      strokeOpacity={0.5}
+                      strokeDasharray="4 3"
+                    />
+                  );
+                })}
+
+                {/* Thumbnail */}
+                <clipPath id={`lc-ghost-clip-${ghost.id}`}>
+                  <rect x={-hs} y={-hs} width={NODE_SIZE} height={NODE_SIZE} rx={NODE_RADIUS} />
+                </clipPath>
+                <image
+                  href={`data:image/png;base64,${ghost.base64_image}`}
+                  x={-hs} y={-hs}
+                  width={NODE_SIZE} height={NODE_SIZE}
+                  clipPath={`url(#lc-ghost-clip-${ghost.id})`}
+                  preserveAspectRatio="xMidYMid slice"
+                  opacity={0.8}
+                />
+
+                {/* Border */}
+                <rect
+                  x={-hs} y={-hs}
+                  width={NODE_SIZE} height={NODE_SIZE}
+                  rx={NODE_RADIUS}
+                  fill="none"
+                  stroke={glowColor}
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  opacity={0.7}
+                />
+
+                {/* Source badge */}
+                <g transform={`translate(${hs - 6},${-hs + 6})`}>
+                  <circle r={7} fill={glowColor} opacity={0.9} />
+                  <text textAnchor="middle" dominantBaseline="central" fontSize={8} fill="white" fontWeight="bold">
+                    {ghost.source === 'concurrent' ? '?' : '!'}
+                  </text>
+                </g>
+
+                {/* Hover info + Keep/Skip buttons */}
+                {isHovered && (
+                  <g>
+                    {/* Label */}
+                    <rect
+                      x={-hs} y={hs + 6}
+                      width={Math.max(NODE_SIZE, label.length * 5.5 + 16)} height={20}
+                      rx={4}
+                      fill="rgba(13,17,23,0.92)"
+                      stroke={glowColor} strokeWidth={1} strokeOpacity={0.5}
+                    />
+                    <text
+                      x={-hs + 8} y={hs + 19}
+                      fontSize={9} fill="rgba(220,232,245,0.9)"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {label.length > 40 ? label.slice(0, 40) + '…' : label}
+                    </text>
+
+                    {/* Keep button */}
+                    <rect
+                      x={-hs} y={hs + 30}
+                      width={NODE_SIZE / 2 - 2} height={22}
+                      rx={11}
+                      fill="rgba(34,197,94,0.88)"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); handleGhostAccept(ghost); }}
+                    />
+                    <text
+                      x={-hs + NODE_SIZE / 4 - 1} y={hs + 44}
+                      textAnchor="middle" fontSize={10} fontWeight="700" fill="#0d1117"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      Keep
+                    </text>
+
+                    {/* Skip button */}
+                    <rect
+                      x={2} y={hs + 30}
+                      width={NODE_SIZE / 2 - 2} height={22}
+                      rx={11}
+                      fill="rgba(239,68,68,0.88)"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => { e.stopPropagation(); apiClient.logEvent('ghost_skipped', { ghostId: ghost.id, prompt: ghost.prompt, source: ghost.source ?? 'agent', parentIds: ghost.parents ?? [] }); removeGhostNode(ghost.id); }}
+                    />
+                    <text
+                      x={NODE_SIZE / 4 + 1} y={hs + 44}
+                      textAnchor="middle" fontSize={10} fontWeight="700" fill="white"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      Skip
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
         </g>
       </svg>
+
+      {/* Brush selection rectangle */}
+      {brush && (
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+          <rect
+            x={brush.x} y={brush.y} width={brush.w} height={brush.h}
+            fill="rgba(0,210,255,0.06)"
+            stroke="rgba(0,210,255,0.55)"
+            strokeWidth={1}
+          />
+        </svg>
+      )}
 
       {/* Legend overlay */}
       {usedCategories.length > 0 && (

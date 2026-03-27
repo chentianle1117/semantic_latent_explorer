@@ -75,6 +75,108 @@ body {
   overflow: hidden;
 }
 
+/* ── Empty Canvas Guidance Overlay ────────────────────────────── */
+.empty-canvas-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.empty-canvas-message {
+  font-size: 14px;
+  color: #484f58;
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.6;
+  margin: 0;
+  user-select: none;
+}
+
+.empty-canvas-actions {
+  display: flex;
+  gap: 10px;
+  pointer-events: all;
+}
+
+.empty-canvas-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #c9d1d9;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.empty-canvas-btn:hover {
+  background: #21262d;
+  border-color: #58a6ff;
+  color: #e6edf3;
+}
+
+.empty-canvas-btn-primary {
+  background: #0d419d;
+  border-color: #388bfd;
+  color: #e6edf3;
+}
+
+.empty-canvas-btn-primary:hover {
+  background: #1158c7;
+  border-color: #58a6ff;
+}
+
+.empty-canvas-inspiration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  pointer-events: all;
+}
+
+.empty-canvas-inspiration-label {
+  font-size: 11px;
+  color: #484f58;
+  letter-spacing: 0.03em;
+  margin: 0;
+  user-select: none;
+}
+
+.empty-canvas-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.empty-canvas-chip {
+  background: transparent;
+  border: 1px solid #30363d;
+  border-radius: 20px;
+  color: #8b949e;
+  font-size: 12px;
+  padding: 5px 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.empty-canvas-chip:hover {
+  background: #161b22;
+  border-color: #58a6ff44;
+  color: #c9d1d9;
+}
+
 .canvas-header {
   padding: 16px 20px;
   border-bottom: 1px solid #30363d;

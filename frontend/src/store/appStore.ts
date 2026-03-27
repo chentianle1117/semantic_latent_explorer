@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry, BriefField, BriefSuggestedParam, MinimapDot, ViewportRect, MultiViewHistoryEntry } from '../types';
+import type { AppState, ImageData, HistoryGroup, VisualSettings, CanvasBounds, AgentInsight, AgentStatus, AgentMode, GhostNode, CanvasLayer, CanvasMeta, EventLogEntry, BriefField, BriefSuggestedParam, BriefHighlight, MinimapDot, ViewportRect, MultiViewHistoryEntry } from '../types';
 import { apiClient } from '../api/client';
 
 interface AppStore extends AppState {
@@ -163,6 +163,7 @@ interface AppStore extends AppState {
   setBriefSuggestedParams: (params: BriefSuggestedParam[]) => void;
   setBriefInterpretation: (text: string | null) => void;
   setBriefLoading: (v: boolean) => void;
+  setBriefHighlights: (highlights: BriefHighlight[]) => void;
   updateBriefFieldValue: (key: string, value: string) => void;
   addBriefField: (param: BriefSuggestedParam) => void;
   removeBriefField: (key: string) => void;
@@ -170,7 +171,9 @@ interface AppStore extends AppState {
   // Session / Multi-Canvas
   setCurrentCanvasId: (id: string | null) => void;
   setCanvasName: (name: string) => void;
+  setLastSaveStatus: (status: 'saving' | 'saved' | 'error' | null) => void;
   setParticipantId: (id: string) => void;
+  setParticipantLockedFromUrl: (locked: boolean) => void;
   setCanvasList: (list: CanvasMeta[]) => void;
   addEventLogEntry: (entry: EventLogEntry) => void;
 
@@ -280,7 +283,6 @@ const initialState: AppState = {
   // Layer system
   layers: [
     { id: 'default', name: 'Shoes', visible: true, color: '#58a6ff' },
-    { id: 'mood-boards', name: 'Mood Boards', visible: true, color: '#FF6B2B' },
     { id: 'references', name: 'References', visible: true, color: '#ff7b72' },
   ] as CanvasLayer[],
   imageLayerMap: {} as Record<number, string>,
@@ -301,6 +303,7 @@ const initialState: AppState = {
   briefSuggestedParams: [] as BriefSuggestedParam[],
   briefInterpretation: null as string | null,
   briefLoading: false,
+  briefHighlights: [] as BriefHighlight[],
 
   // Deletion undo stack
   deletedImageStack: [] as ImageData[],
@@ -309,9 +312,11 @@ const initialState: AppState = {
   currentCanvasId: null as string | null,
   canvasName: 'Canvas 1',
   participantId: 'researcher',
+  participantLockedFromUrl: false,
   studySessionName: '' as string,
   canvasList: [] as CanvasMeta[],
   eventLog: [] as EventLogEntry[],
+  lastSaveStatus: null as 'saving' | 'saved' | 'error' | null,
 
   // Shoe view filter toggles
   visibleSatelliteViews: {} as Record<string, boolean>,  // all off by default
@@ -778,6 +783,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setBriefSuggestedParams: (params) => set({ briefSuggestedParams: params }),
   setBriefInterpretation: (text) => set({ briefInterpretation: text }),
   setBriefLoading: (v) => set({ briefLoading: v }),
+  setBriefHighlights: (highlights) => set({ briefHighlights: highlights }),
   updateBriefFieldValue: (key, value) => set((s) => ({
     briefFields: s.briefFields.map((f) => f.key === key ? { ...f, value } : f),
   })),
@@ -792,7 +798,9 @@ export const useAppStore = create<AppStore>((set) => ({
   // Session / Multi-Canvas actions
   setCurrentCanvasId: (id) => set({ currentCanvasId: id }),
   setCanvasName: (name) => set({ canvasName: name }),
+  setLastSaveStatus: (status: 'saving' | 'saved' | 'error' | null) => set({ lastSaveStatus: status }),
   setParticipantId: (id) => set({ participantId: id }),
+  setParticipantLockedFromUrl: (locked) => set({ participantLockedFromUrl: locked }),
   setStudySessionName: (name: string) => set({ studySessionName: name }),
   setCanvasList: (list) => set({ canvasList: list }),
   addEventLogEntry: (entry) => set((s) => ({ eventLog: [...s.eventLog, entry] })),

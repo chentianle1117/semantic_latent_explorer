@@ -285,6 +285,12 @@ export const AxisTuningRail: React.FC = () => {
   const handleReproject = useCallback(async () => {
     setLoading(true);
     useProgressStore.getState().showProgress("reprojecting", "Reprojecting with tuned axes...", false);
+    apiClient.logEvent('axis_tuning_reproject', {
+      sentences,
+      anchorCount: anchors.length,
+      anchors: anchors.map(a => ({ imageId: a.imageId, axis: a.axis, position: a.position })),
+      textWeight,
+    });
     try {
       await apiClient.updateAxesTuned({
         custom_sentences: sentences,
@@ -295,10 +301,14 @@ export const AxisTuningRail: React.FC = () => {
       useProgressStore.getState().updateProgress(50, "Fetching updated coordinates...");
       // WebSocket broadcast doesn't reach us — fetch state explicitly
       const freshState = await apiClient.getState();
-      const store = useAppStore.getState();
-      store.setImages(freshState.images);
-      if (freshState.history_groups) store.setHistoryGroups(freshState.history_groups);
-      store.resetCanvasBounds();
+      // CRITICAL: batch all updates in one setState call so SemanticCanvas sees
+      // both images AND canvasBounds change simultaneously (prevents fast-path
+      // from treating new coordinates as a no-op reorder)
+      useAppStore.setState({
+        images: freshState.images,
+        ...(freshState.history_groups ? { historyGroups: freshState.history_groups } : {}),
+        canvasBounds: null,  // force full re-render with new coordinate extents
+      });
 
       useProgressStore.getState().updateProgress(100);
       useProgressStore.getState().hideProgress();

@@ -31,6 +31,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const setStudyMode = useAppStore((s) => s.setStudyMode);
   const participantId = useAppStore((s) => s.participantId);
   const setParticipantId = useAppStore((s) => s.setParticipantId);
+  const participantLockedFromUrl = useAppStore((s) => s.participantLockedFromUrl);
   const [participantInput, setParticipantInput] = useState(participantId);
   useEffect(() => {
     if (isOpen) setParticipantInput(participantId);
@@ -60,57 +61,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="settings-body">
-          {/* Session */}
-          <div className="settings-section">
-            <label className="settings-label">Session</label>
-            <div className="settings-row">
-              <label>Participant ID</label>
-              <input
-                type="text"
-                value={participantInput}
-                onChange={(e) => setParticipantInput(e.target.value)}
-                onBlur={async () => {
-                  const trimmed = participantInput.trim() || 'researcher';
-                  setParticipantInput(trimmed);
-                  if (trimmed !== participantId) {
-                    setParticipantId(trimmed);
-                    try {
-                      await apiClient.setParticipant(trimmed);
-                      // Refresh canvas list for the new participant's directory
-                      const { sessions } = await apiClient.listSessions();
-                      useAppStore.getState().setCanvasList(sessions);
-                    } catch {/* silent */}
-                  }
-                }}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                placeholder="researcher"
-                style={{
-                  padding: '5px 10px', borderRadius: '6px',
-                  border: '1px solid var(--border)', background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)', fontSize: '12px', width: '140px',
-                }}
-              />
+          {/* Session — only shown to researcher (not URL-locked participants) */}
+          {!participantLockedFromUrl && (
+            <div className="settings-section">
+              <label className="settings-label">Session</label>
+              <div className="settings-row">
+                <label>Participant ID</label>
+                <input
+                  type="text"
+                  value={participantInput}
+                  onChange={(e) => setParticipantInput(e.target.value)}
+                  onBlur={async () => {
+                    const trimmed = participantInput.trim() || 'researcher';
+                    setParticipantInput(trimmed);
+                    if (trimmed !== participantId) {
+                      setParticipantId(trimmed);
+                      try {
+                        await apiClient.setParticipant(trimmed);
+                        const { sessions } = await apiClient.listSessions();
+                        useAppStore.getState().setCanvasList(sessions);
+                      } catch {/* silent */}
+                    }
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                  placeholder="researcher"
+                  style={{
+                    padding: '5px 10px', borderRadius: '6px',
+                    border: '1px solid var(--border)', background: 'var(--bg-primary)',
+                    color: 'var(--text-primary)', fontSize: '12px', width: '140px',
+                  }}
+                />
+              </div>
             </div>
-            <p className="settings-hint" style={{ fontSize: '10px', marginTop: '4px', opacity: 0.6 }}>
-              Session data saved to backend/data/{participantId}/sessions/
-            </p>
-          </div>
+          )}
 
-          {/* Study Mode */}
-          <div className="settings-section">
-            <label className="settings-label">Study Mode</label>
-            <label className="settings-toggle">
-              <input
-                type="checkbox"
-                checked={studyMode}
-                onChange={(e) => setStudyMode(e.target.checked)}
-              />
-              Side-view only (no multi-view, no mood boards)
-            </label>
-            <p className="settings-hint" style={{ fontSize: '10px', marginTop: '4px', opacity: 0.6 }}>
-              Disables satellite view generation, mood boards, and the multi-view editor
-            </p>
-          </div>
+          {/* Study Mode — only shown to researcher */}
+          {!participantLockedFromUrl && (
+            <div className="settings-section">
+              <label className="settings-label">Study Mode</label>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={studyMode}
+                  onChange={(e) => setStudyMode(e.target.checked)}
+                />
+                Side-view only (no multi-view, no mood boards)
+              </label>
+              <p className="settings-hint" style={{ fontSize: '10px', marginTop: '4px', opacity: 0.6 }}>
+                Disables satellite view generation, mood boards, and the multi-view editor
+              </p>
+            </div>
+          )}
 
           {/* Generation */}
           <div className="settings-section">

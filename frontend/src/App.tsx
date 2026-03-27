@@ -19,18 +19,21 @@ import { MoodBoardDialog } from "./components/MoodBoardDialog/MoodBoardDialog";
 import { RadialDial } from "./components/RadialDial/RadialDial";
 import { ExplorationTreeModal } from "./components/ExplorationTreeModal/ExplorationTreeModal";
 import { DynamicIsland } from "./components/DynamicIsland/DynamicIsland";
-import { DesignBriefOverlay } from "./components/DesignBriefOverlay/DesignBriefOverlay";
+import { DesignBriefOverlay, commitBriefExternal } from "./components/DesignBriefOverlay/DesignBriefOverlay";
 import { InlineAxisSuggestions } from "./components/InlineAxisSuggestions/InlineAxisSuggestions";
 import { ConfirmDialog } from "./components/ConfirmDialog/ConfirmDialog";
 import { OnboardingTour } from "./components/OnboardingTour/OnboardingTour";
 import { MultiViewEditor } from "./components/MultiViewEditor/MultiViewEditor";
 import { AxisTuningRail } from "./components/AxisTuningRail/AxisTuningRail";
+import { FeedbackNotepad } from "./components/FeedbackNotepad/FeedbackNotepad";
 import { useAppStore } from "./store/appStore";
 import type { ImageData, ShoeViewType } from "./types";
 import { useAgentBehaviors } from "./hooks/useAgentBehaviors";
 import { useAutoSave } from "./hooks/useAutoSave";
 import { useEventLog } from "./hooks/useEventLog";
-import { apiClient } from "./api/client";
+import { apiClient, _registerParticipantIdGetter } from "./api/client";
+// Register getter so axios interceptor can read participantId without require()
+_registerParticipantIdGetter(() => useAppStore.getState().participantId || 'researcher');
 import { falClient, extractBriefConstraint, SATELLITE_VIEWS } from "./api/falClient";
 import { generateAllViews } from "./utils/generateAllViews";
 import "./styles/app.css";
@@ -66,6 +69,52 @@ export const App: React.FC = () => {
   const [showBatchPromptDialog, setShowBatchPromptDialog] = useState(false);
   const [showExternalImageLoader, setShowExternalImageLoader] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+
+  // Shared login handler: authenticate → load most recent canvas (if any)
+  const handleLogin = async (username: string, password: string) => {
+    const res = await apiClient.login(username, password);
+    useAppStore.getState().setParticipantId(res.participantId);
+    if (res.role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
+
+    // Load the participant's last-active canvas (or most recent if marker missing)
+    try {
+      const resp = await apiClient.listSessions();
+      const sessions = resp.sessions;
+      const lastActiveId = (resp as any).lastActiveCanvasId;
+      useAppStore.getState().setCanvasList(sessions);
+      if (sessions.length > 0) {
+        // Prefer the last-active canvas; fall back to most recently updated
+        const target = (lastActiveId && sessions.find((s: any) => s.id === lastActiveId))
+          || [...sessions].sort((a: any, b: any) =>
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          )[0];
+        console.log(`[login] Loading canvas: "${target.name}" (${target.id})`);
+        const loaded = await apiClient.loadSession(target.id);
+        useAppStore.getState().setCurrentCanvasId(loaded.canvasId);
+        useAppStore.getState().setCanvasName(loaded.canvasName);
+        if (loaded.state?.images) setImages(loaded.state.images);
+        if (loaded.state?.history_groups) setHistoryGroups(loaded.state.history_groups);
+        if (loaded.state?.axis_labels) useAppStore.getState().setAxisLabels(loaded.state.axis_labels);
+        if (loaded.state?.design_brief) useAppStore.getState().setDesignBrief(loaded.state.design_brief);
+      } else {
+        // No existing canvases — fetch default state (fresh canvas)
+        const session = await apiClient.getCurrentSession();
+        useAppStore.getState().setCurrentCanvasId(session.canvasId);
+        useAppStore.getState().setCanvasName(session.canvasName);
+      }
+    } catch (err) {
+      console.warn('[login] Failed to load sessions, using default canvas:', err);
+    }
+
+    apiClient.logEvent('login', { participantId: res.participantId, role: res.role });
+    // Persist login so browser refresh doesn't require re-login
+    sessionStorage.setItem('sc_auth', JSON.stringify({ participantId: res.participantId, role: res.role }));
+    setShowLoginPrompt(false);
+  };
   // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
   const setCurrentBrief = useAppStore((s) => s.setDesignBrief);
   // AxisSuggestionModal removed — axes now shown via InlineAxisSuggestions + Dynamic Island
@@ -154,6 +203,32 @@ export const App: React.FC = () => {
   }, [layers, imageLayerMap]);
 
   useEffect(() => {
+    // Lock participant identity from URL param (e.g. ?participant=Alice)
+    const urlParticipant = new URLSearchParams(window.location.search).get('participant');
+    if (urlParticipant) {
+      useAppStore.getState().setParticipantId(urlParticipant);
+      useAppStore.getState().setParticipantLockedFromUrl(true);
+      apiClient.setParticipant(urlParticipant).catch(() => {});
+    } else {
+      // Check sessionStorage for persisted login (survives refresh)
+      const savedAuth = sessionStorage.getItem('sc_auth');
+      if (savedAuth) {
+        try {
+          const { participantId, role } = JSON.parse(savedAuth);
+          useAppStore.getState().setParticipantId(participantId);
+          if (role === 'admin') useAppStore.getState().setParticipantLockedFromUrl(false);
+          // Re-authenticate with backend so server state matches
+          apiClient.setParticipant(participantId).catch(() => {});
+          console.log(`[auth] Restored session for ${participantId} from sessionStorage`);
+        } catch {
+          setShowLoginPrompt(true);
+        }
+      } else {
+        // No URL param, no saved session — show login form
+        setShowLoginPrompt(true);
+      }
+    }
+
     // Initialize CLIP on mount
     console.log("🚀 Initializing CLIP embedder...");
 
@@ -968,6 +1043,52 @@ export const App: React.FC = () => {
             <DynamicIsland />
             {/* Design Brief floating overlay */}
             <DesignBriefOverlay />
+            {/* Empty canvas guidance overlay */}
+            {isInitialized && images.length === 0 && (
+              <div className="empty-canvas-overlay">
+                <p className="empty-canvas-message">
+                  Start exploring — middle-click anywhere or use a button below
+                </p>
+                <div className="empty-canvas-actions">
+                  <button
+                    className="empty-canvas-btn empty-canvas-btn-primary"
+                    onClick={() => setShowTextToImageDialog(true)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+                    </svg>
+                    Generate New Shoe
+                  </button>
+                  <button
+                    className="empty-canvas-btn"
+                    onClick={() => setShowExternalImageLoader(true)}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                    Load Files
+                  </button>
+                </div>
+                <div className="empty-canvas-inspiration">
+                  <p className="empty-canvas-inspiration-label">or set a design direction →</p>
+                  <div className="empty-canvas-chips">
+                    {[
+                      { label: '🌿  Material Shift', brief: 'I want to explore how a shoe concept shifts across a Biomimetic Organic ↔ Machined Aerospace axis — building out the design space between these two material extremes.' },
+                      { label: '🌳  Branch a Lineage', brief: 'Start with a single baseline shoe and branch it into a large family of variations. I want to explore how small design decisions diverge into very different directions across multiple generations.' },
+                      { label: '⚡  Opposite Worlds', brief: 'I want to combine two opposite design directions — one highly geometric and structural, one fluid and organic — and explore the creative space between them.' },
+                    ].map(({ label, brief }) => (
+                      <button
+                        key={label}
+                        className="empty-canvas-chip"
+                        onClick={() => commitBriefExternal(brief)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Canvas view toggle (Semantic | Lineage) */}
             <CanvasViewToggle />
             {/* Axis Tuning Rail overlay */}
@@ -1367,6 +1488,81 @@ export const App: React.FC = () => {
         <BottomDrawer />
       </div>
 
+      {/* Login — shown on direct URL access (no ?participant= param) */}
+      {showLoginPrompt && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#161b22', border: '1px solid #30363d', borderRadius: '12px',
+            padding: '36px 40px', width: '360px', display: 'flex', flexDirection: 'column', gap: '16px',
+          }}>
+            <div style={{ fontSize: '18px', fontWeight: 700, color: '#e6edf3' }}>Sign in</div>
+            <div style={{ fontSize: '12px', color: '#8b949e', lineHeight: 1.5 }}>
+              Enter the username and password provided by the researcher.
+            </div>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Username"
+              value={loginUsername}
+              onChange={(e) => { setLoginUsername(e.target.value); setLoginError(''); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (document.getElementById('login-password-input') as HTMLInputElement)?.focus(); }}
+              style={{
+                padding: '9px 12px', borderRadius: '8px',
+                border: `1px solid ${loginError ? '#f85149' : '#30363d'}`, background: '#0d1117',
+                color: '#e6edf3', fontSize: '13px', outline: 'none',
+              }}
+            />
+            <input
+              id="login-password-input"
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={(e) => { setLoginPassword(e.target.value); setLoginError(''); }}
+              onKeyDown={async (e) => {
+                if (e.key !== 'Enter' || !loginUsername.trim() || !loginPassword.trim()) return;
+                try {
+                  await handleLogin(loginUsername.trim(), loginPassword.trim());
+                } catch {
+                  setLoginError('Invalid username or password');
+                }
+              }}
+              style={{
+                padding: '9px 12px', borderRadius: '8px',
+                border: `1px solid ${loginError ? '#f85149' : '#30363d'}`, background: '#0d1117',
+                color: '#e6edf3', fontSize: '13px', outline: 'none',
+              }}
+            />
+            {loginError && (
+              <div style={{ fontSize: '12px', color: '#f85149' }}>{loginError}</div>
+            )}
+            <button
+              disabled={!loginUsername.trim() || !loginPassword.trim()}
+              onClick={async () => {
+                setLoginError('');
+                try {
+                  await handleLogin(loginUsername.trim(), loginPassword.trim());
+                } catch {
+                  setLoginError('Invalid username or password');
+                }
+              }}
+              style={{
+                padding: '9px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer',
+                background: loginUsername.trim() && loginPassword.trim() ? '#388bfd' : '#1c2a3a',
+                border: '1px solid #388bfd',
+                color: loginUsername.trim() && loginPassword.trim() ? '#fff' : '#555',
+                fontWeight: 600,
+              }}
+            >
+              Sign in
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Settings Modal */}
       <SettingsModal
         isOpen={showSettingsModal}
@@ -1383,6 +1579,9 @@ export const App: React.FC = () => {
         isOpen={showExplorationTreeModal}
         onClose={() => setShowExplorationTreeModal(false)}
       />
+
+      {/* Floating feedback notepad — always visible for study participants */}
+      <FeedbackNotepad />
 
       {/* Multi-View Editor overlay */}
       {multiViewTarget && (
@@ -1507,7 +1706,7 @@ export const App: React.FC = () => {
                 : hiddenImageIds.length > 0
                 ? `Unhide all ${hiddenImageIds.length} hidden image(s)`
                 : "No images selected to hide",
-            category: "view",
+            category: "global",
             onClick: () => {
               if (selectedImageIds.length > 0) {
                 useAppStore.getState().hideImages([...selectedImageIds]);
@@ -1524,7 +1723,7 @@ export const App: React.FC = () => {
               selectedImageIds.length > 0
                 ? `Remove ${selectedImageIds.length} selected image(s)`
                 : "Clear all images from canvas",
-            category: "global",
+            category: "danger",
             onClick: () => {
               if (selectedImageIds.length > 0) {
                 const ids = [...selectedImageIds];
@@ -1545,11 +1744,30 @@ export const App: React.FC = () => {
             },
           },
           {
+            id: "export",
+            icon: "↓",
+            label: selectedImageIds.length > 0 ? `Save ${selectedImageIds.length} Image${selectedImageIds.length !== 1 ? 's' : ''}` : "Save Image",
+            description: selectedImageIds.length > 0
+              ? `Download ${selectedImageIds.length} selected image(s) to disk`
+              : "Select images first to save them",
+            category: "system",
+            onClick: () => {
+              const imgs = images.filter(img => selectedImageIds.includes(img.id));
+              if (imgs.length === 0) return;
+              imgs.forEach((img) => {
+                const a = document.createElement('a');
+                a.href = `data:image/png;base64,${img.base64_image}`;
+                a.download = `shoe_${img.id}.png`;
+                a.click();
+              });
+            },
+          },
+          {
             id: "settings",
             icon: "🔧",
             label: "Settings",
             description: "App & visual preferences",
-            category: "global",
+            category: "system",
             onClick: () => setShowSettingsModal(true),
           },
         ].filter(a => !useAppStore.getState().studyMode || a.id !== 'mood-board') as import('./components/RadialDial/RadialDial').RadialDialAction[]}

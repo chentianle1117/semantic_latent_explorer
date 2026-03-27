@@ -12,6 +12,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { useProgressStore } from '../../store/progressStore';
 import { apiClient } from '../../api/client';
+import { cancelPendingSave } from '../../hooks/useAutoSave';
 import './CanvasSwitcher.css';
 
 export const CanvasSwitcher: React.FC = () => {
@@ -73,6 +74,8 @@ export const CanvasSwitcher: React.FC = () => {
 
   const handleSwitchCanvas = async (canvasId: string) => {
     if (canvasId === currentCanvasId || isSwitching) return;
+    // Cancel any pending auto-save timer to prevent cross-canvas corruption
+    cancelPendingSave();
     setIsOpen(false);
     setIsSwitching(true);
     const ps = useProgressStore.getState();
@@ -121,9 +124,11 @@ export const CanvasSwitcher: React.FC = () => {
     setIsOpen(false);
     const name = window.prompt('New canvas name:', 'Canvas ' + (canvasList.length + 2));
     if (!name) return;
+    cancelPendingSave(); // prevent stale auto-save from firing after switch
     try {
       apiClient.logEvent('canvas_switch', { fromCanvasId: currentCanvasId, action: 'new', newName: name });
       const result = await apiClient.newCanvas(name);
+      apiClient.logEvent('canvas_created', { canvasId: result.canvasId, canvasName: result.canvasName, fromCanvasId: currentCanvasId });
       setMinimapDots([]);
       setMinimapGhostDots([]);
       setIsolatedImageIds(null);
@@ -143,8 +148,10 @@ export const CanvasSwitcher: React.FC = () => {
     setIsOpen(false);
     const name = window.prompt('Branch canvas name:', canvasName + ' – Branch');
     if (!name) return;
+    cancelPendingSave(); // prevent stale auto-save from firing after switch
     try {
       const result = await apiClient.branchCanvas(name, selectedImageIds);
+      apiClient.logEvent('branch_created', { newCanvasId: result.canvasId, newCanvasName: result.canvasName, fromCanvasId: currentCanvasId, imageCount: selectedImageIds.length, imageIds: selectedImageIds });
       // Reload state from backend after branch
       const loadResult = await apiClient.loadSession(result.canvasId);
       const s = loadResult.state;
@@ -182,8 +189,21 @@ export const CanvasSwitcher: React.FC = () => {
   const handleDeleteCanvas = async (canvasId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!window.confirm('Delete this canvas? This cannot be undone.')) return;
+    cancelPendingSave(); // prevent stale auto-save if deleting active canvas
     try {
-      await apiClient.deleteSession(canvasId);
+      const result = await apiClient.deleteSession(canvasId);
+      // If we deleted the active canvas, backend auto-switched — reload state
+      if (result.switchedTo) {
+        const freshState = await apiClient.getState();
+        const session = await apiClient.getCurrentSession();
+        useAppStore.setState({
+          images: freshState.images,
+          canvasBounds: null,
+          currentCanvasId: session.canvasId,
+          canvasName: session.canvasName,
+        });
+        if (freshState.history_groups) useAppStore.getState().setHistoryGroups(freshState.history_groups);
+      }
       await refreshList();
     } catch (err) {
       alert(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);

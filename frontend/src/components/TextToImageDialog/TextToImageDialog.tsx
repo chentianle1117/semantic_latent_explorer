@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '../../store/appStore';
 import { apiClient } from '../../api/client';
 import { ImageCountSlider } from '../ImageCountSlider/ImageCountSlider';
@@ -11,17 +11,24 @@ import './TextToImageDialog.css';
 interface TextToImageDialogProps {
   onClose: () => void;
   onGenerate: (prompt: string, count: number, shoeType?: string) => void;
+  initialPrompt?: string;
 }
 
 export const TextToImageDialog: React.FC<TextToImageDialogProps> = ({
   onClose,
   onGenerate,
+  initialPrompt,
 }) => {
   // Selected tag chips: tag text → category key
   const [selectedTags, setSelectedTags] = useState<Map<string, string>>(new Map());
   // Free-form additional text
-  const [freeText, setFreeText] = useState('');
-  const [imageCount, setImageCount] = useState(2);
+  const [freeText, setFreeText] = useState(initialPrompt ?? '');
+
+  // If an inspiration prompt was passed in, pre-fill on mount
+  useEffect(() => {
+    if (initialPrompt) setFreeText(initialPrompt);
+  }, [initialPrompt]);
+  const [imageCount, setImageCount] = useState(1);
   // All available pills from SuggestionsPanel (kept for future use)
   const [_availablePills, setAvailablePills] = useState<PillDef[]>([]);
 

@@ -11,10 +11,43 @@ import type {
   WebSocketMessage,
   SuggestTagsResponse,
   ViewAnalysisResponse,
+  BriefHighlight,
 } from '../types';
 
 const API_BASE = '/api';
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+
+// Lazy getter — resolves after all modules are initialized (avoids circular dep at parse time)
+let _getParticipantId: (() => string) | null = null;
+export function _registerParticipantIdGetter(fn: () => string) { _getParticipantId = fn; }
+
+// Inject X-Participant-Id on every outgoing request so the backend
+// can isolate per-participant state for concurrent users.
+axios.interceptors.request.use((config) => {
+  const pid = _getParticipantId ? _getParticipantId() : 'researcher';
+  config.headers = config.headers ?? {};
+  config.headers['X-Participant-Id'] = pid;
+  return config;
+});
+
+// Global interceptor: extract FastAPI error detail and log it clearly
+axios.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (axios.isAxiosError(err)) {
+      const status = err.response?.status ?? 'network error';
+      const url = err.config?.url ?? '?';
+      const method = (err.config?.method ?? 'GET').toUpperCase();
+      const detail =
+        err.response?.data?.detail ??
+        err.response?.data?.message ??
+        err.response?.data ??
+        err.message;
+      console.error(`[API] ${method} ${url} → ${status}`, detail);
+    }
+    return Promise.reject(err);
+  }
+);
 
 class APIClient {
   private ws: WebSocket | null = null;
@@ -206,6 +239,7 @@ class APIClient {
     interpretation: string;
     extracted: Array<{ key: string; label: string; value: string }>;
     unmentioned: Array<{ key: string; label: string; hint: string }>;
+    highlights: BriefHighlight[];
   }> {
     const response = await axios.post(`${API_BASE}/agent/interpret-brief`, { brief });
     return response.data;
@@ -353,13 +387,35 @@ class APIClient {
     return response.data;
   }
 
-  async deleteSession(canvasId: string): Promise<{ success: boolean; deleted: string }> {
+  async deleteSession(canvasId: string): Promise<{ success: boolean; deleted: string; switchedTo?: string }> {
     const response = await axios.post(`${API_BASE}/sessions/delete`, { canvas_id: canvasId });
     return response.data;
   }
 
   async setParticipant(participantId: string): Promise<{ participantId: string }> {
     const response = await axios.post(`${API_BASE}/session/set-participant`, { participant_id: participantId });
+    return response.data;
+  }
+
+  async login(username: string, password: string): Promise<{ success: boolean; participantId: string; role: string }> {
+    const response = await axios.post(`${API_BASE}/auth/login`, { username, password });
+    return response.data;
+  }
+
+  async submitFeedback(payload: {
+    category: string;
+    content: string;
+    userId: string;
+    context: { currentRoute: string; activeCanvasId: string; browser: string };
+  }): Promise<{ feedbackId: string }> {
+    const response = await axios.post(`${API_BASE}/feedback`, {
+      feedback_id: crypto.randomUUID(),
+      user_id: payload.userId,
+      timestamp: new Date().toISOString(),
+      category: payload.category,
+      content: payload.content,
+      context: payload.context,
+    });
     return response.data;
   }
 

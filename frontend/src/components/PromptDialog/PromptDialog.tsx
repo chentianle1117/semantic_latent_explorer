@@ -41,7 +41,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
   const [chipMap, setChipMap] = useState<Map<string, string>>(new Map());
   // Free-form text typed in the textarea (may contain @A/@B mentions)
   const [freeText, setFreeText] = useState('');
-  const [numImages, setNumImages] = useState(2);
+  const [numImages, setNumImages] = useState(1);
   const [showMentionDrop, setShowMentionDrop] = useState(false);
   const [dropdownIdx, setDropdownIdx] = useState(0);
   const [textScrollTop, setTextScrollTop] = useState(0);
@@ -99,7 +99,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
       if (labelIdx >= referenceImages.length) continue;
       if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
       parts.push(
-        <span key={match.index} style={{ color: REF_IMAGE_COLORS[labelIdx], fontWeight: 700 }}>
+        <span key={match.index} style={{ color: REF_IMAGE_COLORS[labelIdx] }}>
           {match[0]}
         </span>
       );
@@ -144,6 +144,7 @@ export const PromptDialog: React.FC<PromptDialogProps> = ({
     resolved = resolved.replace(/@[A-D]'s\b/gi, 'the reference image\'s').replace(/@[A-D]\b/gi, 'the reference image');
 
     const referenceIds = referenceImages.map(img => img.id);
+    apiClient.logEvent('reference_generation', { referenceIds, prompt: resolved, rawPrompt: composedPrompt, count: numImages, shoeType: shoeType.trim() || null });
     onGenerate(referenceIds, resolved, numImages, shoeType.trim() || undefined);
   };
 

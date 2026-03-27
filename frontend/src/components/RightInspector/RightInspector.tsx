@@ -244,6 +244,16 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
     }
   };
 
+  const handleExportSelected = () => {
+    const targets = selectedImages.length > 0 ? selectedImages : (inspectedImage ? [inspectedImage] : []);
+    targets.forEach((img) => {
+      const a = document.createElement('a');
+      a.href = `data:image/png;base64,${img.base64_image}`;
+      a.download = `shoe_${img.id}.png`;
+      a.click();
+    });
+  };
+
   const isHeroSelected = inspectedImageId != null && selectedImageIds.includes(inspectedImageId);
 
   return (
@@ -556,8 +566,15 @@ export const RightInspector: React.FC<RightInspectorProps> = ({
               </button>
             </div>
 
-            {/* Row 3: Remove + Deselect */}
+            {/* Row 3: Export + Remove + Deselect */}
             <div className="action-row">
+              <button
+                className="action-export"
+                onClick={handleExportSelected}
+                title={`Save ${selectedImages.length > 1 ? selectedImages.length + ' images' : 'image'} to local disk`}
+              >
+                ↓ Save{selectedImages.length > 1 ? ` (${selectedImages.length})` : ''}
+              </button>
               {onRemoveSelected && (
                 <button className="action-danger" onClick={onRemoveSelected} data-tour="action-remove">
                   Remove

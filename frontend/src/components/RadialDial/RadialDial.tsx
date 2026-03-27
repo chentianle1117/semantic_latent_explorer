@@ -7,13 +7,14 @@
 import React, { useEffect } from "react";
 import "./RadialDial.css";
 
-export type RadialDialCategory = "agentic" | "image" | "global" | "system";
+export type RadialDialCategory = "agentic" | "image" | "global" | "system" | "danger";
 
 const CATEGORY_META: Record<RadialDialCategory, { color: string; label: string }> = {
   agentic: { color: '#a855f7', label: 'Agent' },
   image:   { color: '#14b8a6', label: 'Create' },
   global:  { color: '#fbbf24', label: 'Canvas' },
   system:  { color: '#58a6ff', label: 'Utility' },
+  danger:  { color: '#f85149', label: 'Remove' },
 };
 
 const ARC_R = 52;   // inner arc radius — kept well inside button ring (buttons at RADIUS=100, 48px wide → inner edge at 76px)

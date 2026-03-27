@@ -19,13 +19,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Backend code
+# Backend code + models + config
 COPY backend/ ./backend/
+COPY models/ ./models/
+COPY config.py ./config.py
 
 # Built frontend from Stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Railway injects PORT at runtime
-EXPOSE 8000
+# Run from backend/ so relative imports (from models import ...) work
+WORKDIR /app/backend
 
-CMD sh -c "uvicorn backend.api:app --host 0.0.0.0 --port ${PORT:-8000}"
+CMD sh -c "uvicorn api:app --host 0.0.0.0 --port ${PORT:-8080}"

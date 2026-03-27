@@ -1,0 +1,236 @@
+/* ── FeedbackNotepad ─────────────────────────────────────────── */
+
+.fn-root {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none; /* children opt-in via pointer-events:all */
+}
+
+/* ── FAB ─────────────────────────────────────────────────────── */
+.fn-fab {
+  pointer-events: all;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #238636;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+
+.fn-fab:hover {
+  background: #2ea043;
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+}
+
+.fn-fab-open {
+  background: #388bfd;
+}
+
+.fn-fab-open:hover {
+  background: #58a6ff;
+}
+
+/* ── Popover ─────────────────────────────────────────────────── */
+.fn-popover {
+  pointer-events: all;
+  width: 320px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 14px;
+  animation: fn-pop-in 0.18s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+@keyframes fn-pop-in {
+  from { opacity: 0; transform: scale(0.88) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.fn-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fn-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e6edf3;
+  letter-spacing: 0.02em;
+}
+
+.fn-close {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.1s, background 0.1s;
+}
+
+.fn-close:hover {
+  color: #e6edf3;
+  background: rgba(255,255,255,0.08);
+}
+
+/* ── Select ──────────────────────────────────────────────────── */
+.fn-select {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: #c9d1d9;
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.fn-select:focus {
+  border-color: #388bfd;
+}
+
+/* ── Textarea ────────────────────────────────────────────────── */
+.fn-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: #e6edf3;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 90px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.fn-textarea:focus {
+  border-color: #388bfd;
+}
+
+.fn-textarea::placeholder {
+  color: #484f58;
+}
+
+/* ── Error ───────────────────────────────────────────────────── */
+.fn-error {
+  font-size: 11px;
+  color: #f85149;
+  padding: 4px 0 0;
+}
+
+/* ── Footer ──────────────────────────────────────────────────── */
+.fn-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 2px;
+}
+
+.fn-hint {
+  font-size: 10px;
+  color: #484f58;
+  user-select: none;
+}
+
+.fn-submit {
+  padding: 6px 18px;
+  border-radius: 6px;
+  border: none;
+  background: #238636;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 72px;
+  justify-content: center;
+}
+
+.fn-submit:hover:not(:disabled) {
+  background: #2ea043;
+}
+
+.fn-submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fn-submit-loading {
+  background: #238636;
+  cursor: default;
+}
+
+/* ── Spinner ─────────────────────────────────────────────────── */
+.fn-spinner {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: fn-spin 0.65s linear infinite;
+  display: inline-block;
+}
+
+@keyframes fn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.fn-toast {
+  position: fixed;
+  bottom: 84px;
+  right: 24px;
+  z-index: 10001;
+  background: #238636;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.fn-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}

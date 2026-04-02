@@ -1184,7 +1184,7 @@ async def root():
     """Serve frontend in production, API info in dev."""
     _dist = Path(__file__).resolve().parent.parent / "frontend" / "dist" / "index.html"
     if _dist.is_file():
-        return FileResponse(str(_dist))
+        return FileResponse(str(_dist), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
     return {"message": "Zappos Semantic Explorer API", "status": "running"}
 
 @app.get("/api/test")
@@ -4898,8 +4898,12 @@ if _frontend_dist.is_dir():
     async def serve_spa(full_path: str):
         file_path = _frontend_dist / full_path
         if file_path.is_file():
+            # Assets have content hashes — cache aggressively
+            if full_path.startswith("assets/"):
+                return FileResponse(str(file_path), headers={"Cache-Control": "public, max-age=31536000, immutable"})
             return FileResponse(str(file_path))
-        return FileResponse(str(_index_html))
+        # index.html must never be cached — it contains the JS/CSS hash references
+        return FileResponse(str(_index_html), headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 else:
     print(f"[SPA] WARNING: frontend dist not found! Contents of parent: {list((_frontend_dist.parent).iterdir()) if _frontend_dist.parent.is_dir() else 'parent missing'}")
 

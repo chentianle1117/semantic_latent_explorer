@@ -9,7 +9,7 @@
  * No popups — results appear directly on canvas.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useAppStore } from '../store/appStore';
 import { apiClient } from '../api/client';
 import { falClient, extractBriefConstraint } from '../api/falClient';
@@ -374,6 +374,8 @@ export function useAgentBehaviors() {
   // ─────────────────────────────────────────────────────────────
   // BEHAVIOR D: Axis Suggestions (session clock, 2-min interval)
   // ─────────────────────────────────────────────────────────────
+  const [isLoadingAxisSuggestions, setIsLoadingAxisSuggestions] = useState(false);
+
   const triggerAxisSuggestions = useCallback(async () => {
     const currentImages = imagesRef.current;
     const brief = designBriefRef.current;
@@ -383,12 +385,14 @@ export function useAgentBehaviors() {
       return;
     }
 
+    // Clear stale suggestions so user can re-trigger
     if (inlineAxisDataRef.current !== null) {
-      console.log('[Agent D] Skipping — previous axis suggestion still pending');
-      return;
+      useAppStore.getState().clearInlineAxisData();
     }
 
     console.log('[Agent D] Axis suggestion triggered');
+    setIsLoadingAxisSuggestions(true);
+    useAppStore.getState().setAgentWorkingLabel('Analyzing canvas for axis suggestions...');
 
     try {
       const currentX = useAppStore.getState().axisLabels.x.join(' - ');
@@ -411,9 +415,14 @@ export function useAgentBehaviors() {
           reasoning: s.reasoning,
         })));
         console.log('[Agent D] Axis suggestions set:', suggestions.length);
+      } else {
+        console.warn('[Agent D] No suggestions returned');
       }
     } catch (err) {
       console.error('[Agent D] Axis suggestions failed:', err);
+    } finally {
+      setIsLoadingAxisSuggestions(false);
+      useAppStore.getState().setAgentWorkingLabel('');
     }
   }, [setInlineAxisData]);
 
@@ -443,5 +452,6 @@ export function useAgentBehaviors() {
     triggerConcurrentGhosts,
     triggerExplorationGhosts,
     triggerAxisSuggestions,
+    isLoadingAxisSuggestions,
   };
 }

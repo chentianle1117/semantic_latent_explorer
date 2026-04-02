@@ -95,7 +95,7 @@ export function useAutoSave() {
 
     if (!force) {
       const now = Date.now();
-      if (now - lastSaveRef.current < 30_000) return; // 30s minimum between saves
+      if (now - lastSaveRef.current < 5_000) return; // 5s minimum between saves
     }
 
     isSavingRef.current = true;

@@ -27,6 +27,9 @@ export const AxisEditor: React.FC<AxisEditorProps> = ({
   expandedPositive = [],
   style,
 }) => {
+  const axisTuningMode = useAppStore(s => s.axisTuningMode);
+  const axisTuningAxis = useAppStore(s => s.axisTuningAxis);
+  const isTuningThisAxis = axisTuningMode && axisTuningAxis === axis;
   const [isEditing, setIsEditing] = useState(false);
   const [negative, setNegative] = useState(negativeLabel);
   const [positive, setPositive] = useState(positiveLabel);
@@ -109,17 +112,21 @@ export const AxisEditor: React.FC<AxisEditorProps> = ({
           </span>
           {(axis === "x" || axis === "y") && (
             <button
-              className="axis-tune-btn"
+              className={`axis-tune-btn${isTuningThisAxis ? ' active' : ''}`}
               data-tour="axis-tune-btn"
               onClick={(e) => {
                 e.stopPropagation();
                 const store = useAppStore.getState();
-                store.setAxisTuningMode(true);
-                store.setAxisTuningAxis(axis);
+                if (isTuningThisAxis) {
+                  store.clearAxisTuning();
+                } else {
+                  store.setAxisTuningMode(true);
+                  store.setAxisTuningAxis(axis);
+                }
               }}
-              title="Open axis tuning mode"
+              title={isTuningThisAxis ? "Exit tuning mode" : "Open axis tuning mode"}
             >
-              Tune
+              {isTuningThisAxis ? 'Exit Tune' : 'Tune'}
             </button>
           )}
           <span className="axis-label-block">

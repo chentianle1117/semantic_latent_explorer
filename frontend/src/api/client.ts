@@ -377,7 +377,7 @@ class APIClient {
     return response.data;
   }
 
-  async listSessions(): Promise<{ sessions: Array<{ id: string; name: string; participantId: string; createdAt: string; updatedAt: string; parentCanvasId: string | null; imageCount: number }> }> {
+  async listSessions(): Promise<{ sessions: Array<{ id: string; name: string; participantId: string; createdAt: string; updatedAt: string; parentCanvasId: string | null; imageCount: number }>; lastActiveCanvasId?: string }> {
     const response = await axios.get(`${API_BASE}/sessions/list`);
     return response.data;
   }

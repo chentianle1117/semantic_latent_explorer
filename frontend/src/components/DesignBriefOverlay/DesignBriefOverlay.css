@@ -5,9 +5,13 @@
   z-index: 50;
   width: 460px;
   max-width: calc(100vw - 48px);
-  pointer-events: all;
+  pointer-events: none; /* let clicks pass through to canvas/tuning rail */
   border-radius: 4px;
   transition: box-shadow 0.4s ease;
+}
+/* Re-enable pointer events on interactive children */
+.design-brief-overlay > * {
+  pointer-events: auto;
 }
 
 /* Active glow: pulses when Gemini is using the brief */

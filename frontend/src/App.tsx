@@ -280,18 +280,48 @@ export const App: React.FC = () => {
           );
         }
         useProgressStore.getState().hideProgress();
-        // Load canvas session metadata
+        // Load canvas session metadata, auto-load last active canvas if available
         return Promise.all([
           apiClient.getCurrentSession(),
           apiClient.listSessions(),
-        ]).then(async ([session, { sessions }]) => {
-          useAppStore.getState().setCurrentCanvasId(session.canvasId);
-          useAppStore.getState().setCanvasName(session.canvasName);
-          useAppStore.getState().setParticipantId(session.participantId);
+        ]).then(async ([session, { sessions, lastActiveCanvasId }]) => {
           useAppStore.getState().setCanvasList(sessions);
 
+          // If there's a saved canvas on disk, load it instead of the fresh empty one
+          const targetCanvasId = lastActiveCanvasId
+            || (sessions.length > 0 ? sessions[0].id : null);  // fallback to most recent
+
+          if (targetCanvasId && sessions.some(s => s.id === targetCanvasId)) {
+            try {
+              console.log(`[init] Auto-loading last active canvas: ${targetCanvasId}`);
+              const loaded = await apiClient.loadSession(targetCanvasId);
+              const s = loaded.state;
+              if (s.images && s.images.length > 0) {
+                setImages(s.images);
+                setHistoryGroups(s.history_groups || []);
+                if (s.axis_labels) useAppStore.getState().setAxisLabels(s.axis_labels);
+                if (s.design_brief) useAppStore.getState().setDesignBrief(s.design_brief);
+              }
+              useAppStore.getState().setCurrentCanvasId(loaded.canvasId);
+              useAppStore.getState().setCanvasName(loaded.canvasName);
+              useAppStore.getState().setParticipantId(session.participantId);
+              console.log(`[init] Loaded canvas "${loaded.canvasName}" with ${s.images?.length || 0} images`);
+            } catch (err) {
+              console.warn('[init] Failed to load last active canvas, using default:', err);
+              useAppStore.getState().setCurrentCanvasId(session.canvasId);
+              useAppStore.getState().setCanvasName(session.canvasName);
+              useAppStore.getState().setParticipantId(session.participantId);
+            }
+          } else {
+            useAppStore.getState().setCurrentCanvasId(session.canvasId);
+            useAppStore.getState().setCanvasName(session.canvasName);
+            useAppStore.getState().setParticipantId(session.participantId);
+          }
+
           // Load per-canvas onboarding progress from localStorage
-          useAppStore.getState().loadOnboardingState(session.canvasId);
+          useAppStore.getState().loadOnboardingState(
+            useAppStore.getState().currentCanvasId
+          );
 
           // Tutorial starts on-demand via "?" button — no auto-start on page load
         }).catch(() => {/* session endpoints optional */});

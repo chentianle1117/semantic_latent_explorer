@@ -118,7 +118,7 @@ export const App: React.FC = () => {
   // Agent/AI state — designBrief lives in Zustand store (replaces local useState)
   const setCurrentBrief = useAppStore((s) => s.setDesignBrief);
   // AxisSuggestionModal removed — axes now shown via InlineAxisSuggestions + Dynamic Island
-  const isLoadingAxes = isLoadingAxisSuggestions;
+  // isLoadingAxes is set after useAgentBehaviors() hook below
   const [showLabels, setShowLabels] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const [showClusters, setShowClusters] = useState(false);
@@ -190,6 +190,7 @@ export const App: React.FC = () => {
   const completeOnboardingStep = useAppStore((s) => s.completeOnboardingStep);
 
   const { triggerConcurrentGhosts, triggerExplorationGhosts, triggerAxisSuggestions, isLoadingAxisSuggestions } = useAgentBehaviors();
+  const isLoadingAxes = isLoadingAxisSuggestions;
   useAutoSave();
   useEventLog();
 

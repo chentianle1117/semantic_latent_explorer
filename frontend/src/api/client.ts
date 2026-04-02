@@ -198,16 +198,16 @@ class APIClient {
     this.ws.onclose = () => {
       console.log('WebSocket disconnected');
       if (this.wsCallbacks.size === 0) return;
-      if (this.wsReconnectAttempts >= ApiClient.WS_MAX_RETRIES) {
-        console.warn(`[WebSocket] Max reconnect attempts (${ApiClient.WS_MAX_RETRIES}) reached — stopping`);
+      if (this.wsReconnectAttempts >= APIClient.WS_MAX_RETRIES) {
+        console.warn(`[WebSocket] Max reconnect attempts (${APIClient.WS_MAX_RETRIES}) reached — stopping`);
         return;
       }
       const delay = Math.min(
-        ApiClient.WS_BASE_DELAY * Math.pow(2, this.wsReconnectAttempts),
-        ApiClient.WS_MAX_DELAY,
+        APIClient.WS_BASE_DELAY * Math.pow(2, this.wsReconnectAttempts),
+        APIClient.WS_MAX_DELAY,
       );
       this.wsReconnectAttempts++;
-      console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.wsReconnectAttempts}/${ApiClient.WS_MAX_RETRIES})`);
+      console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.wsReconnectAttempts}/${APIClient.WS_MAX_RETRIES})`);
       setTimeout(() => {
         if (this.wsCallbacks.size > 0) {
           this.connectWebSocket(Array.from(this.wsCallbacks)[0]);

@@ -1193,27 +1193,53 @@ async def health():
 # All fal.ai calls routed through backend so FAL_KEY stays server-side.
 # Uses asyncio.to_thread to avoid blocking the event loop during long generations.
 
-def _fal_sync_call(endpoint: str, input_data: dict) -> dict:
-    """Blocking HTTP call to fal.ai synchronous endpoint."""
+def _fal_sync_call(endpoint: str, input_data: dict, retries: int = 3, delay: float = 4.0) -> dict:
+    """Blocking HTTP call to fal.ai synchronous endpoint.
+    Retries on transient errors (502, 503, 504, timeouts, connection errors)."""
+    import time
     fal_key = os.getenv("FAL_KEY", "")
-    resp = requests.post(
-        f"https://fal.run/{endpoint}",
-        headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
-        json=input_data,
-        timeout=180,
-    )
-    if not resp.ok:
-        # Extract fal.ai's error body for readable diagnosis
+    last_status = None
+    last_detail = ""
+    for attempt in range(1, retries + 1):
         try:
-            err_body = resp.json()
-        except Exception:
-            err_body = resp.text[:500]
-        print(f"[fal-proxy] ERROR {resp.status_code} from {endpoint}: {err_body}")
-        raise HTTPException(
-            status_code=resp.status_code,
-            detail=f"fal.ai {endpoint} → {resp.status_code}: {err_body}",
-        )
-    return resp.json()
+            resp = requests.post(
+                f"https://fal.run/{endpoint}",
+                headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
+                json=input_data,
+                timeout=180,
+            )
+            if resp.ok:
+                return resp.json()
+            # Extract error body
+            try:
+                err_body = resp.json()
+            except Exception:
+                err_body = resp.text[:500]
+            last_status = resp.status_code
+            last_detail = f"fal.ai {endpoint} → {resp.status_code}: {err_body}"
+            # Only retry on transient server errors
+            if resp.status_code in (502, 503, 504) and attempt < retries:
+                print(f"[fal-proxy] {endpoint} attempt {attempt}/{retries} got {resp.status_code}, retrying in {delay}s...")
+                time.sleep(delay)
+                continue
+            # Non-retryable error (400, 401, 422, etc.) — fail immediately
+            print(f"[fal-proxy] ERROR {resp.status_code} from {endpoint}: {err_body}")
+            raise HTTPException(status_code=resp.status_code, detail=last_detail)
+        except HTTPException:
+            raise
+        except Exception as e:
+            last_status = 502
+            last_detail = f"fal.ai {endpoint} connection error: {e}"
+            if attempt < retries:
+                print(f"[fal-proxy] {endpoint} attempt {attempt}/{retries} failed ({e}), retrying in {delay}s...")
+                time.sleep(delay)
+                continue
+    # All retries exhausted
+    print(f"[fal-proxy] ERROR all {retries} attempts failed for {endpoint}")
+    raise HTTPException(
+        status_code=last_status or 502,
+        detail=f"Generation failed after {retries} attempts. Please try again. ({last_detail})",
+    )
 
 
 @app.post("/api/fal/run")
@@ -2813,14 +2839,24 @@ async def add_external_images(request: AddExternalImagesRequest):
                     raise HTTPException(status_code=400, detail=f"Failed to decode image {i+1}: {str(e)}")
             elif is_http_url:
                 print(f"  Downloading from HTTP URL: {url[:50]}...")
-                try:
-                    response = requests.get(url, timeout=30)
-                    response.raise_for_status()
-                    img = Image.open(BytesIO(response.content))
-                    print(f"  [OK] Image {i+1} downloaded (size: {img.size})")
-                except Exception as e:
-                    print(f"  [ERROR] downloading: {e}")
-                    raise HTTPException(status_code=400, detail=f"Failed to download image {i+1}: {str(e)}")
+                import time as _time
+                _dl_err = None
+                for _dl_attempt in range(1, 4):
+                    try:
+                        response = requests.get(url, timeout=30)
+                        response.raise_for_status()
+                        img = Image.open(BytesIO(response.content))
+                        print(f"  [OK] Image {i+1} downloaded (size: {img.size})")
+                        _dl_err = None
+                        break
+                    except Exception as e:
+                        _dl_err = e
+                        if _dl_attempt < 3:
+                            print(f"  [WARN] Image {i+1} download attempt {_dl_attempt}/3 failed ({e}), retrying in 3s...")
+                            _time.sleep(3)
+                if _dl_err:
+                    print(f"  [ERROR] downloading after 3 attempts: {_dl_err}")
+                    raise HTTPException(status_code=400, detail=f"Failed to download image {i+1} after 3 attempts: {str(_dl_err)}")
             else:
                 print(f"  [ERROR] Unsupported URL format: {url[:100]}")
                 raise HTTPException(status_code=400, detail=f"Unsupported URL format for image {i+1}: {url[:100]}")
@@ -3673,9 +3709,22 @@ async def embed_ghost_image(request: Request):
             img_bytes = base64.b64decode(encoded)
             img = Image.open(BytesIO(img_bytes))
         elif image_url.startswith("http://") or image_url.startswith("https://"):
-            resp = requests.get(image_url, timeout=30)
-            resp.raise_for_status()
-            img = Image.open(BytesIO(resp.content))
+            import time as _time
+            _dl_err = None
+            for _dl_attempt in range(1, 4):
+                try:
+                    resp = requests.get(image_url, timeout=30)
+                    resp.raise_for_status()
+                    img = Image.open(BytesIO(resp.content))
+                    _dl_err = None
+                    break
+                except Exception as e:
+                    _dl_err = e
+                    if _dl_attempt < 3:
+                        print(f"  [WARN] Ghost image download attempt {_dl_attempt}/3 failed ({e}), retrying in 3s...")
+                        _time.sleep(3)
+            if _dl_err:
+                raise HTTPException(status_code=502, detail=f"Failed to download ghost image after 3 attempts: {_dl_err}")
         else:
             raise HTTPException(status_code=400, detail="Unsupported URL format")
 

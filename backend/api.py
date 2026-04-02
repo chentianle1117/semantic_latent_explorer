@@ -24,25 +24,36 @@ import json
 import tempfile
 
 
-def remove_background(image_bytes: bytes) -> bytes:
-    """Remove background via fal.ai's rembg REST API (replaces local rembg/PyTorch)."""
+def remove_background(image_bytes: bytes, retries: int = 3, delay: float = 3.0) -> bytes:
+    """Remove background via fal.ai's rembg REST API (replaces local rembg/PyTorch).
+    Retries up to `retries` times on transient errors (502, 503, connection issues)."""
+    import time
     fal_key = os.getenv("FAL_KEY", "")
     b64_input = base64.b64encode(image_bytes).decode()
     data_url = f"data:image/png;base64,{b64_input}"
-    resp = requests.post(
-        "https://fal.run/fal-ai/imageutils/rembg",
-        headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
-        json={"image_url": data_url},
-        timeout=60,
-    )
-    resp.raise_for_status()
-    result = resp.json()
-    img_url = result.get("image", {}).get("url", "")
-    if not img_url:
-        raise RuntimeError(f"fal.ai rembg returned no image URL: {result}")
-    img_resp = requests.get(img_url, timeout=30)
-    img_resp.raise_for_status()
-    return img_resp.content
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.post(
+                "https://fal.run/fal-ai/imageutils/rembg",
+                headers={"Authorization": f"Key {fal_key}", "Content-Type": "application/json"},
+                json={"image_url": data_url},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            img_url = result.get("image", {}).get("url", "")
+            if not img_url:
+                raise RuntimeError(f"fal.ai rembg returned no image URL: {result}")
+            img_resp = requests.get(img_url, timeout=30)
+            img_resp.raise_for_status()
+            return img_resp.content
+        except Exception as e:
+            last_err = e
+            if attempt < retries:
+                print(f"  [WARN] remove_background attempt {attempt}/{retries} failed ({e}), retrying in {delay}s...")
+                time.sleep(delay)
+    raise last_err
 
 
 class _NumpyEncoder(json.JSONEncoder):
@@ -2822,13 +2833,15 @@ async def add_external_images(request: AddExternalImagesRequest):
                 img_bytes = BytesIO()
                 img.save(img_bytes, format='PNG')
                 img_bytes.seek(0)
-
-                output_bytes = remove_background(img_bytes.getvalue())
-
-                img = Image.open(BytesIO(output_bytes))
-                if img.mode != 'RGBA':
+                try:
+                    output_bytes = remove_background(img_bytes.getvalue())
+                    img = Image.open(BytesIO(output_bytes))
+                    if img.mode != 'RGBA':
+                        img = img.convert('RGBA')
+                    print(f"  OK: Background removed from image {i+1} (transparent)")
+                except Exception as rembg_err:
+                    print(f"  [WARN] remove_background failed after retries ({rembg_err}), adding image without BG removal")
                     img = img.convert('RGBA')
-                print(f"  OK: Background removed from image {i+1} (transparent)")
             else:
                 # Preserve RGBA transparency (agent ghost images already have BG removed).
                 # Only normalise exotic modes (P, CMYK, etc.) to RGB.

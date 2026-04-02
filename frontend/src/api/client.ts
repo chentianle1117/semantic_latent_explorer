@@ -52,6 +52,10 @@ axios.interceptors.response.use(
 class APIClient {
   private ws: WebSocket | null = null;
   private wsCallbacks: Set<(message: WebSocketMessage) => void> = new Set();
+  private wsReconnectAttempts = 0;
+  private static WS_MAX_RETRIES = 10;
+  private static WS_BASE_DELAY = 3000; // ms
+  private static WS_MAX_DELAY = 60000; // ms
 
   // Initialize CLIP only (for fal.ai mode)
   async initializeClipOnly(): Promise<void> {
@@ -184,6 +188,7 @@ class APIClient {
 
     this.ws.onopen = () => {
       console.log('WebSocket connected');
+      this.wsReconnectAttempts = 0; // reset on successful connection
     };
 
     this.ws.onerror = (error) => {
@@ -192,12 +197,22 @@ class APIClient {
 
     this.ws.onclose = () => {
       console.log('WebSocket disconnected');
-      // Attempt to reconnect after 3 seconds
+      if (this.wsCallbacks.size === 0) return;
+      if (this.wsReconnectAttempts >= ApiClient.WS_MAX_RETRIES) {
+        console.warn(`[WebSocket] Max reconnect attempts (${ApiClient.WS_MAX_RETRIES}) reached — stopping`);
+        return;
+      }
+      const delay = Math.min(
+        ApiClient.WS_BASE_DELAY * Math.pow(2, this.wsReconnectAttempts),
+        ApiClient.WS_MAX_DELAY,
+      );
+      this.wsReconnectAttempts++;
+      console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${this.wsReconnectAttempts}/${ApiClient.WS_MAX_RETRIES})`);
       setTimeout(() => {
         if (this.wsCallbacks.size > 0) {
           this.connectWebSocket(Array.from(this.wsCallbacks)[0]);
         }
-      }, 3000);
+      }, delay);
     };
   }
 

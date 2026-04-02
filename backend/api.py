@@ -98,6 +98,15 @@ if gemini_api_key:
 else:
     print("[WARNING] GOOGLE_API_KEY not found in .env file")
 
+# Gemini helper: all generate_content calls go through this to enforce timeout
+GEMINI_TIMEOUT = 60  # seconds
+def _gemini_generate(model, content, **kwargs):
+    """Wrapper around model.generate_content() with a default timeout."""
+    request_options = kwargs.pop("request_options", {})
+    if "timeout" not in request_options:
+        request_options["timeout"] = GEMINI_TIMEOUT
+    return model.generate_content(content, request_options=request_options, **kwargs)
+
 # Add parent directory to Python path to import models
 parent_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(parent_dir))
@@ -611,8 +620,8 @@ def _log_event_to_file(entry: dict):
         try:
             with open(state.event_log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, cls=_NumpyEncoder) + "\n")
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[ERROR] Failed to write event log to {state.event_log_path}: {e}")
 
 
 def _deserialize_canvas(data: dict) -> None:
@@ -1366,7 +1375,7 @@ Example for "elegant":
 
 Now generate {num_expansions} descriptions for "{concept}":"""
 
-        response = gemini_model.generate_content(prompt)
+        response = _gemini_generate(gemini_model, prompt)
         text = (getattr(response, "text", None) or "").strip()
         # Strip markdown code block if present (Gemini often returns ```json\n[...]\n```)
         if text.startswith("```"):
@@ -1639,7 +1648,7 @@ Rewrite each group of sentences to reflect the user's instruction. Rules:
 Example output:
 {{"x_negative": ["sentence1", "sentence2", "sentence3", "sentence4"], "x_positive": [...]}}"""
 
-        response = gemini_model.generate_content(prompt)
+        response = _gemini_generate(gemini_model, prompt)
         text = (getattr(response, "text", None) or "").strip()
         if text.startswith("```"):
             text = re.sub(r"^```(?:json)?\s*\n?", "", text)
@@ -1821,7 +1830,7 @@ Return JSON ONLY (no markdown):
 }}"""
 
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
+        response = _gemini_generate(model, prompt)
         text = (getattr(response, "text", None) or "").strip()
         if text.startswith("```"):
             text = text.split("```")[1]
@@ -1886,7 +1895,7 @@ Write as if a designer is describing their shoe concept — specific, evocative,
 
     try:
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
+        response = _gemini_generate(model, prompt)
         brief = (getattr(response, "text", None) or "").strip()
         # Persist in state so it's included in future prompts
         state.design_brief = brief
@@ -2027,7 +2036,7 @@ Return JSON ONLY (no markdown):
                 else:
                     print(f"[suggest_tags] WARNING: no image data for id={img.id}, skipping")
 
-            response = model.generate_content(content)
+            response = _gemini_generate(model, content)
             text = (getattr(response, "text", None) or "").strip()
             if text.startswith("```"):
                 text = text.split("```")[1]
@@ -2172,7 +2181,7 @@ Return JSON ONLY (no markdown):
                     print(f"[suggest_tags] mood-board-reference: WARNING no image data for id={img.id}, skipping")
 
             print(f"[suggest_tags] mood-board-reference: sending {len(content)-1} images to Gemini")
-            response = model.generate_content(content)
+            response = _gemini_generate(model, content)
             text = (getattr(response, "text", None) or "").strip()
             if text.startswith("```"):
                 text = text.split("```")[1]
@@ -2248,7 +2257,7 @@ Return JSON ONLY (no markdown):
   ]
 }}"""
 
-            response = model.generate_content(prompt_text)
+            response = _gemini_generate(model, prompt_text)
             text = (getattr(response, "text", None) or "").strip()
             if text.startswith("```"):
                 text = text.split("```")[1]
@@ -2292,7 +2301,7 @@ Return JSON ONLY (no markdown):
   ]
 }}"""
 
-            response = model.generate_content(prompt_text)
+            response = _gemini_generate(model, prompt_text)
             text = (getattr(response, "text", None) or "").strip()
             if text.startswith("```"):
                 text = text.split("```")[1]
@@ -2459,7 +2468,7 @@ Return ONLY valid JSON, no markdown fences:
             except Exception as img_err:
                 print(f"[analyze-views] failed to load {vt}: {img_err}")
 
-        response = model.generate_content(content)
+        response = _gemini_generate(model, content)
         text = (getattr(response, "text", None) or "").strip()
         if text.startswith("```"):
             text = text.split("```")[1]
@@ -2531,7 +2540,7 @@ BAD: "Component: toe cap, Descriptor: pointed" (just listing — not natural lan
 
 Return ONLY the prompt text, no JSON, no quotes, no explanation."""
 
-        response = model.generate_content(prompt)
+        response = _gemini_generate(model, prompt)
         text = (getattr(response, "text", None) or "").strip().strip('"').strip("'")
         print(f"[compose-edit-prompt] result: {text[:100]}...")
         return {"prompt": text}
@@ -2560,7 +2569,7 @@ Write as a descriptive phrase, not a list.
 Return JSON ONLY: {{"prompt": "..."}}"""
 
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt_text)
+        response = _gemini_generate(model, prompt_text)
         text = (getattr(response, "text", None) or "").strip()
         if text.startswith("```"):
             text = text.split("```")[1]
@@ -2701,9 +2710,9 @@ Return JSON ONLY (no markdown): {{"prompt": "..."}}"""
                     content.append(resized)
                 except Exception:
                     pass
-            response = model.generate_content(content)
+            response = _gemini_generate(model, content)
         else:
-            response = model.generate_content(prompt_text)
+            response = _gemini_generate(model, prompt_text)
 
         text = (getattr(response, "text", None) or "").strip()
         if text.startswith("```"):
@@ -3179,7 +3188,7 @@ Return JSON ONLY (no markdown):
 }}"""
 
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
+        response = _gemini_generate(model, prompt)
 
         json_match = re.search(r'\{[\s\S]*\}', response.text)
         if json_match:
@@ -3296,7 +3305,7 @@ Return JSON ONLY (no markdown, no code blocks):
 Remember: EVERY x_axis and y_axis value MUST contain " - " (space-dash-space)."""
 
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        response = model.generate_content(prompt)
+        response = _gemini_generate(model, prompt)
 
         # Common semantic opposites for shoe design
         OPPOSITES = {
@@ -3642,7 +3651,7 @@ Be bold and specific. Push into corners of the design space that are visually em
             except Exception:
                 pass
 
-        response = model.generate_content(ghosts_content)
+        response = _gemini_generate(model, ghosts_content)
         text = response.text.strip()
 
         # Parse JSON from response
@@ -3887,7 +3896,7 @@ key_shifts should be 2-3 concise contrasts like "leather → mesh" or "muted →
                 content.append(grid_img)
             except Exception:
                 pass
-        response = model.generate_content(content)
+        response = _gemini_generate(model, content)
         text = response.text.strip()
 
         # Strip markdown if present

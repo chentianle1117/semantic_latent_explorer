@@ -85,6 +85,8 @@ export function useAutoSave() {
     return () => { _cancelPendingSave = null; };
   }, [clearPendingTimeout]);
 
+  const consecutiveFailsRef = useRef(0);
+
   const doSave = useCallback(async (force = false) => {
     if (isSavingRef.current) return;
     if (!isInitializedRef.current) return;
@@ -99,11 +101,27 @@ export function useAutoSave() {
     isSavingRef.current = true;
     lastSaveRef.current = Date.now();
     useAppStore.getState().setLastSaveStatus('saving');
-    try {
-      await apiClient.saveSession();
-      useAppStore.getState().setLastSaveStatus('saved');
-    } catch {
+
+    // Retry up to 3 times with exponential backoff (1s, 2s, 4s)
+    let saved = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await apiClient.saveSession();
+        useAppStore.getState().setLastSaveStatus('saved');
+        consecutiveFailsRef.current = 0;
+        saved = true;
+        break;
+      } catch (err) {
+        console.warn(`[auto-save] attempt ${attempt + 1}/3 failed:`, err);
+        if (attempt < 2) {
+          await new Promise(r => setTimeout(r, (1 << attempt) * 1000)); // 1s, 2s
+        }
+      }
+    }
+    if (!saved) {
+      consecutiveFailsRef.current++;
       useAppStore.getState().setLastSaveStatus('error');
+      console.error(`[auto-save] All 3 attempts failed (${consecutiveFailsRef.current} consecutive failures)`);
     }
     isSavingRef.current = false;
   }, []);
